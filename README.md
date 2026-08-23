@@ -14,7 +14,7 @@ npm run dev
 
 Abre `http://localhost:5173`.
 
-En internet (móvil, sin el PC): https://chirivin.github.io/techo/
+En internet (móvil, sin el PC): https://alexponcem.github.io/techo/
 
 ## Usarla en el móvil (misma Wi‑Fi)
 
