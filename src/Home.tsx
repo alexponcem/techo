@@ -13,6 +13,15 @@ const LIGHT_COPY: Record<Light, string> = {
   idle: 'Sin techo',
 }
 
+function alertLine(alert: EnvelopeView['alert'], pct: number): string {
+  if (alert === 'half') return `Pasó el 50% (${pct}%)`
+  if (alert === 'near') return `Se acerca al límite (${pct}%)`
+  if (alert === 'almost') return `Casi al límite (${pct}%)`
+  if (alert === 'limit') return 'Al límite'
+  if (alert === 'over') return 'Superó el techo'
+  return ''
+}
+
 export function Home({
   onOpen,
   onEnvelope,
@@ -31,8 +40,12 @@ export function Home({
   if (!cycle) return null
 
   const pace = paceFor(views, cycle)
-  const hot = views.filter((v) => v.alert === 'near' || v.alert === 'limit' || v.alert === 'over')
-  const atLimit = hot.filter((v) => v.alert === 'limit' || v.alert === 'over')
+  const hot = views.filter(
+    (v) => v.alert === 'near' || v.alert === 'almost' || v.alert === 'limit' || v.alert === 'over',
+  )
+  const over = hot.filter((v) => v.alert === 'over')
+  const atLimit = hot.filter((v) => v.alert === 'limit')
+  const almost = hot.filter((v) => v.alert === 'almost')
   const near = hot.filter((v) => v.alert === 'near')
   const capLine = pace.caps
     .filter((c) => c.remaining > 0)
@@ -64,14 +77,18 @@ export function Home({
       </header>
 
       {hot.length > 0 && (
-        <div className={`banner ${atLimit.length > 0 ? 'red' : 'orange'}`}>
-          {atLimit.length === 1 && (
+        <div className={`banner ${over.length + atLimit.length + almost.length > 0 ? 'red' : 'orange'}`}>
+          {over.length === 1 && <div>{over[0].env.name} superó el techo.</div>}
+          {over.length > 1 && <div>Superaron el techo: {over.map((v) => v.env.name).join(', ')}.</div>}
+          {atLimit.length === 1 && <div>{atLimit[0].env.name} está al límite.</div>}
+          {atLimit.length > 1 && <div>Al límite: {atLimit.map((v) => v.env.name).join(', ')}.</div>}
+          {almost.length === 1 && (
             <div>
-              {atLimit[0].env.name} está al límite ({atLimit[0].pct}%).
+              {almost[0].env.name} está casi al límite ({almost[0].pct}%).
             </div>
           )}
-          {atLimit.length > 1 && (
-            <div>Al límite: {atLimit.map((v) => v.env.name).join(', ')}.</div>
+          {almost.length > 1 && (
+            <div>Casi al límite: {almost.map((v) => v.env.name).join(', ')}.</div>
           )}
           {near.length === 1 && (
             <div>
@@ -128,6 +145,7 @@ export function Home({
             <button
               type="button"
               className="food-row"
+              id={`sobre-${v.env.id}`}
               key={v.env.id}
               onClick={() => onEnvelope(v.env.id)}
             >
@@ -146,6 +164,11 @@ export function Home({
                   }}
                 />
               </div>
+              {v.alert && (
+                <div className={`env-warn pill ${v.light}`} style={{ marginTop: 8, display: 'inline-flex' }}>
+                  {alertLine(v.alert, v.pct)}
+                </div>
+              )}
               <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
                 {v.week?.label ?? 'viernes → jueves'}
                 {v.env.id === 'comida'
@@ -209,7 +232,7 @@ function EnvelopeCard({
 }) {
   const { env, remaining, total, pct, light, paid } = view
   return (
-    <button className="env" onClick={onOpen}>
+    <button className="env" id={`sobre-${env.id}`} onClick={onOpen}>
       <div className="emoji">{env.emoji}</div>
       <div>
         <div className="name">{env.name}</div>
@@ -230,10 +253,7 @@ function EnvelopeCard({
       </div>
       {view.alert && (
         <div className={`env-warn pill ${light}`} style={{ justifySelf: 'start' }}>
-          {view.alert === 'half' && `Pasó el 50% (${pct}%)`}
-          {view.alert === 'near' && `Se acerca al límite (${pct}%)`}
-          {view.alert === 'limit' && `Al límite (${pct}%)`}
-          {view.alert === 'over' && `Superó el techo`}
+          {alertLine(view.alert, pct)}
         </div>
       )}
       {env.kind === 'fixed' && !paid && remaining > 0 && (

@@ -11,7 +11,7 @@ export function AddSheet({
   onClose,
 }: {
   presetId?: string
-  onClose: () => void
+  onClose: (saved?: boolean, envelopeId?: string) => void
 }) {
   const state = useAppState()
   const views = viewsFor(state)
@@ -32,7 +32,7 @@ export function AddSheet({
     if (isSavings) {
       if (!reasonOk) return
       addExpense(envelopeId, cents, `AHORRO: ${note.trim()}`)
-      onClose()
+      onClose(true, envelopeId)
       return
     }
     if (plan) {
@@ -40,7 +40,7 @@ export function AddSheet({
       return
     }
     addExpense(envelopeId, cents, note)
-    onClose()
+    onClose(true, envelopeId)
   }
 
   function acceptCover() {
@@ -59,15 +59,14 @@ export function AddSheet({
           ? { id: plan.savingsId, amount: plan.fromSavings, reason: reason.trim() }
           : undefined,
     })
-    onClose()
+    onClose(true, envelopeId)
   }
 
   return (
-    <Sheet title={isSavings ? 'Usar ahorro' : '¿Me cabe?'} onClose={onClose}>
+    <Sheet title={isSavings ? 'Usar ahorro' : '¿Me cabe?'} onClose={() => onClose()}>
       <label className="field">
         Importe
         <input
-          autoFocus
           inputMode="decimal"
           value={amount}
           onChange={(e) => {

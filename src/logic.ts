@@ -55,7 +55,7 @@ export interface WeekSlice {
   label: string
 }
 
-export type UsageAlert = 'half' | 'near' | 'limit' | 'over' | null
+export type UsageAlert = 'half' | 'near' | 'almost' | 'limit' | 'over' | null
 
 export interface EnvelopeView {
   env: Envelope
@@ -134,12 +134,10 @@ function usageStatus(
   remaining: number,
   week?: WeekSlice,
 ): { light: Light; alert: UsageAlert } {
-  if (env.kind === 'savings' || env.kind === 'fund') {
-    if (remaining < 0) return { light: 'red', alert: 'over' }
+  if (env.kind === 'fixed' || env.kind === 'savings' || env.kind === 'fund') {
+    if (env.kind !== 'fixed' && remaining < 0) return { light: 'red', alert: 'over' }
+    if (env.kind === 'fixed') return { light: 'green', alert: null }
     return { light: remaining > 0 ? 'green' : 'idle', alert: null }
-  }
-  if (env.kind === 'fixed' && remaining > 0) {
-    return { light: 'green', alert: null }
   }
   if (remaining < 0 || (total > 0 && spent > total)) {
     return { light: 'red', alert: 'over' }
@@ -148,21 +146,21 @@ function usageStatus(
 
   const pct = Math.round((spent / total) * 100)
   const fromPct = band(pct)
-  if (fromPct.alert === 'over' || fromPct.alert === 'limit' || fromPct.alert === 'near' || fromPct.alert === 'half') {
-    return fromPct
-  }
+  if (fromPct.alert) return fromPct
 
   if (week && week.target > 0) {
     const wp = Math.round((week.spent / week.target) * 100)
-    if (week.spent > week.target) return { light: 'red', alert: 'over' }
-    return band(wp)
+    const weekly = band(wp)
+    if (weekly.alert === 'over') return { light: 'red', alert: 'almost' }
+    return weekly
   }
   return { light: 'green', alert: null }
 }
 
 function band(pct: number): { light: Light; alert: UsageAlert } {
-  if (pct >= 100) return { light: 'red', alert: 'over' }
-  if (pct >= 90) return { light: 'red', alert: 'limit' }
+  if (pct > 100) return { light: 'red', alert: 'over' }
+  if (pct >= 100) return { light: 'red', alert: 'limit' }
+  if (pct >= 90) return { light: 'red', alert: 'almost' }
   if (pct >= 80) return { light: 'orange', alert: 'near' }
   if (pct >= 50) return { light: 'yellow', alert: 'half' }
   return { light: 'green', alert: null }
