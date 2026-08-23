@@ -1,0 +1,312 @@
+import { useSyncExternalStore } from 'react'
+import { suggestedNextPay, todayISO } from './dates'
+import { activeCycle, assigned, carryKinds, ensureRhythm, uid, withBalancedBuffer } from './logic'
+import { alexPlan } from './template'
+import type { AppState, Envelope, Settings, Tx } from './types'
+
+const KEY = 'techo.v1'
+
+const empty = (): AppState => ({
+  version: 1,
+  onboarded: false,
+  settings: { payMode: 'last-weekday', fixedDay: 1 },
+  template: alexPlan(),
+  envelopes: [],
+  cycles: [],
+  txs: [],
+})
+
+function load(): AppState {
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return empty()
+    const parsed = JSON.parse(raw) as AppState
+    if (parsed.version !== 1) return empty()
+    return {
+      ...parsed,
+      envelopes: parsed.envelopes.map(ensureRhythm),
+      template: parsed.template.map(ensureRhythm),
+    }
+  } catch {
+    return empty()
+  }
+}
+
+let state: AppState = load()
+const listeners = new Set<() => void>()
+
+function emit(next: AppState) {
+  state = next
+  localStorage.setItem(KEY, JSON.stringify(next))
+  listeners.forEach((l) => l())
+}
+
+export function getState(): AppState {
+  return state
+}
+
+export function subscribe(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+export function useAppState(): AppState {
+  return useSyncExternalStore(subscribe, getState, getState)
+}
+
+export function resetAll() {
+  localStorage.removeItem(KEY)
+  emit(empty())
+}
+
+export function startFirstCycle(input: {
+  income: number
+  startedAt: string
+  expectedEndAt: string
+  settings: Settings
+  template: Envelope[]
+  savingsOpening?: number
+}) {
+  const saved = input.savingsOpening ?? 0
+  const template = withBalancedBuffer(input.template, input.income).map((e) => ({
+    ...ensureRhythm(e),
+    opening: e.kind === 'savings' ? saved : 0,
+  }))
+  const cycleId = uid()
+  emit({
+    version: 1,
+    onboarded: true,
+    settings: input.settings,
+    template: template.map((e) => ({ ...e, opening: 0 })),
+    envelopes: template,
+    cycles: [
+      {
+        id: cycleId,
+        startedAt: input.startedAt,
+        expectedEndAt: input.expectedEndAt,
+        income: input.income,
+      },
+    ],
+    txs: [],
+  })
+}
+
+function pushTx(tx: Omit<Tx, 'id' | 'cycleId' | 'at'> & { at?: string }) {
+  const cycle = activeCycle(state)
+  if (!cycle) return
+  const next: Tx = {
+    id: uid(),
+    cycleId: cycle.id,
+    at: tx.at ?? new Date().toISOString(),
+    type: tx.type,
+    envelopeId: tx.envelopeId,
+    toEnvelopeId: tx.toEnvelopeId,
+    amount: tx.amount,
+    note: tx.note,
+  }
+  emit({ ...state, txs: [...state.txs, next] })
+}
+
+export function addExpense(envelopeId: string, amount: number, note: string) {
+  if (amount <= 0) return
+  pushTx({ type: 'expense', envelopeId, amount, note })
+}
+
+export function coverAndSpend(input: {
+  envelopeId: string
+  amount: number
+  note: string
+  fromLibre?: { id: string; amount: number }
+  fromSavings?: { id: string; amount: number; reason: string }
+}) {
+  const cycle = activeCycle(state)
+  if (!cycle || input.amount <= 0) return
+  const at = new Date().toISOString()
+  const extra: Tx[] = []
+  if (input.fromLibre && input.fromLibre.amount > 0) {
+    extra.push({
+      id: uid(),
+      cycleId: cycle.id,
+      at,
+      type: 'transfer',
+      envelopeId: input.fromLibre.id,
+      toEnvelopeId: input.envelopeId,
+      amount: input.fromLibre.amount,
+      note: 'Extra cubierto con Libre',
+    })
+  }
+  if (input.fromSavings && input.fromSavings.amount > 0) {
+    extra.push({
+      id: uid(),
+      cycleId: cycle.id,
+      at,
+      type: 'transfer',
+      envelopeId: input.fromSavings.id,
+      toEnvelopeId: input.envelopeId,
+      amount: input.fromSavings.amount,
+      note: `AHORRO: ${input.fromSavings.reason}`,
+    })
+  }
+  extra.push({
+    id: uid(),
+    cycleId: cycle.id,
+    at,
+    type: 'expense',
+    envelopeId: input.envelopeId,
+    amount: input.amount,
+    note: input.note,
+  })
+  emit({ ...state, txs: [...state.txs, ...extra] })
+}
+
+export function addIncome(envelopeId: string, amount: number, note: string) {
+  if (amount <= 0) return
+  pushTx({ type: 'income', envelopeId, amount, note })
+}
+
+export function moveMoney(fromId: string, toId: string, amount: number, note: string) {
+  if (amount <= 0 || fromId === toId) return
+  pushTx({
+    type: 'transfer',
+    envelopeId: fromId,
+    toEnvelopeId: toId,
+    amount,
+    note,
+  })
+}
+
+export function undoLast() {
+  if (state.txs.length === 0) return
+  emit({ ...state, txs: state.txs.slice(0, -1) })
+}
+
+export function removeTx(id: string) {
+  emit({ ...state, txs: state.txs.filter((t) => t.id !== id) })
+}
+
+export function markPaid(envelopeId: string, remaining: number) {
+  if (remaining <= 0) return
+  pushTx({
+    type: 'expense',
+    envelopeId,
+    amount: remaining,
+    note: 'Pagado',
+  })
+}
+
+export function updatePlanned(id: string, planned: number) {
+  const cycle = activeCycle(state)
+  if (!cycle) return
+  const envelopes = withBalancedBuffer(
+    state.envelopes.map((e) => (e.id === id ? { ...e, planned } : e)),
+    cycle.income,
+  )
+  emit({
+    ...state,
+    envelopes,
+    template: state.template.map((t) => {
+      const match = envelopes.find((e) => e.id === t.id)
+      return match ? { ...t, planned: match.planned, name: match.name } : t
+    }),
+  })
+}
+
+export function renameEnvelope(id: string, name: string) {
+  emit({
+    ...state,
+    envelopes: state.envelopes.map((e) => (e.id === id ? { ...e, name } : e)),
+    template: state.template.map((e) => (e.id === id ? { ...e, name } : e)),
+  })
+}
+
+export function addEnvelope(env: Envelope) {
+  const cycle = activeCycle(state)
+  if (!cycle) return
+  const row = ensureRhythm(env)
+  const envelopes = withBalancedBuffer([...state.envelopes, row], cycle.income)
+  emit({
+    ...state,
+    envelopes,
+    template: withBalancedBuffer([...state.template, { ...row, opening: 0 }], cycle.income),
+  })
+}
+
+export function startNextCycle(
+  income: number,
+  startedAt: string,
+  expectedEndAt?: string,
+  leftoverToId?: string,
+) {
+  const current = activeCycle(state)
+  if (!current) return
+  const end =
+    expectedEndAt ??
+    suggestedNextPay(startedAt, state.settings.payMode, state.settings.fixedDay)
+
+  const leftoverById = new Map<string, number>()
+  for (const env of state.envelopes) {
+    leftoverById.set(env.id, env.opening + env.planned)
+  }
+  for (const t of state.txs.filter((x) => x.cycleId === current.id)) {
+    if (t.type === 'expense') {
+      leftoverById.set(t.envelopeId, (leftoverById.get(t.envelopeId) ?? 0) - t.amount)
+    }
+    if (t.type === 'income') {
+      leftoverById.set(t.envelopeId, (leftoverById.get(t.envelopeId) ?? 0) + t.amount)
+    }
+    if (t.type === 'transfer') {
+      leftoverById.set(t.envelopeId, (leftoverById.get(t.envelopeId) ?? 0) - t.amount)
+      if (t.toEnvelopeId) {
+        leftoverById.set(t.toEnvelopeId, (leftoverById.get(t.toEnvelopeId) ?? 0) + t.amount)
+      }
+    }
+  }
+
+  const savingsId = state.envelopes.find((e) => e.kind === 'savings')?.id ?? 'ahorro'
+  const destId = leftoverToId ?? savingsId
+  let extra = 0
+  const openings = new Map<string, number>()
+  for (const env of state.envelopes) {
+    const left = leftoverById.get(env.id) ?? 0
+    if (carryKinds(env.kind)) {
+      openings.set(env.id, Math.max(0, left))
+    } else {
+      extra += Math.max(0, left)
+    }
+  }
+  openings.set(destId, (openings.get(destId) ?? 0) + extra)
+
+  const template = withBalancedBuffer(
+    state.template.map((e) => ({ ...e, opening: 0 })),
+    income,
+  )
+  const envelopes = template.map((e) => ({
+    ...ensureRhythm(e),
+    opening: openings.get(e.id) ?? 0,
+  }))
+
+  const cycleId = uid()
+  emit({
+    ...state,
+    template,
+    envelopes,
+    cycles: [
+      ...state.cycles.map((c) =>
+        c.id === current.id ? { ...c, closedAt: todayISO() } : c,
+      ),
+      { id: cycleId, startedAt, expectedEndAt: end, income },
+    ],
+  })
+}
+
+export function updateSettings(settings: Settings) {
+  emit({ ...state, settings })
+}
+
+export function exportJson(): string {
+  return JSON.stringify(state, null, 2)
+}
+
+export function planFits(envelopes: Envelope[], income: number): boolean {
+  return assigned(envelopes.filter((e) => e.kind !== 'buffer')) <= income
+}
