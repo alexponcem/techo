@@ -56,7 +56,13 @@ export function AddSheet({
           : undefined,
       fromSavings:
         plan.fromSavings > 0 && plan.savingsId
-          ? { id: plan.savingsId, amount: plan.fromSavings, reason: reason.trim() }
+          ? {
+              id: plan.savingsId,
+              amount: plan.fromSavings,
+              reason: plan.goalFromSavings
+                ? note.trim() || view?.env.name || 'Fondo'
+                : reason.trim(),
+            }
           : undefined,
     })
     onClose(true, envelopeId)
@@ -121,25 +127,38 @@ export function AddSheet({
       <div className={`verdict ${verdict.status}`}>{verdict.message}</div>
       {confirm && plan && (
         <div className={plan.possible ? 'hint' : 'deficit'}>
-          {view ? (
+          {plan.goalFromSavings ? (
             <p>
-              En {view.env.name} caben {euros(Math.max(0, view.remaining))}. Este gasto se pasa
-              por {euros(plan.overflow)}.
+              {view?.env.name}: no hay dinero apartado en este fondo. Se descontarán{' '}
+              <b>{euros(plan.fromSavings)}</b> del ahorro. ¿De acuerdo?
             </p>
-          ) : null}
-          {plan.fromLibre > 0 && (
-            <p style={{ marginTop: 8 }}>
-              Se descontarán <b>{euros(plan.fromLibre)}</b> de Libre. ¿De acuerdo?
-            </p>
-          )}
-          {plan.fromSavings > 0 && (
-            <p style={{ marginTop: 8 }}>
-              Libre no alcanza. El resto (<b>{euros(plan.fromSavings)}</b>) saldría del ahorro
-              bloqueado. Segunda advertencia: hay que poner un motivo.
-            </p>
+          ) : (
+            <>
+              {view ? (
+                <p>
+                  En {view.env.name} caben {euros(Math.max(0, view.remaining))}. Este gasto se pasa
+                  por {euros(plan.overflow)}.
+                </p>
+              ) : null}
+              {plan.fromLibre > 0 && (
+                <p style={{ marginTop: 8 }}>
+                  Se descontarán <b>{euros(plan.fromLibre)}</b> de Libre. ¿De acuerdo?
+                </p>
+              )}
+              {plan.fromSavings > 0 && (
+                <p style={{ marginTop: 8 }}>
+                  Libre no alcanza. El resto (<b>{euros(plan.fromSavings)}</b>) saldría del ahorro
+                  bloqueado. Segunda advertencia: hay que poner un motivo.
+                </p>
+              )}
+            </>
           )}
           {!plan.possible && (
-            <p style={{ marginTop: 8 }}>No hay suficiente en Libre + Ahorro para cubrir el extra.</p>
+            <p style={{ marginTop: 8 }}>
+              {plan.goalFromSavings
+                ? 'No hay suficiente ahorro para este gasto.'
+                : 'No hay suficiente en Libre + Ahorro para cubrir el extra.'}
+            </p>
           )}
           {plan.needsSavingsReason && plan.possible && (
             <label className="field" style={{ marginTop: 10 }}>
@@ -172,7 +191,13 @@ export function AddSheet({
           disabled={!envelopeId || cents <= 0 || (isSavings && !reasonOk)}
           onClick={trySave}
         >
-          {isSavings ? 'Usar ahorro con este motivo' : plan ? 'Continuar (hay extra)' : 'Anotar gasto'}
+          {isSavings
+            ? 'Usar ahorro con este motivo'
+            : plan?.goalFromSavings
+              ? 'Continuar (sale del ahorro)'
+              : plan
+                ? 'Continuar (hay extra)'
+                : 'Anotar gasto'}
         </button>
       )}
     </Sheet>

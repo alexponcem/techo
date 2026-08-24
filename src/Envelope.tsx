@@ -65,8 +65,10 @@ export function EnvelopeScreen({ id, onBack, onAdd }: { id: string; onBack: () =
           ? 'No entra en el gasto diario. Compras del sábado (y extras). Techo mensual 130 € → 130 ÷ 4,5 semanas ≈ 29 €/semana.'
           : env.id === 'futbol'
             ? 'No se paga de golpe. Anotas cada partido (viernes o sábado). Techo 25 €/mes ≈ 6 €/semana. Si un mes juegas más, el extra sale de Libre.'
-            : env.kind === 'savings'
-              ? 'Bloqueado. Se acumula. Si lo necesitas de verdad, úsalo con un motivo escrito.'
+            : env.kind === 'fund'
+              ? 'Si el fondo está vacío, el gasto sale del ahorro (para eso ahorras). Si quieres apartar antes de gastar, usa Mover desde Ahorro.'
+              : env.kind === 'savings'
+              ? 'Bloqueado. Se acumula. Viajes y ropa salen de aquí. Un imprevisto también, con motivo.'
               : KIND_HINT[env.kind]}
       </p>
       <div className="actions">

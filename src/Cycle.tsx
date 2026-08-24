@@ -49,8 +49,9 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
         Cerrar ciclo
       </h2>
       <p className="muted">
-        Los meses se acumulan. Lo que sobre de cada sobre (comida, fútbol, ocio,
-        cuotas, libre) no se tira: lo mandas al ahorro o a un fondo (viajes/ropa).
+        Si no llegas al techo de comida, fútbol u ocio, ese dinero no se pierde: al
+        cerrar el ciclo pasa al ahorro (o a viajes/ropa, si lo eliges). Viajes y
+        ropa, si están vacíos, los gastos ya salieron del ahorro.
       </p>
       <div className="math">
         {views.map((v) => (

@@ -174,6 +174,7 @@ export interface CoverPlan {
   savingsId?: string
   possible: boolean
   needsSavingsReason: boolean
+  goalFromSavings: boolean
 }
 
 export function coverPlan(views: EnvelopeView[], envelopeId: string, amount: number): CoverPlan | null {
@@ -185,6 +186,21 @@ export function coverPlan(views: EnvelopeView[], envelopeId: string, amount: num
 
   const libre = views.find((v) => v.env.kind === 'buffer')
   const savings = views.find((v) => v.env.kind === 'savings')
+  const savingsLeft = Math.max(0, savings?.remaining ?? 0)
+
+  if (view.env.kind === 'fund') {
+    return {
+      overflow,
+      fromLibre: 0,
+      fromSavings: overflow,
+      libreId: libre?.env.id,
+      savingsId: savings?.env.id,
+      possible: overflow <= savingsLeft,
+      needsSavingsReason: false,
+      goalFromSavings: true,
+    }
+  }
+
   let rest = overflow
   let fromLibre = 0
   if (view.env.kind !== 'buffer' && libre) {
@@ -192,7 +208,6 @@ export function coverPlan(views: EnvelopeView[], envelopeId: string, amount: num
     rest -= fromLibre
   }
   const fromSavings = rest
-  const savingsLeft = Math.max(0, savings?.remaining ?? 0)
   return {
     overflow,
     fromLibre,
@@ -201,6 +216,7 @@ export function coverPlan(views: EnvelopeView[], envelopeId: string, amount: num
     savingsId: savings?.env.id,
     possible: fromSavings <= savingsLeft,
     needsSavingsReason: fromSavings > 0,
+    goalFromSavings: false,
   }
 }
 
@@ -342,10 +358,17 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number): Verd
     }
   }
   if (view.env.kind === 'fund') {
+    if (remainingAfter >= 0) {
+      return {
+        status: 'ok',
+        remainingAfter,
+        message: `Sale de lo apartado en ${view.env.name}. Quedarían ${fmt(remainingAfter)} en el fondo.`,
+      }
+    }
     return {
-      status: 'ok',
+      status: 'tight',
       remainingAfter,
-      message: `Sale del fondo ${view.env.name}. Quedarían ${fmt(remainingAfter)}.`,
+      message: `En ${view.env.name} no hay apartado. Este gasto sale del ahorro.`,
     }
   }
   if (remainingAfter <= view.total * 0.2 || view.pct >= 80) {

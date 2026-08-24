@@ -37,14 +37,14 @@ export const KIND_LABEL: Record<Envelope['kind'], string> = {
   savings: 'Ahorro protegido',
   fixed: 'Cuota',
   cap: 'Techo',
-  fund: 'Fondo',
-  buffer: 'Residual / libre',
+  fund: 'Fondo (sale del ahorro)',
+  buffer: 'Imprevistos',
 }
 
 export const KIND_HINT: Record<Envelope['kind'], string> = {
   savings: 'Se reserva primero y se acumula ciclo a ciclo. No se reinicia al cobrar.',
   fixed: 'Importe conocido. Márcalo pagado cuando salga.',
-  cap: 'Límite del ciclo. Si no lo gastas, sobra.',
-  fund: 'No hace falta techo cada mes. Crece con lo que muevas y se guarda.',
-  buffer: 'Lo que queda después de ahorro, cuotas y techos. Si no lo gastas, pasa a ahorro o a fondos.',
+  cap: 'Límite del ciclo. Si no lo gastas, al cerrar el mes pasa al ahorro.',
+  fund: 'No tiene techo mensual. Si el fondo está vacío, el gasto sale del ahorro. Puedes apartar antes con Mover.',
+  buffer: 'Colchón pequeño para imprevistos. No es ocio. Si no lo usas, al cerrar el mes va al ahorro.',
 }

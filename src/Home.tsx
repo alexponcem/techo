@@ -3,14 +3,17 @@ import { formatRange } from './dates'
 import { euros } from './money'
 import { KIND_LABEL } from './template'
 import { markPaid, useAppState } from './store'
-import type { Light, Sheet as SheetState } from './types'
+import type { Sheet as SheetState } from './types'
 
-const LIGHT_COPY: Record<Light, string> = {
-  green: 'Bien',
-  yellow: '50%',
-  orange: '80%',
-  red: '90%',
-  idle: 'Sin techo',
+function pillLabel(view: EnvelopeView): string {
+  if (view.paid) return 'Pagado'
+  if (view.env.kind === 'fund') {
+    return view.remaining > 0 ? 'Apartado' : view.spent > 0 ? 'Del ahorro' : 'Vacío'
+  }
+  if (view.light === 'green') return 'Bien'
+  if (view.light === 'idle') return '—'
+  if (view.alert === 'limit') return '100%'
+  return `${Math.max(0, view.pct)}%`
 }
 
 function alertLine(alert: EnvelopeView['alert'], pct: number): string {
@@ -59,7 +62,10 @@ export function Home({
       title: 'Día a día',
       items: views.filter((v) => rhythmOf(v.env) === 'daily'),
     },
-    { title: 'Fondos', items: views.filter((v) => v.env.kind === 'fund') },
+    {
+      title: 'Viajes y ropa (salen del ahorro)',
+      items: views.filter((v) => v.env.kind === 'fund'),
+    },
   ]
 
   return (
@@ -237,16 +243,18 @@ function EnvelopeCard({
       <div>
         <div className="name">{env.name}</div>
         <div className="meta">
-          {rhythmOf(env) === 'weekly'
-            ? `Semanal · mes ${euros(view.spent)} / ${euros(total)}`
-            : KIND_LABEL[env.kind]}
-          {rhythmOf(env) !== 'weekly' && total > 0 ? ` · ${pct}% usado` : ''}
+          {env.kind === 'fund'
+            ? `Fondo · gastado ${euros(view.spent)} este ciclo`
+            : rhythmOf(env) === 'weekly'
+              ? `Semanal · mes ${euros(view.spent)} / ${euros(total)}`
+              : KIND_LABEL[env.kind]}
+          {env.kind !== 'fund' && rhythmOf(env) !== 'weekly' && total > 0 ? ` · ${pct}% usado` : ''}
           {env.opening > 0 ? ` · traes ${euros(env.opening)}` : ''}
         </div>
       </div>
       <div className="right">
         <div className="remain">{euros(remaining)}</div>
-        <span className={`pill ${light}`}>{paid ? 'Pagado' : LIGHT_COPY[light]}</span>
+        <span className={`pill ${light}`}>{pillLabel(view)}</span>
       </div>
       <div className={`bar ${light}`}>
         <span style={{ width: `${Math.min(100, pct)}%` }} />
