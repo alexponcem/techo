@@ -31,10 +31,24 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
   const [sheet, setSheet] = useState<Sheet>(null)
   const scrollY = useRef(0)
+  const lastEnvelope = useRef<string | undefined>(undefined)
 
   function openSheet(next: NonNullable<Sheet>) {
     scrollY.current = window.scrollY
     setSheet(next)
+  }
+
+  function openEnvelope(id: string) {
+    scrollY.current = window.scrollY
+    lastEnvelope.current = id
+    setScreen({ name: 'envelope', id })
+  }
+
+  function backHome() {
+    const y = scrollY.current
+    const id = lastEnvelope.current
+    setScreen({ name: 'home' })
+    restoreScroll(y, id)
   }
 
   function closeSheet(saved?: boolean, envelopeId?: string) {
@@ -57,7 +71,7 @@ export default function App() {
       {screen.name === 'home' && (
         <Home
           onOpen={openSheet}
-          onEnvelope={(id) => setScreen({ name: 'envelope', id })}
+          onEnvelope={openEnvelope}
           onSettings={() => setScreen({ name: 'settings' })}
           onCycle={() => setScreen({ name: 'cycle' })}
         />
@@ -65,7 +79,7 @@ export default function App() {
       {screen.name === 'envelope' && (
         <EnvelopeScreen
           id={screen.id}
-          onBack={() => setScreen({ name: 'home' })}
+          onBack={backHome}
           onAdd={() => openSheet({ name: 'add', envelopeId: screen.id })}
         />
       )}

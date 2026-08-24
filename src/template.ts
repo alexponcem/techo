@@ -9,13 +9,15 @@ export function alexPlan(): Envelope[] {
     { id: 'arriendo', name: 'Arriendo', kind: 'fixed', planned: 43_000, emoji: '🏠', opening: 0, rhythm: 'none' },
     { id: 'transporte', name: 'Transporte', kind: 'fixed', planned: 4_920, emoji: '🚇', opening: 0, rhythm: 'none' },
     { id: 'movil', name: 'Plan móvil', kind: 'fixed', planned: 1_600, emoji: '📱', opening: 0, rhythm: 'none' },
+    { id: 'seguro', name: 'Seguro médico', kind: 'fixed', planned: 945, emoji: '🏥', opening: 0, rhythm: 'none' },
     { id: 'futbol', name: 'Fútbol', kind: 'cap', planned: 2_500, emoji: '⚽', opening: 0, rhythm: 'weekly' },
     { id: 'gym', name: 'GYM', kind: 'fixed', planned: 2_500, emoji: '🏋️', opening: 0, rhythm: 'none' },
     { id: 'comida', name: 'Comida', kind: 'cap', planned: 13_000, emoji: '🍽️', opening: 0, rhythm: 'weekly' },
     { id: 'ocio', name: 'Ocio', kind: 'cap', planned: 10_000, emoji: '🎬', opening: 0, rhythm: 'daily' },
     { id: 'viajes', name: 'Viajes', kind: 'fund', planned: 0, emoji: '✈️', opening: 0, rhythm: 'none' },
     { id: 'ropa', name: 'Ropa', kind: 'fund', planned: 0, emoji: '👕', opening: 0, rhythm: 'none' },
-    { id: 'libre', name: 'Libre', kind: 'buffer', planned: 1_580, emoji: '💧', opening: 0, rhythm: 'daily' },
+    { id: 'medicina', name: 'Medicina', kind: 'fund', planned: 0, emoji: '💊', opening: 0, rhythm: 'none' },
+    { id: 'libre', name: 'Libre', kind: 'buffer', planned: 635, emoji: '💧', opening: 0, rhythm: 'daily' },
   ]
 }
 
@@ -25,10 +27,12 @@ export function blankPlan(): Envelope[] {
     { id: 'arriendo', name: 'Arriendo', kind: 'fixed', planned: 0, emoji: '🏠', opening: 0, rhythm: 'none' },
     { id: 'transporte', name: 'Transporte', kind: 'fixed', planned: 0, emoji: '🚇', opening: 0, rhythm: 'none' },
     { id: 'movil', name: 'Plan móvil', kind: 'fixed', planned: 0, emoji: '📱', opening: 0, rhythm: 'none' },
+    { id: 'seguro', name: 'Seguro médico', kind: 'fixed', planned: 0, emoji: '🏥', opening: 0, rhythm: 'none' },
     { id: 'comida', name: 'Comida', kind: 'cap', planned: 0, emoji: '🍽️', opening: 0, rhythm: 'weekly' },
     { id: 'ocio', name: 'Ocio', kind: 'cap', planned: 0, emoji: '🎬', opening: 0, rhythm: 'daily' },
     { id: 'viajes', name: 'Viajes', kind: 'fund', planned: 0, emoji: '✈️', opening: 0, rhythm: 'none' },
     { id: 'ropa', name: 'Ropa', kind: 'fund', planned: 0, emoji: '👕', opening: 0, rhythm: 'none' },
+    { id: 'medicina', name: 'Medicina', kind: 'fund', planned: 0, emoji: '💊', opening: 0, rhythm: 'none' },
     { id: 'libre', name: 'Libre', kind: 'buffer', planned: 0, emoji: '💧', opening: 0, rhythm: 'daily' },
   ]
 }

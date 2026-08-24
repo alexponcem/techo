@@ -63,7 +63,7 @@ export function Home({
       items: views.filter((v) => rhythmOf(v.env) === 'daily'),
     },
     {
-      title: 'Viajes y ropa (salen del ahorro)',
+      title: 'Fondos (salen del ahorro)',
       items: views.filter((v) => v.env.kind === 'fund'),
     },
   ]

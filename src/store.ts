@@ -4,6 +4,46 @@ import { activeCycle, assigned, carryKinds, ensureRhythm, uid, withBalancedBuffe
 import { alexPlan } from './template'
 import type { AppState, Envelope, Settings, Tx } from './types'
 
+const SEGURO: Envelope = {
+  id: 'seguro',
+  name: 'Seguro médico',
+  kind: 'fixed',
+  planned: 945,
+  emoji: '🏥',
+  opening: 0,
+  rhythm: 'none',
+}
+
+const MEDICINA: Envelope = {
+  id: 'medicina',
+  name: 'Medicina',
+  kind: 'fund',
+  planned: 0,
+  emoji: '💊',
+  opening: 0,
+  rhythm: 'none',
+}
+
+function insertAfter(list: Envelope[], afterId: string, row: Envelope): Envelope[] {
+  const i = list.findIndex((e) => e.id === afterId)
+  if (i < 0) return [...list, row]
+  return [...list.slice(0, i + 1), row, ...list.slice(i + 1)]
+}
+
+function withMissingEnvelopes(list: Envelope[], income: number): Envelope[] {
+  let next = list.map(ensureRhythm)
+  let added = false
+  if (!next.some((e) => e.id === 'seguro')) {
+    next = insertAfter(next, 'movil', { ...SEGURO })
+    added = true
+  }
+  if (!next.some((e) => e.id === 'medicina')) {
+    next = insertAfter(next, 'ropa', { ...MEDICINA })
+    added = true
+  }
+  return added ? withBalancedBuffer(next, income) : next
+}
+
 const KEY = 'techo.v1'
 
 const empty = (): AppState => ({
@@ -22,11 +62,15 @@ function load(): AppState {
     if (!raw) return empty()
     const parsed = JSON.parse(raw) as AppState
     if (parsed.version !== 1) return empty()
-    return {
+    const cycle = [...parsed.cycles].reverse().find((c) => !c.closedAt)
+    const income = cycle?.income ?? parsed.cycles[0]?.income ?? 139_100
+    const migrated = {
       ...parsed,
-      envelopes: parsed.envelopes.map(ensureRhythm),
-      template: parsed.template.map(ensureRhythm),
+      envelopes: withMissingEnvelopes(parsed.envelopes, income),
+      template: withMissingEnvelopes(parsed.template, income),
     }
+    localStorage.setItem(KEY, JSON.stringify(migrated))
+    return migrated
   } catch {
     return empty()
   }
