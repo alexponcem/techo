@@ -317,6 +317,7 @@ export interface CycleReport {
   variableSpent: number
   variableCap: number
   savingsParts: { id: string; name: string; emoji: string; amount: number }[]
+  contributions: { id: string; name: string; emoji: string; amount: number }[]
   fixedSpent: number
 }
 
@@ -330,9 +331,15 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   const live = !cycle.closedAt
   const views = live ? viewsFor(state) : []
   const savings = views.find((v) => v.env.kind === 'savings')
-  const leftover = views
+  const leftoverRowsLive = views
     .filter((v) => v.env.kind === 'cap' || v.env.kind === 'buffer')
-    .reduce((s, v) => s + Math.max(0, v.remaining), 0)
+    .map((v) => ({
+      id: v.env.id,
+      name: v.env.name,
+      emoji: v.env.emoji,
+      amount: Math.max(0, v.remaining),
+    }))
+  const leftover = leftoverRowsLive.reduce((s, r) => s + r.amount, 0)
 
   const savingsGoal = live ? (savings?.env.planned ?? 0) : (cycle.savingsGoal ?? 0)
   const savingsId =
@@ -352,8 +359,10 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
           cap: v.total,
           remaining: Math.max(0, v.remaining),
         }))
-    : (state.template.filter((e) => e.kind === 'cap' || e.kind === 'buffer').map((e) => {
-        const s = txs.filter((t) => t.type === 'expense' && t.envelopeId === e.id).reduce((n, t) => n + t.amount, 0)
+    : state.template.filter((e) => e.kind === 'cap' || e.kind === 'buffer').map((e) => {
+        const s = txs
+          .filter((t) => t.type === 'expense' && t.envelopeId === e.id)
+          .reduce((n, t) => n + t.amount, 0)
         return {
           id: e.id,
           name: e.name,
@@ -362,7 +371,7 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
           cap: e.planned,
           remaining: Math.max(0, e.planned - s),
         }
-      }))
+      })
 
   const partsMap = new Map<string, number>()
   for (const t of txs) {
@@ -403,6 +412,23 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   const pileDown = live && savingsNow + leftover < savingsStart
   const variableSpent = variable.reduce((s, r) => s + r.spent, 0)
   const variableCap = variable.reduce((s, r) => s + r.cap, 0)
+  const leftoverParts = (live ? leftoverRowsLive : variable.map((v) => ({
+    id: v.id,
+    name: v.name,
+    emoji: v.emoji,
+    amount: v.remaining,
+  }))).filter((r) => r.amount > 0)
+  const contributions = [
+    ...(savingsGoal > 0
+      ? [{ id: 'ahorro-meta', name: 'Ahorro apartado', emoji: '🌱', amount: savingsGoal }]
+      : []),
+    ...leftoverParts.map((r) => ({
+      id: r.id,
+      name: `Sobra de ${r.name}`,
+      emoji: r.emoji,
+      amount: r.amount,
+    })),
+  ]
   const fixedSpent = txs
     .filter((t) => {
       if (t.type !== 'expense') return false
@@ -458,6 +484,7 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
     variableSpent,
     variableCap,
     savingsParts,
+    contributions,
     fixedSpent,
   }
 }

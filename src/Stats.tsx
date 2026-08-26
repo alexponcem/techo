@@ -1,9 +1,11 @@
 import { formatRange } from './dates'
-import { reportFor, type CycleReport, type SpendRow } from './logic'
+import { reportFor, type CycleReport } from './logic'
 import { euros } from './money'
 import { useAppState } from './store'
 
-const BAR = ['#2c5a43', '#4a7a5e', '#c65a12', '#8d6110', '#6b8aa8', '#b4452c']
+const COLORS = ['#2c5a43', '#4a7a5e', '#6b8aa8', '#c65a12', '#8d6110', '#b4452c', '#7a6b8a']
+
+type Slice = { id: string; name: string; emoji: string; amount: number }
 
 export function StatsScreen() {
   const state = useAppState()
@@ -47,6 +49,22 @@ function LiveReport({ report }: { report: CycleReport }) {
           ? 'stats-hero tight'
           : 'stats-hero ok'
 
+  const variableSlices: Slice[] = [
+    ...report.variable
+      .filter((r) => r.spent > 0)
+      .map((r) => ({ id: r.id, name: r.name, emoji: r.emoji, amount: r.spent })),
+    ...(report.variableCap - report.variableSpent > 0
+      ? [
+          {
+            id: 'sin-gastar',
+            name: 'Aún sin gastar',
+            emoji: '🫧',
+            amount: report.variableCap - report.variableSpent,
+          },
+        ]
+      : []),
+  ]
+
   return (
     <>
       <section className={heroClass}>
@@ -57,7 +75,7 @@ function LiveReport({ report }: { report: CycleReport }) {
         </div>
         <div className="sub">
           {report.savingsGoal > 0
-            ? `hacia tu meta de ${euros(report.savingsGoal)} · ${report.goalPct}%`
+            ? `ahorro neto · meta ${euros(report.savingsGoal)} · ${report.goalPct}%`
             : 'ahorro neto de este ciclo'}
         </div>
         <p className="stats-hero-copy">{report.detail}</p>
@@ -65,37 +83,50 @@ function LiveReport({ report }: { report: CycleReport }) {
 
       <section className="card stack">
         <div>
-          <strong>Lo que sí cambia</strong>
+          <strong>Qué forma este ahorro</strong>
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Variables: comida, ocio, fútbol, libre. Las cuotas no están aquí porque
-            cada mes son las mismas.
+            Lo que apartaste más lo que no gastaste en variables. Las cuotas no
+            entran: son las mismas cada mes.
           </p>
         </div>
-        {report.variable.length === 0 || report.variableSpent === 0 ? (
-          <p className="muted">Aún no hay gastos variables en este ciclo.</p>
+        {report.contributions.some((c) => c.amount > 0) ? (
+          <Pie slices={report.contributions.filter((c) => c.amount > 0)} />
         ) : (
-          <Bars
-            rows={report.variable.map((r) => ({
-              ...r,
-              value: r.spent,
-              total: r.cap > 0 ? r.cap : r.spent,
-            }))}
-          />
+          <p className="muted">Aún no hay ahorro que mostrar en este ciclo.</p>
         )}
-        {report.variableCap > 0 && (
+        {report.savingsUsed > 0 && (
           <p className="muted" style={{ fontSize: 13 }}>
-            Llevas {euros(report.variableSpent)} de {euros(report.variableCap)} en
-            variables.
+            De esa suma hay que restar {euros(report.savingsUsed)} que salieron del
+            colchón → neto {euros(report.savedNet)}.
           </p>
         )}
       </section>
 
       <section className="card stack">
         <div>
-          <strong>El ahorro</strong>
+          <strong>Variables: en qué se fue el techo</strong>
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Viajes, ropa y medicina salen de aquí. Si el colchón no se tocó, el mes
-            va bien.
+            Comida, ocio, fútbol y libre. Si no gastaste nada, no hay gráfico.
+          </p>
+        </div>
+        {report.variableSpent <= 0 ? (
+          <p className="muted">Todavía no hay gastos variables.</p>
+        ) : (
+          <>
+            <p>
+              Gastaste <b>{euros(report.variableSpent)}</b> de{' '}
+              <b>{euros(report.variableCap)}</b> en lo que sí cambia.
+            </p>
+            <Pie slices={variableSlices} />
+          </>
+        )}
+      </section>
+
+      <section className="card stack">
+        <div>
+          <strong>Si tocaste el ahorro</strong>
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            Viajes, ropa y medicina. Aquí ves cuánto salió y a qué se fue.
           </p>
         </div>
         {report.savingsUsed <= 0 ? (
@@ -104,33 +135,13 @@ function LiveReport({ report }: { report: CycleReport }) {
           </div>
         ) : (
           <>
-            <div className="row">
-              <span>Salieron del colchón</span>
-              <b>{euros(report.savingsUsed)}</b>
-            </div>
-            <Bars
-              rows={report.savingsParts.map((p) => ({
-                id: p.id,
-                name: p.name,
-                emoji: p.emoji,
-                spent: p.amount,
-                cap: report.savingsUsed,
-                remaining: 0,
-                value: p.amount,
-                total: report.savingsUsed,
-              }))}
-              mode="share"
-            />
+            <p>
+              Salieron <b>{euros(report.savingsUsed)}</b> del colchón.
+            </p>
+            <Pie slices={report.savingsParts} />
           </>
         )}
       </section>
-
-      {report.fixedSpent > 0 && (
-        <p className="muted" style={{ fontSize: 13 }}>
-          Cuotas ya marcadas: {euros(report.fixedSpent)} (no entran en las gráficas:
-          se repiten cada mes).
-        </p>
-      )}
     </>
   )
 }
@@ -162,42 +173,40 @@ function tonePill(v: CycleReport['verdict']): string {
   return 'yellow'
 }
 
-function Bars({
-  rows,
-  mode = 'techo',
-}: {
-  rows: (SpendRow & { value: number; total: number })[]
-  mode?: 'techo' | 'share'
-}) {
-  const max = Math.max(...rows.map((r) => r.total), 1)
+function Pie({ slices }: { slices: Slice[] }) {
+  const total = slices.reduce((s, x) => s + x.amount, 0)
+  if (total <= 0) return <p className="muted">Nada que graficar aún.</p>
+  let deg = 0
+  const parts: string[] = []
+  const colored = slices.map((s, i) => {
+    const start = deg
+    const span = (s.amount / total) * 360
+    deg += span
+    const color = COLORS[i % COLORS.length]
+    parts.push(`${color} ${start}deg ${deg}deg`)
+    return { ...s, color, pct: Math.round((s.amount / total) * 100) }
+  })
+
   return (
-    <div className="stats-bars">
-      {rows.map((r, i) => {
-        const pct = r.total > 0 ? Math.min(100, Math.round((r.value / r.total) * 100)) : 0
-        const width = mode === 'share' ? pct : Math.min(100, Math.round((r.value / max) * 100))
-        return (
-          <div key={r.id} className="stats-bar">
-            <div className="row">
-              <span>
-                {r.emoji} {r.name}
-              </span>
-              <span>
-                {euros(r.value)}
-                {mode === 'techo' && r.cap > 0 ? ` / ${euros(r.cap)}` : ''}
-                {mode === 'share' ? ` · ${pct}%` : ''}
-              </span>
-            </div>
-            <div className="bar idle">
-              <span
-                style={{
-                  width: `${width}%`,
-                  background: BAR[i % BAR.length],
-                }}
-              />
-            </div>
-          </div>
-        )
-      })}
+    <div className="pie-wrap">
+      <div
+        className="donut"
+        style={{ background: `conic-gradient(${parts.join(', ')})` }}
+        aria-hidden
+      />
+      <ul className="pie-legend">
+        {colored.map((s) => (
+          <li key={s.id}>
+            <span className="swatch" style={{ background: s.color }} />
+            <span>
+              {s.emoji} {s.name}
+            </span>
+            <b>
+              {euros(s.amount)} · {s.pct}%
+            </b>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
