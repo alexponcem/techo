@@ -5,6 +5,7 @@ import { Home } from './Home'
 import { SettingsScreen } from './Settings'
 import { Setup } from './Setup'
 import { AddSheet, IncomeSheet, MoveSheet } from './Sheets'
+import { StatsScreen } from './Stats'
 import { useAppState } from './store'
 import type { Screen, Sheet } from './types'
 
@@ -85,11 +86,29 @@ export default function App() {
       )}
       {screen.name === 'settings' && (
         <SettingsScreen
-          onBack={() => setScreen({ name: 'home' })}
+          onBack={backHome}
           onIncome={() => openSheet({ name: 'income' })}
         />
       )}
-      {screen.name === 'cycle' && <CycleScreen onBack={() => setScreen({ name: 'home' })} />}
+      {screen.name === 'cycle' && <CycleScreen onBack={backHome} />}
+      {screen.name === 'stats' && <StatsScreen />}
+
+      <nav className="tabbar">
+        <button
+          type="button"
+          className={screen.name === 'home' || screen.name === 'envelope' ? 'on' : ''}
+          onClick={backHome}
+        >
+          Inicio
+        </button>
+        <button
+          type="button"
+          className={screen.name === 'stats' ? 'on' : ''}
+          onClick={() => setScreen({ name: 'stats' })}
+        >
+          Estadísticas
+        </button>
+      </nav>
 
       {sheet?.name === 'add' && (
         <AddSheet

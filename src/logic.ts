@@ -60,6 +60,7 @@ export type UsageAlert = 'half' | 'near' | 'almost' | 'limit' | 'over' | null
 export interface EnvelopeView {
   env: Envelope
   spent: number
+  used: number
   remaining: number
   total: number
   pct: number
@@ -103,13 +104,27 @@ export function envelopeView(env: Envelope, txs: Tx[], cycle: Cycle, today = tod
   const total = env.opening + env.planned
   const remaining = total + n.in - n.out - n.spent
   const spent = n.spent
-  const pct = total <= 0 ? (spent > 0 ? 100 : 0) : Math.round((spent / total) * 100)
+  const used = n.spent + n.out
+  const base = env.kind === 'savings' ? env.opening + env.planned + n.in : total
+  const pct =
+    env.kind === 'savings'
+      ? base <= 0
+        ? used > 0
+          ? 100
+          : 0
+        : Math.round((used / base) * 100)
+      : total <= 0
+        ? spent > 0
+          ? 100
+          : 0
+        : Math.round((spent / total) * 100)
   const paid = env.kind === 'fixed' && remaining <= 0 && total > 0
   const week = weekSlice(env, txs, cycle, today)
   const status = usageStatus(ensureRhythm(env), spent, total, remaining, week)
   return {
     env: ensureRhythm(env),
     spent,
+    used,
     remaining,
     total,
     pct,
@@ -269,6 +284,101 @@ export function paceFor(views: EnvelopeView[], cycle: Cycle, today = todayISO())
 
 export function weeklyViews(views: EnvelopeView[]): EnvelopeView[] {
   return views.filter((v) => rhythmOf(v.env) === 'weekly')
+}
+
+export type MonthVerdict = 'good' | 'ok' | 'tight' | 'hard'
+
+export interface CycleReport {
+  cycle: Cycle
+  income: number
+  spent: number
+  kept: number
+  spendPct: number
+  keepPct: number
+  savingsGoal: number
+  savingsUsed: number
+  savingsStart: number
+  savingsNow: number
+  savedNet: number
+  goalPct: number
+  verdict: MonthVerdict
+  title: string
+  detail: string
+}
+
+export function reportFor(state: AppState, cycle: Cycle): CycleReport {
+  const txs = cycleTxs(state, cycle.id)
+  const spent = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const live = !cycle.closedAt
+  const views = live ? viewsFor(state) : []
+  const savings = views.find((v) => v.env.kind === 'savings')
+  const leftover = views
+    .filter((v) => v.env.kind === 'cap' || v.env.kind === 'buffer')
+    .reduce((s, v) => s + Math.max(0, v.remaining), 0)
+
+  const savingsGoal = live
+    ? (savings?.env.planned ?? 0)
+    : (cycle.savingsGoal ?? 0)
+  const savingsUsed = live
+    ? (savings?.used ?? 0)
+    : (cycle.savingsUsed ?? 0)
+  const savingsNow = savings?.remaining ?? 0
+  const savingsStart = savings ? savings.env.opening : 0
+  const savedNet = live
+    ? savingsNow - savingsStart + leftover
+    : (cycle.savedNet ?? Math.max(0, cycle.income - spent))
+  const spentFinal = live ? spent : (cycle.spent ?? spent)
+  const income = cycle.income
+  const kept = Math.max(0, income - spentFinal)
+  const spendPct = income > 0 ? Math.round((spentFinal / income) * 100) : 0
+  const keepPct = income > 0 ? Math.round((kept / income) * 100) : 0
+  const goalPct = savingsGoal > 0 ? Math.round((savedNet / savingsGoal) * 100) : keepPct
+  const pileDown = live && savingsNow + leftover < savingsStart
+
+  let verdict: MonthVerdict = 'ok'
+  let title = 'Mes correcto'
+  let detail = 'Vas cerca de la meta de ahorro.'
+  if (pileDown || goalPct < 40) {
+    verdict = 'hard'
+    title = 'Mes difícil'
+    detail = pileDown
+      ? 'El colchón bajó: salió más del ahorro de lo que este ciclo aportó.'
+      : 'Ahorraste menos de la mitad de tu meta. El mes se comió el plan.'
+  } else if (goalPct >= 100 && savingsUsed === 0) {
+    verdict = 'good'
+    title = 'Mes bueno'
+    detail = 'Llegaste a la meta y no tocaste el ahorro extra. Eso es control.'
+  } else if (goalPct >= 100) {
+    verdict = 'good'
+    title = 'Mes bueno'
+    detail = 'La meta se cumple, aunque parte del ahorro se usó (viaje, medicina…).'
+  } else if (goalPct >= 70) {
+    verdict = 'ok'
+    title = 'Mes correcto'
+    detail = `Vas al ${goalPct}% de tu meta de ahorro. Casi.`
+  } else {
+    verdict = 'tight'
+    title = 'Mes justo'
+    detail = 'Ahorraste, pero por debajo de lo que te habías propuesto.'
+  }
+
+  return {
+    cycle,
+    income,
+    spent: spentFinal,
+    kept,
+    spendPct,
+    keepPct,
+    savingsGoal,
+    savingsUsed,
+    savingsStart,
+    savingsNow,
+    savedNet,
+    goalPct,
+    verdict,
+    title,
+    detail,
+  }
 }
 
 export function assigned(envelopes: Envelope[]): number {

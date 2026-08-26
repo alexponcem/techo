@@ -20,6 +20,10 @@ export interface Cycle {
   expectedEndAt: string
   income: number
   closedAt?: string
+  spent?: number
+  savedNet?: number
+  savingsUsed?: number
+  savingsGoal?: number
 }
 
 export interface Tx {
@@ -51,6 +55,7 @@ export interface AppState {
 export type Screen =
   | { name: 'setup' }
   | { name: 'home' }
+  | { name: 'stats' }
   | { name: 'envelope'; id: string }
   | { name: 'settings' }
   | { name: 'cycle' }

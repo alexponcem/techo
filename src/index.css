@@ -67,7 +67,7 @@ button {
   width: min(430px, 100%);
   margin: 0 auto;
   min-height: 100dvh;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(28px + var(--safe-bottom));
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(88px + var(--safe-bottom));
 }
 
 h1,
@@ -118,6 +118,59 @@ p {
   font-size: 28px;
   font-weight: 560;
   letter-spacing: -0.03em;
+}
+
+.tabbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: min(430px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 16px calc(10px + var(--safe-bottom));
+  background: var(--paper);
+  box-shadow: 0 -8px 24px rgba(26, 23, 20, 0.06);
+  z-index: 10;
+}
+
+.tabbar button {
+  border: 0;
+  background: transparent;
+  border-radius: 14px;
+  padding: 10px 8px;
+  font-weight: 750;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.tabbar button.on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.donut {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.donut::after {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border-radius: 50%;
+  background: var(--card);
 }
 
 .icon-btn {

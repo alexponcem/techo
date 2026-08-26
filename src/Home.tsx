@@ -7,6 +7,7 @@ import type { Sheet as SheetState } from './types'
 
 function pillLabel(view: EnvelopeView): string {
   if (view.paid) return 'Pagado'
+  if (view.env.kind === 'savings') return view.used > 0 ? `${view.pct}%` : 'Bien'
   if (view.env.kind === 'fund') {
     return view.remaining > 0 ? 'Apartado' : view.spent > 0 ? 'Del ahorro' : 'Vacío'
   }
@@ -243,7 +244,9 @@ function EnvelopeCard({
       <div>
         <div className="name">{env.name}</div>
         <div className="meta">
-          {env.kind === 'fund'
+          {env.kind === 'savings'
+            ? `Usado ${euros(view.used)} este mes`
+            : env.kind === 'fund'
             ? `Fondo · gastado ${euros(view.spent)} este ciclo`
             : rhythmOf(env) === 'weekly'
               ? `Semanal · mes ${euros(view.spent)} / ${euros(total)}`

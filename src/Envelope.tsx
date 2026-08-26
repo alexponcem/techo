@@ -52,7 +52,12 @@ export function EnvelopeScreen({ id, onBack, onAdd }: { id: string; onBack: () =
           {env.emoji} {KIND_LABEL[env.kind]}
         </div>
         <div className="amount">{euros(view.remaining)}</div>
-        <div className="sub">{env.name} · quedan de {euros(view.total)}</div>
+        <div className="sub">
+          {env.name}
+          {env.kind === 'savings'
+            ? ` · usado ${euros(view.used)} este mes (${view.pct}%)`
+            : ` · quedan de ${euros(view.total)}`}
+        </div>
       </div>
       {view.week && (
         <div className="hint">

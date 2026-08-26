@@ -1,6 +1,14 @@
 import { useSyncExternalStore } from 'react'
 import { suggestedNextPay, todayISO } from './dates'
-import { activeCycle, assigned, carryKinds, ensureRhythm, uid, withBalancedBuffer } from './logic'
+import {
+  activeCycle,
+  assigned,
+  carryKinds,
+  ensureRhythm,
+  reportFor,
+  uid,
+  withBalancedBuffer,
+} from './logic'
 import { alexPlan } from './template'
 import type { AppState, Envelope, Settings, Tx } from './types'
 
@@ -329,6 +337,7 @@ export function startNextCycle(
     opening: openings.get(e.id) ?? 0,
   }))
 
+  const snap = reportFor(state, current)
   const cycleId = uid()
   emit({
     ...state,
@@ -336,7 +345,16 @@ export function startNextCycle(
     envelopes,
     cycles: [
       ...state.cycles.map((c) =>
-        c.id === current.id ? { ...c, closedAt: todayISO() } : c,
+        c.id === current.id
+          ? {
+              ...c,
+              closedAt: todayISO(),
+              spent: snap.spent,
+              savedNet: snap.savedNet,
+              savingsUsed: snap.savingsUsed,
+              savingsGoal: snap.savingsGoal,
+            }
+          : c,
       ),
       { id: cycleId, startedAt, expectedEndAt: end, income },
     ],
