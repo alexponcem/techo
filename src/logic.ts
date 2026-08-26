@@ -288,6 +288,15 @@ export function weeklyViews(views: EnvelopeView[]): EnvelopeView[] {
 
 export type MonthVerdict = 'good' | 'ok' | 'tight' | 'hard'
 
+export interface SpendRow {
+  id: string
+  name: string
+  emoji: string
+  spent: number
+  cap: number
+  remaining: number
+}
+
 export interface CycleReport {
   cycle: Cycle
   income: number
@@ -304,6 +313,15 @@ export interface CycleReport {
   verdict: MonthVerdict
   title: string
   detail: string
+  variable: SpendRow[]
+  variableSpent: number
+  variableCap: number
+  savingsParts: { id: string; name: string; emoji: string; amount: number }[]
+  fixedSpent: number
+}
+
+function envMeta(state: AppState, id: string): Envelope | undefined {
+  return state.envelopes.find((e) => e.id === id) ?? state.template.find((e) => e.id === id)
 }
 
 export function reportFor(state: AppState, cycle: Cycle): CycleReport {
@@ -316,12 +334,61 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
     .filter((v) => v.env.kind === 'cap' || v.env.kind === 'buffer')
     .reduce((s, v) => s + Math.max(0, v.remaining), 0)
 
-  const savingsGoal = live
-    ? (savings?.env.planned ?? 0)
-    : (cycle.savingsGoal ?? 0)
+  const savingsGoal = live ? (savings?.env.planned ?? 0) : (cycle.savingsGoal ?? 0)
+  const savingsId =
+    savings?.env.id ??
+    state.envelopes.find((e) => e.kind === 'savings')?.id ??
+    state.template.find((e) => e.kind === 'savings')?.id ??
+    'ahorro'
+
+  const variable: SpendRow[] = live
+    ? views
+        .filter((v) => v.env.kind === 'cap' || v.env.kind === 'buffer')
+        .map((v) => ({
+          id: v.env.id,
+          name: v.env.name,
+          emoji: v.env.emoji,
+          spent: v.spent,
+          cap: v.total,
+          remaining: Math.max(0, v.remaining),
+        }))
+    : (state.template.filter((e) => e.kind === 'cap' || e.kind === 'buffer').map((e) => {
+        const s = txs.filter((t) => t.type === 'expense' && t.envelopeId === e.id).reduce((n, t) => n + t.amount, 0)
+        return {
+          id: e.id,
+          name: e.name,
+          emoji: e.emoji,
+          spent: s,
+          cap: e.planned,
+          remaining: Math.max(0, e.planned - s),
+        }
+      }))
+
+  const partsMap = new Map<string, number>()
+  for (const t of txs) {
+    if (t.type === 'transfer' && t.envelopeId === savingsId && t.toEnvelopeId) {
+      partsMap.set(t.toEnvelopeId, (partsMap.get(t.toEnvelopeId) ?? 0) + t.amount)
+    }
+    if (t.type === 'expense' && t.envelopeId === savingsId) {
+      partsMap.set('otros', (partsMap.get('otros') ?? 0) + t.amount)
+    }
+  }
+  const savingsParts = [...partsMap.entries()]
+    .map(([id, amount]) => {
+      if (id === 'otros') return { id, name: 'Otros', emoji: '🌱', amount }
+      const meta = envMeta(state, id)
+      return {
+        id,
+        name: meta?.name ?? id,
+        emoji: meta?.emoji ?? '✦',
+        amount,
+      }
+    })
+    .sort((a, b) => b.amount - a.amount)
+
   const savingsUsed = live
     ? (savings?.used ?? 0)
-    : (cycle.savingsUsed ?? 0)
+    : (cycle.savingsUsed ?? savingsParts.reduce((s, p) => s + p.amount, 0))
   const savingsNow = savings?.remaining ?? 0
   const savingsStart = savings ? savings.env.opening : 0
   const savedNet = live
@@ -334,6 +401,15 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   const keepPct = income > 0 ? Math.round((kept / income) * 100) : 0
   const goalPct = savingsGoal > 0 ? Math.round((savedNet / savingsGoal) * 100) : keepPct
   const pileDown = live && savingsNow + leftover < savingsStart
+  const variableSpent = variable.reduce((s, r) => s + r.spent, 0)
+  const variableCap = variable.reduce((s, r) => s + r.cap, 0)
+  const fixedSpent = txs
+    .filter((t) => {
+      if (t.type !== 'expense') return false
+      const k = envMeta(state, t.envelopeId)?.kind
+      return k === 'fixed'
+    })
+    .reduce((s, t) => s + t.amount, 0)
 
   let verdict: MonthVerdict = 'ok'
   let title = 'Mes correcto'
@@ -378,6 +454,11 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
     verdict,
     title,
     detail,
+    variable,
+    variableSpent,
+    variableCap,
+    savingsParts,
+    fixedSpent,
   }
 }
 

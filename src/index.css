@@ -173,6 +173,67 @@ p {
   background: var(--card);
 }
 
+.stats-hero {
+  border-radius: 28px;
+  padding: 22px 22px 18px;
+  color: #f7f3ea;
+  box-shadow: var(--shadow);
+}
+
+.stats-hero.good {
+  background: var(--sage);
+}
+.stats-hero.ok {
+  background: #3d5c4a;
+}
+.stats-hero.tight {
+  background: #8a5a22;
+}
+.stats-hero.hard {
+  background: var(--terra);
+}
+
+.stats-hero .label {
+  opacity: 0.8;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stats-hero .amount {
+  font-family: var(--serif);
+  font-size: 46px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  margin: 8px 0 6px;
+  font-weight: 560;
+}
+
+.stats-hero .sub {
+  opacity: 0.85;
+  font-size: 14px;
+}
+
+.stats-hero-copy {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(247, 243, 234, 0.18);
+  font-size: 14px;
+  line-height: 1.45;
+  opacity: 0.95;
+}
+
+.stats-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stats-bar .row {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
 .icon-btn {
   width: 42px;
   height: 42px;
