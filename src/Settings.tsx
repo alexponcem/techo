@@ -44,9 +44,9 @@ export function SettingsScreen({
           </p>
         )}
         <p className="muted">
-          Los datos viven en este navegador. Si se lo instalas en el móvil
-          (Añadir a pantalla de inicio), se siente como una app. Cada persona
-          tiene su propio plan en su teléfono.
+          Los datos viven en este navegador, no en la nube. Quitar el icono de
+          inicio no suele borrar nada; borrar datos del sitio o desinstalar la
+          PWA en Android sí puede. Antes de tocar eso, exporta una copia.
         </p>
       </div>
       <button className="btn secondary full" onClick={onIncome}>

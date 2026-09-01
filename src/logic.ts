@@ -335,6 +335,28 @@ export function weeklyViews(views: EnvelopeView[]): EnvelopeView[] {
   return views.filter((v) => rhythmOf(v.env) === 'weekly')
 }
 
+export function accountSnapshot(views: EnvelopeView[]): {
+  inAccount: number
+  unpaid: EnvelopeView[]
+  unpaidTotal: number
+  afterFixed: number
+  floor: number
+} {
+  const inAccount = views.reduce((s, v) => s + v.remaining, 0)
+  const unpaid = views.filter((v) => v.env.kind === 'fixed' && !v.paid && v.remaining > 0)
+  const unpaidTotal = unpaid.reduce((s, v) => s + v.remaining, 0)
+  const floor = views
+    .filter((v) => v.env.kind === 'savings' || v.env.kind === 'fund')
+    .reduce((s, v) => s + Math.max(0, v.remaining), 0)
+  return {
+    inAccount,
+    unpaid,
+    unpaidTotal,
+    afterFixed: inAccount - unpaidTotal,
+    floor,
+  }
+}
+
 export type MonthVerdict = 'good' | 'ok' | 'tight' | 'hard'
 
 export interface SpendRow {

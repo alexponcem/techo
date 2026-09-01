@@ -1,4 +1,5 @@
 import {
+  accountSnapshot,
   cycleTxs,
   kindOrder,
   paceFor,
@@ -70,6 +71,8 @@ export function Home({
     .map((c) => `${c.name} ${euros(c.remaining)}`)
     .join(' · ')
   const weekly = weeklyViews(views)
+  const snap = accountSnapshot(views)
+  const unpaidNames = snap.unpaid.map((v) => v.env.name).join(', ')
   const groups: { title: string; items: EnvelopeView[] }[] = [
     { title: 'Ahorro (se acumula)', items: views.filter((v) => v.env.kind === 'savings') },
     { title: 'Cuotas', items: views.filter((v) => v.env.kind === 'fixed') },
@@ -160,6 +163,35 @@ export function Home({
           <span>{formatRange(cycle.startedAt, cycle.expectedEndAt)}</span>
           <span>Entraron {euros(cycle.income)}</span>
         </div>
+      </section>
+
+      <section className="saldo">
+        <div className="tiny">En tu cuenta ahora</div>
+        <div className="saldo-amount">{euros(snap.inAccount)}</div>
+        <p className="muted" style={{ fontSize: 13 }}>
+          Debería coincidir con el banco si anotaste todo (un solo bolsillo).
+        </p>
+        {snap.unpaidTotal > 0 ? (
+          <div className="saldo-next">
+            <div className="row">
+              <span>Cuando salgan las cuotas pendientes</span>
+              <b>{euros(snap.afterFixed)}</b>
+            </div>
+            <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+              Falta: {unpaidNames}. Eso que queda es ahorro + variables + fondos.
+            </p>
+          </div>
+        ) : (
+          <p className="muted" style={{ fontSize: 13 }}>
+            Cuotas de este ciclo ya marcadas. Este es el saldo que te queda.
+          </p>
+        )}
+        {snap.floor > 0 && snap.unpaidTotal > 0 && (
+          <p className="muted" style={{ fontSize: 13 }}>
+            Si agotas comida, ocio, fútbol y libre, te quedarían {euros(snap.floor)}{' '}
+            (ahorro + fondos).
+          </p>
+        )}
       </section>
 
       {weekly.length > 0 && (
