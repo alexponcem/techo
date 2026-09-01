@@ -1,8 +1,23 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import {
+  clampDay,
+  formatDay,
+  stampAtNoon,
+  todayISO,
+  yesterdayISO,
+} from './dates'
 import { KIND_LABEL } from './template'
-import { coverPlan, kindOrder, verdictFor, viewsFor, type EnvelopeView } from './logic'
+import {
+  activeCycle,
+  coverPlan,
+  kindOrder,
+  saveReview,
+  verdictFor,
+  viewsFor,
+  type EnvelopeView,
+} from './logic'
 import { euros, parseEuros } from './money'
-import { addExpense, addIncome, coverAndSpend, moveMoney, useAppState } from './store'
+import { addExpense, addIncome, coverAndSpend, getState, moveMoney, useAppState } from './store'
 
 const QUICK = [2, 5, 10, 15, 20, 25, 30, 50]
 
@@ -20,6 +35,13 @@ export function AddSheet({
   const [note, setNote] = useState('')
   const [reason, setReason] = useState('')
   const [confirm, setConfirm] = useState(false)
+  const [spendDay, setSpendDay] = useState(todayISO())
+  const [done, setDone] = useState<{ status: 'ok' | 'tight' | 'over'; title: string; body: string } | null>(
+    null,
+  )
+  const cycle = activeCycle(state)
+  const minDay = cycle?.startedAt ?? todayISO()
+  const maxDay = todayISO()
   const cents = parseEuros(amount) ?? 0
   const view = views.find((v) => v.env.id === envelopeId)
   const verdict = verdictFor(view, cents)
@@ -27,20 +49,26 @@ export function AddSheet({
   const reasonOk = (isSavings ? note : reason).trim().length >= 4
   const plan = envelopeId ? coverPlan(views, envelopeId, cents) : null
 
+  const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
+
+  function finish() {
+    setDone(saveReview(getState(), envelopeId, cents, clampDay(spendDay, minDay, maxDay)))
+  }
+
   function trySave() {
     if (!envelopeId || cents <= 0) return
     if (isSavings) {
       if (!reasonOk) return
-      addExpense(envelopeId, cents, `AHORRO: ${note.trim()}`)
-      onClose(true, envelopeId)
+      addExpense(envelopeId, cents, `AHORRO: ${note.trim()}`, at)
+      finish()
       return
     }
     if (plan) {
       setConfirm(true)
       return
     }
-    addExpense(envelopeId, cents, note)
-    onClose(true, envelopeId)
+    addExpense(envelopeId, cents, note, at)
+    finish()
   }
 
   function acceptCover() {
@@ -50,6 +78,7 @@ export function AddSheet({
       envelopeId,
       amount: cents,
       note,
+      at,
       fromLibre:
         plan.fromLibre > 0 && plan.libreId
           ? { id: plan.libreId, amount: plan.fromLibre }
@@ -65,7 +94,23 @@ export function AddSheet({
             }
           : undefined,
     })
-    onClose(true, envelopeId)
+    finish()
+  }
+
+  if (done) {
+    return (
+      <Sheet title="Anotado" onClose={() => onClose(true, envelopeId)}>
+        <div className={`verdict ${done.status}`}>
+          <p>
+            <b>{done.title}</b>
+          </p>
+          <p style={{ marginTop: 8, fontWeight: 500 }}>{done.body}</p>
+        </div>
+        <button type="button" className="btn full sage" onClick={() => onClose(true, envelopeId)}>
+          Listo
+        </button>
+      </Sheet>
+    )
   }
 
   return (
@@ -89,6 +134,40 @@ export function AddSheet({
           </button>
         ))}
       </div>
+      <p className="tiny">¿Cuándo lo gastaste?</p>
+      <div className="chips">
+        <button
+          type="button"
+          className={`chip ${spendDay === todayISO() ? 'on' : ''}`}
+          onClick={() => setSpendDay(todayISO())}
+        >
+          Hoy
+        </button>
+        {yesterdayISO() >= minDay && (
+          <button
+            type="button"
+            className={`chip ${spendDay === yesterdayISO() ? 'on' : ''}`}
+            onClick={() => setSpendDay(yesterdayISO())}
+          >
+            Ayer
+          </button>
+        )}
+      </div>
+      <label className="field">
+        Otra fecha
+        <input
+          type="date"
+          min={minDay}
+          max={maxDay}
+          value={clampDay(spendDay, minDay, maxDay)}
+          onChange={(e) => setSpendDay(clampDay(e.target.value || todayISO(), minDay, maxDay))}
+        />
+      </label>
+      {spendDay !== todayISO() && (
+        <p className="muted" style={{ fontSize: 13 }}>
+          Cuenta para el {formatDay(spendDay)} (y su semana), no como gasto de hoy.
+        </p>
+      )}
       <p className="tiny">Sobre</p>
       <div className="chips">
         {views

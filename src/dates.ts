@@ -16,6 +16,20 @@ export function todayISO(): string {
   return toISODate(new Date())
 }
 
+export function yesterdayISO(): string {
+  return addDays(todayISO(), -1)
+}
+
+export function stampAtNoon(isoDay: string): string {
+  return parseISODate(isoDay).toISOString()
+}
+
+export function clampDay(isoDay: string, min: string, max: string): string {
+  if (isoDay < min) return min
+  if (isoDay > max) return max
+  return isoDay
+}
+
 export function lastWeekdayOfMonth(year: number, month: number): Date {
   const d = new Date(year, month, 0, 12, 0, 0, 0)
   while (d.getDay() === 0 || d.getDay() === 6) {

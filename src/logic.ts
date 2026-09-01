@@ -78,6 +78,55 @@ export function weeklyTarget(env: Envelope, _cycle?: Cycle): number {
   return Math.round(env.planned / WEEKS_PER_MONTH)
 }
 
+export function saveReview(
+  state: AppState,
+  envelopeId: string,
+  _amount: number,
+  day: string,
+): { status: 'ok' | 'tight' | 'over'; title: string; body: string } {
+  const cycle = activeCycle(state)
+  const env = state.envelopes.find((e) => e.id === envelopeId)
+  if (!cycle || !env) {
+    return { status: 'ok', title: 'Anotado', body: 'El gasto quedó registrado.' }
+  }
+  const txs = cycleTxs(state, cycle.id)
+  const when = formatDay(day)
+  if (rhythmOf(env) === 'weekly') {
+    const w = weekSlice(env, txs, cycle, day)
+    if (!w) return { status: 'ok', title: 'Anotado', body: `Quedó en ${env.name} el ${when}.` }
+    const ok = w.spent <= w.target
+    return {
+      status: ok ? (w.spent >= w.target * 0.85 ? 'tight' : 'ok') : 'over',
+      title: ok ? `Anotado el ${when}` : `Esa semana se pasó el techo`,
+      body: `Semana ${w.label}: ${fmt(w.spent)} de ~${fmt(w.target)} en ${env.name}. Este gasto va a esa semana, no a la de hoy.`,
+    }
+  }
+  const views = viewsFor(state)
+  const dailyIds = views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id)
+  const thatDay = spentOnDay(txs, [envelopeId], day)
+  const rem = views.filter((v) => dailyIds.includes(v.env.id)).reduce((s, v) => s + Math.max(0, v.remaining), 0)
+  const days = Math.max(1, daysBetween(day, cycle.expectedEndAt))
+  const pace = Math.floor(rem / days)
+  const over = thatDay > pace && pace > 0
+  return {
+    status: over ? 'tight' : 'ok',
+    title: `Anotado el ${when}`,
+    body:
+      day === todayISO()
+        ? `Hoy en ${env.name}: ${fmt(thatDay)}. Ritmo ~${fmt(pace)}/día.`
+        : `Ese día en ${env.name} llevas ${fmt(thatDay)}. El ritmo era ~${fmt(pace)}/día. El cupo de hoy no se come por un gasto de otro día; el dinero sí sale del sobre.`,
+  }
+}
+
+export function spentOnDay(txs: Tx[], envelopeIds: string[], day: string): number {
+  let n = 0
+  for (const t of txs) {
+    if (t.type !== 'expense' || !envelopeIds.includes(t.envelopeId)) continue
+    if (localDayFromStamp(t.at) === day) n += t.amount
+  }
+  return n
+}
+
 export function weekSlice(env: Envelope, txs: Tx[], cycle: Cycle, today = todayISO()): WeekSlice | undefined {
   if (rhythmOf(env) !== 'weekly') return undefined
   const start = weekStartOn(today)

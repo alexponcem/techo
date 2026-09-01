@@ -159,21 +159,22 @@ function pushTx(tx: Omit<Tx, 'id' | 'cycleId' | 'at'> & { at?: string }) {
   emit({ ...state, txs: [...state.txs, next] })
 }
 
-export function addExpense(envelopeId: string, amount: number, note: string) {
+export function addExpense(envelopeId: string, amount: number, note: string, at?: string) {
   if (amount <= 0) return
-  pushTx({ type: 'expense', envelopeId, amount, note })
+  pushTx({ type: 'expense', envelopeId, amount, note, at })
 }
 
 export function coverAndSpend(input: {
   envelopeId: string
   amount: number
   note: string
+  at?: string
   fromLibre?: { id: string; amount: number }
   fromSavings?: { id: string; amount: number; reason: string }
 }) {
   const cycle = activeCycle(state)
   if (!cycle || input.amount <= 0) return
-  const at = new Date().toISOString()
+  const at = input.at ?? new Date().toISOString()
   const extra: Tx[] = []
   if (input.fromLibre && input.fromLibre.amount > 0) {
     extra.push({

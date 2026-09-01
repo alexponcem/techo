@@ -1,7 +1,7 @@
 {
   "name": "Techo",
   "short_name": "Techo",
-  "description": "Controla tus gastos por sobres, con techo y ritmo.",
+  "description": "Techo: tu dinero con techo. Sobres, ritmo y ¿me cabe?",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,5 +1,14 @@
-import { kindOrder, paceFor, rhythmOf, viewsFor, weeklyViews, type EnvelopeView } from './logic'
-import { formatRange } from './dates'
+import {
+  cycleTxs,
+  kindOrder,
+  paceFor,
+  rhythmOf,
+  spentOnDay,
+  viewsFor,
+  weeklyViews,
+  type EnvelopeView,
+} from './logic'
+import { formatRange, todayISO } from './dates'
 import { euros } from './money'
 import { KIND_LABEL } from './template'
 import { markPaid, useAppState } from './store'
@@ -44,6 +53,11 @@ export function Home({
   if (!cycle) return null
 
   const pace = paceFor(views, cycle)
+  const todayLogged = spentOnDay(
+    cycleTxs(state, cycle.id),
+    views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id),
+    todayISO(),
+  )
   const hot = views.filter(
     (v) => v.alert === 'near' || v.alert === 'almost' || v.alert === 'limit' || v.alert === 'over',
   )
@@ -118,7 +132,9 @@ export function Home({
           <div className="hero-pill">
             <div className="k">Hoy</div>
             <div className="v">{euros(pace.daily)}</div>
-            <div className="s">ritmo para que alcance</div>
+            <div className="s">
+              {todayLogged > 0 ? `hoy ya ${euros(todayLogged)}` : 'ritmo para que alcance'}
+            </div>
           </div>
           <div className="hero-pill">
             <div className="k">{pace.weekDays < 7 ? 'Hasta el sueldo' : 'Esta semana'}</div>
