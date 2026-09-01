@@ -62,6 +62,7 @@ export type Screen =
 
 export type Sheet =
   | { name: 'add'; envelopeId?: string }
+  | { name: 'edit'; txId: string }
   | { name: 'move' }
   | { name: 'income' }
   | null

@@ -237,6 +237,52 @@ export function removeTx(id: string) {
   emit({ ...state, txs: state.txs.filter((t) => t.id !== id) })
 }
 
+function coverSiblings(expense: Tx): Tx[] {
+  return state.txs.filter(
+    (t) =>
+      t.type === 'transfer' &&
+      t.cycleId === expense.cycleId &&
+      t.at === expense.at &&
+      t.toEnvelopeId === expense.envelopeId,
+  )
+}
+
+export function removeExpense(id: string) {
+  const tx = state.txs.find((t) => t.id === id)
+  if (!tx) return
+  if (tx.type !== 'expense') {
+    removeTx(id)
+    return
+  }
+  const drop = new Set([id, ...coverSiblings(tx).map((t) => t.id)])
+  emit({ ...state, txs: state.txs.filter((t) => !drop.has(t.id)) })
+}
+
+export function updateExpense(
+  id: string,
+  patch: { amount: number; note: string; at: string },
+) {
+  const tx = state.txs.find((t) => t.id === id)
+  if (!tx || tx.type !== 'expense' || patch.amount <= 0) return
+  const siblings = coverSiblings(tx)
+  const cover = siblings.reduce((s, t) => s + t.amount, 0)
+  const fromOwn = Math.max(0, tx.amount - cover)
+  const newCover = Math.max(0, patch.amount - fromOwn)
+  let txs = state.txs.map((t) =>
+    t.id === id ? { ...t, amount: patch.amount, note: patch.note, at: patch.at } : t,
+  )
+  if (siblings.length === 1) {
+    const sid = siblings[0].id
+    if (newCover === 0) txs = txs.filter((t) => t.id !== sid)
+    else {
+      txs = txs.map((t) =>
+        t.id === sid ? { ...t, amount: newCover, at: patch.at } : t,
+      )
+    }
+  }
+  emit({ ...state, txs })
+}
+
 export function markPaid(envelopeId: string, remaining: number) {
   if (remaining <= 0) return
   pushTx({

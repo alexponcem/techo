@@ -4,7 +4,7 @@ import { EnvelopeScreen } from './Envelope'
 import { Home } from './Home'
 import { SettingsScreen } from './Settings'
 import { Setup } from './Setup'
-import { AddSheet, IncomeSheet, MoveSheet } from './Sheets'
+import { AddSheet, EditSheet, IncomeSheet, MoveSheet } from './Sheets'
 import { StatsScreen } from './Stats'
 import { useAppState } from './store'
 import type { Screen, Sheet } from './types'
@@ -82,6 +82,7 @@ export default function App() {
           id={screen.id}
           onBack={backHome}
           onAdd={() => openSheet({ name: 'add', envelopeId: screen.id })}
+          onEdit={(txId) => openSheet({ name: 'edit', txId })}
         />
       )}
       {screen.name === 'settings' && (
@@ -115,6 +116,9 @@ export default function App() {
           presetId={sheet.envelopeId}
           onClose={(saved, envelopeId) => closeSheet(saved, envelopeId)}
         />
+      )}
+      {sheet?.name === 'edit' && (
+        <EditSheet txId={sheet.txId} onClose={() => closeSheet()} />
       )}
       {sheet?.name === 'move' && <MoveSheet onClose={() => closeSheet()} />}
       {sheet?.name === 'income' && <IncomeSheet onClose={() => closeSheet()} />}

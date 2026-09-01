@@ -2,15 +2,27 @@ import { useState } from 'react'
 import { activeCycle, cycleTxs, envelopeView, WEEKS_PER_MONTH } from './logic'
 import { euros, parseEuros } from './money'
 import { KIND_HINT, KIND_LABEL } from './template'
-import { markPaid, removeTx, updatePlanned, useAppState } from './store'
+import { markPaid, removeExpense, removeTx, updatePlanned, useAppState } from './store'
+import type { Tx } from './types'
 
-export function EnvelopeScreen({ id, onBack, onAdd }: { id: string; onBack: () => void; onAdd: () => void }) {
+export function EnvelopeScreen({
+  id,
+  onBack,
+  onAdd,
+  onEdit,
+}: {
+  id: string
+  onBack: () => void
+  onAdd: () => void
+  onEdit: (txId: string) => void
+}) {
   const state = useAppState()
   const cycle = activeCycle(state)
   const env = state.envelopes.find((e) => e.id === id)
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState(false)
   const [msg, setMsg] = useState('')
+  const [pending, setPending] = useState<Tx | null>(null)
 
   if (!cycle || !env) {
     return (
@@ -148,13 +160,55 @@ export function EnvelopeScreen({ id, onBack, onAdd }: { id: string; onBack: () =
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div>{sign(t, id)}{euros(t.amount)}</div>
-                <button className="back" onClick={() => removeTx(t.id)}>
+                {t.type === 'expense' && (
+                  <button type="button" className="back" onClick={() => onEdit(t.id)}>
+                    editar
+                  </button>
+                )}
+                {' '}
+                <button type="button" className="back" onClick={() => setPending(t)}>
                   borrar
                 </button>
               </div>
             </div>
           ))}
       </div>
+      {pending && (
+        <div className="sheet-backdrop" onClick={() => setPending(null)}>
+          <div className="sheet stack" onClick={(e) => e.stopPropagation()}>
+            <div className="handle" />
+            <h2 className="serif" style={{ fontSize: 26 }}>
+              ¿Borrar este movimiento?
+            </h2>
+            <p>
+              {sign(pending, id)}
+              {euros(pending.amount)}
+              {pending.note ? ` · ${pending.note}` : ''}
+            </p>
+            <p className="muted">
+              Si era un gasto cubierto con ahorro o libre, también se deshace ese
+              traspaso. Esto no se puede deshacer después (salvo “deshacer último”
+              en ajustes, si era el último).
+            </p>
+            <div className="actions">
+              <button type="button" className="btn ghost" onClick={() => setPending(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                onClick={() => {
+                  if (pending.type === 'expense') removeExpense(pending.id)
+                  else removeTx(pending.id)
+                  setPending(null)
+                }}
+              >
+                Sí, borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

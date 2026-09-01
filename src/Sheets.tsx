@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import {
   clampDay,
   formatDay,
+  localDayFromStamp,
   stampAtNoon,
   todayISO,
   yesterdayISO,
@@ -17,7 +18,15 @@ import {
   type EnvelopeView,
 } from './logic'
 import { euros, parseEuros } from './money'
-import { addExpense, addIncome, coverAndSpend, getState, moveMoney, useAppState } from './store'
+import {
+  addExpense,
+  addIncome,
+  coverAndSpend,
+  getState,
+  moveMoney,
+  updateExpense,
+  useAppState,
+} from './store'
 
 const QUICK = [2, 5, 10, 15, 20, 25, 30, 50]
 
@@ -279,6 +288,86 @@ export function AddSheet({
                 : 'Anotar gasto'}
         </button>
       )}
+    </Sheet>
+  )
+}
+
+export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void }) {
+  const state = useAppState()
+  const tx = state.txs.find((t) => t.id === txId)
+  const cycle = activeCycle(state)
+  const minDay = cycle?.startedAt ?? todayISO()
+  const maxDay = todayISO()
+  const [amount, setAmount] = useState(tx ? String(tx.amount / 100) : '')
+  const [note, setNote] = useState(tx?.note ?? '')
+  const [spendDay, setSpendDay] = useState(tx ? localDayFromStamp(tx.at) : todayISO())
+
+  if (!tx || tx.type !== 'expense') {
+    return (
+      <Sheet title="Editar" onClose={onClose}>
+        <p>Ese movimiento no se puede editar.</p>
+        <button type="button" className="btn full" onClick={onClose}>
+          Cerrar
+        </button>
+      </Sheet>
+    )
+  }
+
+  const cents = parseEuros(amount) ?? 0
+  const day = clampDay(spendDay, minDay, maxDay)
+
+  function save() {
+    if (cents <= 0) return
+    updateExpense(txId, { amount: cents, note, at: stampAtNoon(day) })
+    onClose()
+  }
+
+  return (
+    <Sheet title="Editar gasto" onClose={onClose}>
+      <label className="field">
+        Importe
+        <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </label>
+      <p className="tiny">¿Cuándo lo gastaste?</p>
+      <div className="chips">
+        <button
+          type="button"
+          className={`chip ${day === todayISO() ? 'on' : ''}`}
+          onClick={() => setSpendDay(todayISO())}
+        >
+          Hoy
+        </button>
+        {yesterdayISO() >= minDay && (
+          <button
+            type="button"
+            className={`chip ${day === yesterdayISO() ? 'on' : ''}`}
+            onClick={() => setSpendDay(yesterdayISO())}
+          >
+            Ayer
+          </button>
+        )}
+      </div>
+      <label className="field">
+        Fecha
+        <input
+          type="date"
+          min={minDay}
+          max={maxDay}
+          value={day}
+          onChange={(e) => setSpendDay(clampDay(e.target.value || todayISO(), minDay, maxDay))}
+        />
+      </label>
+      <label className="field">
+        Nota
+        <input value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
+      <p className="muted" style={{ fontSize: 13 }}>
+        Así no hace falta borrarlo y volverlo a meter. Si salió del ahorro, el
+        traspaso se ajusta al nuevo importe.
+      </p>
+      <button type="button" className="btn full sage" disabled={cents <= 0} onClick={save}>
+        Guardar cambios
+      </button>
     </Sheet>
   )
 }
