@@ -416,6 +416,30 @@ export function exportJson(): string {
   return JSON.stringify(state, null, 2)
 }
 
+export function importJson(raw: string): { ok: true } | { ok: false; error: string } {
+  try {
+    const parsed = JSON.parse(raw) as AppState
+    if (!parsed || parsed.version !== 1) {
+      return { ok: false, error: 'Ese archivo no es una copia de Techo.' }
+    }
+    if (!Array.isArray(parsed.envelopes) || !Array.isArray(parsed.cycles) || !Array.isArray(parsed.txs)) {
+      return { ok: false, error: 'La copia está incompleta o dañada.' }
+    }
+    const cycle = [...parsed.cycles].reverse().find((c) => !c.closedAt)
+    const income = cycle?.income ?? parsed.cycles[0]?.income ?? 139_100
+    emit({
+      ...parsed,
+      onboarded: parsed.onboarded || parsed.cycles.length > 0,
+      settings: parsed.settings ?? { payMode: 'last-weekday', fixedDay: 1 },
+      template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
+      envelopes: withMissingEnvelopes(parsed.envelopes, income),
+    })
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'No pude leer el archivo. ¿Es el techo-backup.json?' }
+  }
+}
+
 export function planFits(envelopes: Envelope[], income: number): boolean {
   return assigned(envelopes.filter((e) => e.kind !== 'buffer')) <= income
 }

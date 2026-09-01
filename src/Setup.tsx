@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { lastPaydayGuess, suggestedNextPay } from './dates'
 import { assigned, withBalancedBuffer } from './logic'
 import { euros, parseEuros } from './money'
-import { startFirstCycle } from './store'
+import { importJson, startFirstCycle } from './store'
 import { ALEX_INCOME, KIND_HINT, KIND_LABEL, alexPlan, blankPlan } from './template'
 import type { Envelope, EnvelopeKind, PayMode } from './types'
 
@@ -22,6 +22,7 @@ export function Setup() {
   const [envelopes, setEnvelopes] = useState<Envelope[]>(alexPlan())
   const [savedText, setSavedText] = useState('0')
   const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const income = parseEuros(incomeText) ?? 0
   const savingsOpening = parseEuros(savedText) ?? 0
@@ -119,6 +120,32 @@ export function Setup() {
           <b>Crear otro plan</b>
           <span className="muted">Para ti o para alguien que vaya a probarla</span>
         </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json,text/plain"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = ''
+            if (!file) return
+            const reader = new FileReader()
+            reader.onload = () => {
+              const text = typeof reader.result === 'string' ? reader.result : ''
+              const result = importJson(text)
+              if (!result.ok) setError(result.error)
+            }
+            reader.readAsText(file)
+          }}
+        />
+        <button type="button" className="choice" onClick={() => fileRef.current?.click()}>
+          <b>Restaurar una copia</b>
+          <span className="muted">El archivo techo-backup.json que exportaste</span>
+        </button>
+        {error ? <p className="deficit">{error}</p> : null}
+        <p className="muted" style={{ fontSize: 13 }}>
+          No uses ventana de incógnito: ahí Safari no guarda nada.
+        </p>
       </div>
     )
   }
