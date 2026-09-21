@@ -134,7 +134,13 @@ export function Setup() {
     const page = TUTORIAL[tip]
     return (
       <div className="stack">
-        <button className="back" onClick={() => setStep('welcome')}>
+        <button
+          className="back"
+          onClick={() => {
+            if (tip > 0) setTip(tip - 1)
+            else setStep('welcome')
+          }}
+        >
           ← Atrás
         </button>
         <p className="tiny">
@@ -169,6 +175,11 @@ export function Setup() {
         >
           {tip < TUTORIAL.length - 1 ? 'Siguiente' : 'Poner mis números'}
         </button>
+        {tip > 0 && (
+          <button type="button" className="btn ghost full" onClick={() => setTip(tip - 1)}>
+            Explicación anterior
+          </button>
+        )}
         <button type="button" className="btn ghost full" onClick={() => setStep('income')}>
           Saltar explicación
         </button>
