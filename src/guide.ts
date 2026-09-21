@@ -69,21 +69,26 @@ export const TUTORIAL: GuidePage[] = [
   },
   {
     title: 'Techos: diario y semanal (no es lo mismo)',
-    lead: 'Un techo es un límite para este cobro. Hay dos ritmos. Si los mezclas, te lías.',
+    lead: 'Un techo es un límite para este cobro. Lo importante: comida (y similares) se APARTA desde el inicio. No se suma a lo que puedes gastar cada día.',
     items: [
       {
-        k: 'Diario (ocio, café, imprevistos chicos)',
-        v: 'La app te enseña un número grande: cuánto puedes gastar hoy en este tipo de cosas. No es magia: es lo que te queda en esas cajitas, partido entre los días que faltan hasta el próximo sueldo. Un café de 3 € baja un poquito ese “cuánto me queda hoy”.',
+        k: 'Primero se reserva',
+        v: 'Ahorro, alquiler, móvil y también el super (comida) se quitan del sueldo al empezar. Ese dinero ya tiene dueño. No está “suelto” para el café de hoy.',
       },
       {
-        k: 'Semanal (super, un hobby)',
-        v: 'El super del sábado no es un café: no se reparte en el “cuánto hoy”. En su lugar ves un consejo: “para que te dure el mes, unos 28 € esta semana”. Si te pasas esa semana, te avisa suave. El límite de verdad es el del MES, no el de la semana.',
+        k: 'Lo diario es SOLO lo que sobra',
+        v: 'Cuando ya apartaste ahorro + fijos + comida, lo que queda (ocio, imprevistos chicos) es lo gastable día a día. La app parte ESO entre los días hasta el próximo sueldo. Eso es “cuánto te queda hoy”. Un café de 3 € sale de ahí. No es todo el sueldo ÷ 30.',
+      },
+      {
+        k: 'Lo semanal (super, un hobby)',
+        v: 'El super del sábado sale de su cajita de comida, no de lo diario. Techo te da un consejo: “para que te dure el mes, unos 28 € esta semana”. Si te pasas esa semana, aviso suave. El límite de verdad es el del MES.',
       },
       {
         k: 'Cómo se configura lo semanal',
-        v: 'Al crear el sobre, elige “Semanal”. Luego dices qué día empieza tu semana: sábado si compras el sábado, lunes, el que sea. Eso también está en Ajustes.',
+        v: 'Al crear el sobre, elige “Semanal”. Luego dices qué día empieza tu semana (sábado si compras el sábado). Eso también está en Ajustes.',
       },
     ],
+    tip: 'Resumen: el diario = lo que queda DESPUÉS de separar ahorro, cuotas y comida.',
   },
   {
     title: 'Ahorro y fondos',
@@ -104,18 +109,27 @@ export const TUTORIAL: GuidePage[] = [
     ],
   },
   {
-    title: 'Un ejemplo entero (para que cierre)',
-    lead: 'Imagina que cobras 1.500 €. Así se parte, de arriba abajo:',
+    title: 'Un ciclo entero (números fáciles)',
+    lead: 'Cobras 1.000 €. El próximo sueldo es dentro de 30 días. Mira el ciclo de punta a punta:',
     items: [
-      { k: 'Apartas primero', v: '200 € al ahorro + 600 € de alquiler + 50 € de móvil = 850 € ya ocupados (fijos + colchón).' },
-      { k: 'Luego techos', v: '150 € de super (semanal) + 100 € de ocio (diario).' },
-      { k: 'Lo que sobre', v: 'Eso es Libre: imprevistos chicos. No es ocio.' },
       {
-        k: 'El día a día',
-        v: 'El café de 3 € va a ocio y baja un poco lo que te queda para el día. El super de 40 € va a comida y al consejo de esa semana. El alquiler: cuando el banco lo cobre, “Marcar pagado”.',
+        k: 'Día 1 — se parte',
+        v: '100 € ahorro + 400 € alquiler + 50 € móvil + 150 € comida = 700 € ya apartados. Te quedan 300 € para ocio y Libre. Eso, entre 30 días, es unos 10 €/día. La comida NO está en esos 10 €: ya tiene su cajita de 150 €.',
+      },
+      {
+        k: 'Una semana — se gasta',
+        v: 'Super 35 € → sale de comida (quedan 115 € en comida). Café 3 € → sale de ocio y los ~10 €/día bajan un poquito. El alquiler aún no lo han cobrado: Techo y el banco siguen mostrando esos 400 €.',
+      },
+      {
+        k: 'El banco cobra el alquiler',
+        v: 'Marcas “pagado”. El total de Techo baja 400 €, igual que el banco. Los 10 €/día no cambian por eso: el alquiler nunca fue dinero “de hoy”.',
+      },
+      {
+        k: 'Cierre — llega el siguiente sueldo',
+        v: 'Comida: gastaste 120 € de 150 € → sobran 30 €. Ocio: 80 € de 100 € → sobran 20 €. Esos 50 € pueden ir al ahorro. Empiezas el ciclo nuevo con 100 € + 50 € de ahorro, y otro sueldo de 1.000 €.',
       },
     ],
-    tip: 'Si al final no te gastaste los 150 € de super, ese resto puede ir al ahorro. Magia (bueno, disciplina).',
+    tip: 'Café = diario. Super = cajita de comida. Alquiler = marcar pagado. Lo que no gastes en techos puede volver al ahorro.',
   },
   {
     title: 'Antes de que te lances…',
