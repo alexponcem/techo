@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { euros } from './money'
 import { WEEKDAY_NAMES, clampWeekStart } from './dates'
+import { HowItWorks } from './Setup'
 import { exportJson, importJson, resetAll, undoLast, updateSettings, useAppState } from './store'
 
 export function SettingsScreen({
@@ -46,6 +47,10 @@ export function SettingsScreen({
       <h2 className="serif" style={{ fontSize: 32 }}>
         Ajustes
       </h2>
+      <div className="section-title">
+        <span>Cómo funciona</span>
+      </div>
+      <HowItWorks />
       <div className="card stack">
         <p>
           <b>Cobro:</b>{' '}

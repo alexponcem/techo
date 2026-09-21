@@ -9,10 +9,11 @@ import {
   weeklyViews,
   type EnvelopeView,
 } from './logic'
+import { useState } from 'react'
 import { formatRange, todayISO } from './dates'
 import { euros } from './money'
 import { KIND_LABEL } from './template'
-import { markPaid, useAppState } from './store'
+import { markPaid, updateSettings, useAppState } from './store'
 import type { Sheet as SheetState } from './types'
 
 function pillLabel(view: EnvelopeView): string {
@@ -129,7 +130,7 @@ export function Home({
         <div className="label">Te queda para el día a día</div>
         <div className="amount">{euros(pace.remaining)}</div>
         <div className="sub">
-          ocio + libre · {pace.days} {pace.days === 1 ? 'día' : 'días'} · la comida va aparte
+          techos diarios · {pace.days} {pace.days === 1 ? 'día' : 'días'} · los semanales van aparte
         </div>
         <div className="hero-pills">
           <div className="hero-pill">
@@ -270,6 +271,57 @@ export function Home({
           </section>
         ),
       )}
+      {state.settings.seenHomeTour === false && (
+        <HomeTour
+          onSkip={() => updateSettings({ ...state.settings, seenHomeTour: true })}
+        />
+      )}
+    </div>
+  )
+}
+
+const TOUR = [
+  {
+    title: 'Tu cuenta',
+    body: '“En tu cuenta ahora” es lo que debería verse en el banco: ahorro, cuotas aún no pagadas y lo que no has gastado.',
+  },
+  {
+    title: 'Hoy',
+    body: 'Ese número es el ritmo de los techos diarios (ocio, libre) hasta el próximo sueldo. Los semanales (super) van en su propia tarjeta.',
+  },
+  {
+    title: '+ Gasto',
+    body: 'Importe, sobre, listo. Si te olvidaste, cambia la fecha. Las cuotas se marcan pagadas cuando salen.',
+  },
+]
+
+function HomeTour({ onSkip }: { onSkip: () => void }) {
+  const [i, setI] = useState(0)
+  const page = TOUR[i]
+  return (
+    <div className="tour">
+      <div className="tour-card stack">
+        <p className="tiny">
+          {i + 1} / {TOUR.length}
+        </p>
+        <h3 className="serif" style={{ fontSize: 24, margin: 0 }}>
+          {page.title}
+        </h3>
+        <p>{page.body}</p>
+        <button
+          type="button"
+          className="btn full sage"
+          onClick={() => {
+            if (i < TOUR.length - 1) setI(i + 1)
+            else onSkip()
+          }}
+        >
+          {i < TOUR.length - 1 ? 'Siguiente' : 'Empezar'}
+        </button>
+        <button type="button" className="btn ghost full" onClick={onSkip}>
+          Saltar
+        </button>
+      </div>
     </div>
   )
 }

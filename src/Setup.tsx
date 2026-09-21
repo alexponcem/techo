@@ -1,25 +1,26 @@
 import { useMemo, useRef, useState } from 'react'
-import { lastPaydayGuess, suggestedNextPay } from './dates'
+import { WEEKDAY_NAMES, clampWeekStart, lastPaydayGuess, suggestedNextPay } from './dates'
+import { HOW_IT_WORKS, KIND_EXPLAIN, TUTORIAL } from './guide'
 import { assigned, withBalancedBuffer } from './logic'
 import { euros, parseEuros } from './money'
 import { importJson, startFirstCycle } from './store'
-import { ALEX_INCOME, KIND_HINT, KIND_LABEL, alexPlan, blankPlan } from './template'
-import type { Envelope, EnvelopeKind, PayMode } from './types'
+import { KIND_LABEL, blankPlan } from './template'
+import type { Envelope, EnvelopeKind, PayMode, Rhythm } from './types'
 
-type Step = 'welcome' | 'income' | 'envelopes' | 'review'
-
-const KINDS: EnvelopeKind[] = ['savings', 'fixed', 'cap', 'fund', 'buffer']
+type Step = 'welcome' | 'tutorial' | 'income' | 'envelopes' | 'review'
 
 export function Setup() {
   const [step, setStep] = useState<Step>('welcome')
-  const [incomeText, setIncomeText] = useState('1391')
+  const [tip, setTip] = useState(0)
+  const [incomeText, setIncomeText] = useState('')
   const [startedAt, setStartedAt] = useState(lastPaydayGuess())
   const [payMode, setPayMode] = useState<PayMode>('last-weekday')
   const [fixedDay, setFixedDay] = useState(1)
+  const [weekStartsOn, setWeekStartsOn] = useState(5)
   const [expectedEndAt, setExpectedEndAt] = useState(() =>
     suggestedNextPay(lastPaydayGuess(), 'last-weekday', 1),
   )
-  const [envelopes, setEnvelopes] = useState<Envelope[]>(alexPlan())
+  const [envelopes, setEnvelopes] = useState<Envelope[]>(blankPlan())
   const [savedText, setSavedText] = useState('0')
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -27,29 +28,14 @@ export function Setup() {
   const income = parseEuros(incomeText) ?? 0
   const savingsOpening = parseEuros(savedText) ?? 0
   const balanced = useMemo(() => withBalancedBuffer(envelopes, income), [envelopes, income])
-  const withoutBuffer = balanced.filter((e) => e.kind !== 'buffer')
-  const plannedOthers = assigned(withoutBuffer)
+  const plannedOthers = assigned(balanced.filter((e) => e.kind !== 'buffer'))
   const deficit = plannedOthers - income
   const buffer = balanced.find((e) => e.kind === 'buffer')
-
-  function useAlex() {
-    setIncomeText('1391')
-    setEnvelopes(alexPlan())
-    setStep('income')
-  }
-
-  function useOwn() {
-    setIncomeText('')
-    setEnvelopes(blankPlan())
-    setStep('income')
-  }
 
   function setPlanned(id: string, raw: string) {
     const cents = parseEuros(raw)
     if (cents === null && raw !== '') return
-    setEnvelopes((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, planned: cents ?? 0 } : e)),
-    )
+    setEnvelopes((prev) => prev.map((e) => (e.id === id ? { ...e, planned: cents ?? 0 } : e)))
   }
 
   function addRow() {
@@ -69,10 +55,8 @@ export function Setup() {
     ])
   }
 
-  function zeroPaidCuotas() {
-    setEnvelopes((prev) =>
-      prev.map((e) => (e.kind === 'fixed' || e.kind === 'savings' ? { ...e, planned: 0 } : e)),
-    )
+  function removeRow(id: string) {
+    setEnvelopes((prev) => prev.filter((e) => e.id !== id && e.kind !== 'buffer'))
   }
 
   function start() {
@@ -82,9 +66,7 @@ export function Setup() {
       return
     }
     if (deficit > 0) {
-      setError(
-        `El plan pide ${euros(deficit)} de más. Baja ahorro o cuotas (pon 0 lo que ya pagaste).`,
-      )
+      setError(`El plan pide ${euros(deficit)} de más. Baja un techo o el ahorro.`)
       return
     }
     try {
@@ -92,12 +74,12 @@ export function Setup() {
         income,
         startedAt,
         expectedEndAt,
-        settings: { payMode, fixedDay, weekStartsOn: 5 },
+        settings: { payMode, fixedDay, weekStartsOn: clampWeekStart(weekStartsOn) },
         template: balanced,
         savingsOpening,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo abrir el ciclo. Prueba otra vez.')
+      setError(err instanceof Error ? err.message : 'No se pudo abrir el ciclo.')
     }
   }
 
@@ -107,18 +89,11 @@ export function Setup() {
         <p className="tiny">Control de dinero</p>
         <h1>Techo</h1>
         <p className="muted">
-          El sueldo entra, el ahorro se reserva primero, cada gasto tiene un sobre
-          y la app te dice si cabe — antes de pagarlo.
+          Cada euro tiene un trabajo. Antes de gastar, la app te dice si cabe.
         </p>
-        <button className="choice" onClick={useAlex}>
-          <b>Empezar con tu plan</b>
-          <span className="muted">
-            1.391 € · ahorro 600 € · arriendo, comida, ocio, viajes y ropa
-          </span>
-        </button>
-        <button className="choice" onClick={useOwn}>
-          <b>Crear otro plan</b>
-          <span className="muted">Para ti o para alguien que vaya a probarla</span>
+        <button className="choice" onClick={() => setStep('tutorial')}>
+          <b>Crear mi plan</b>
+          <span className="muted">Te explicamos en un minuto y luego pones tus números</span>
         </button>
         <input
           ref={fileRef}
@@ -140,12 +115,49 @@ export function Setup() {
         />
         <button type="button" className="choice" onClick={() => fileRef.current?.click()}>
           <b>Restaurar una copia</b>
-          <span className="muted">El archivo techo-backup.json que exportaste</span>
+          <span className="muted">Si ya usabas Techo y tienes un techo-backup.json</span>
         </button>
         {error ? <p className="deficit">{error}</p> : null}
         <p className="muted" style={{ fontSize: 13 }}>
-          No uses ventana de incógnito: ahí Safari no guarda nada.
+          No uses ventana de incógnito: ahí no se guarda nada.
         </p>
+      </div>
+    )
+  }
+
+  if (step === 'tutorial') {
+    const page = TUTORIAL[tip]
+    return (
+      <div className="stack">
+        <button className="back" onClick={() => setStep('welcome')}>
+          ← Atrás
+        </button>
+        <p className="tiny">
+          {tip + 1} / {TUTORIAL.length}
+        </p>
+        <h2 className="serif" style={{ fontSize: 30 }}>
+          {page.title}
+        </h2>
+        <p>{page.body}</p>
+        <div className="hint">{page.example}</div>
+        <div className="dots">
+          {TUTORIAL.map((_, i) => (
+            <span key={i} className={i === tip ? 'dot on' : 'dot'} />
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn full sage"
+          onClick={() => {
+            if (tip < TUTORIAL.length - 1) setTip(tip + 1)
+            else setStep('income')
+          }}
+        >
+          {tip < TUTORIAL.length - 1 ? 'Siguiente' : 'Poner mis números'}
+        </button>
+        <button type="button" className="btn ghost full" onClick={() => setStep('income')}>
+          Saltar explicación
+        </button>
       </div>
     )
   }
@@ -153,15 +165,15 @@ export function Setup() {
   if (step === 'income') {
     return (
       <div className="stack">
-        <button className="back" onClick={() => setStep('welcome')}>
+        <button className="back" onClick={() => setStep('tutorial')}>
           ← Atrás
         </button>
         <h2 className="serif" style={{ fontSize: 32 }}>
           Este ciclo
         </h2>
         <p className="muted">
-          El sueldo no es una fecha mágica. Lo registras cuando llega, aunque sea
-          el viernes si el mes cae en domingo.
+          El ciclo empieza el día que cobras, no el 1 del mes. Si pagan un viernes
+          porque el 31 es domingo, usa esa fecha.
         </p>
         <label className="field">
           ¿Cuánto ha entrado? (sueldo de este ciclo)
@@ -169,11 +181,11 @@ export function Setup() {
             inputMode="decimal"
             value={incomeText}
             onChange={(e) => setIncomeText(e.target.value)}
-            placeholder="1391"
+            placeholder="1500"
           />
         </label>
         <label className="field">
-          ¿Ya traes ahorro de meses anteriores?
+          ¿Ya traes ahorro de antes?
           <input
             inputMode="decimal"
             value={savedText}
@@ -182,11 +194,11 @@ export function Setup() {
           />
         </label>
         <p className="muted" style={{ fontSize: 13 }}>
-          Esto no se gasta en el mes: se suma al sobre Ahorro y sigue ahí cuando
-          cobre el siguiente sueldo. Si estás probando agosto, déjalo en 0.
+          Eso se suma al sobre Ahorro y no se gasta en el mes. Si empiezas de cero,
+          déjalo en 0.
         </p>
         <label className="field">
-          ¿Qué día llegó (o llegó el anterior)?
+          ¿Qué día llegó (o el cobro anterior)?
           <input
             type="date"
             value={startedAt}
@@ -227,13 +239,26 @@ export function Setup() {
           </label>
         )}
         <label className="field">
-          Próximo sueldo estimado (editable)
+          Próximo sueldo estimado
           <input type="date" value={expectedEndAt} onChange={(e) => setExpectedEndAt(e.target.value)} />
         </label>
-        <div className="hint">
-          Si el fin de mes cae en domingo y pagan el viernes, cambia estas fechas.
-          El ritmo diario se calcula hasta el próximo sueldo.
-        </div>
+        <label className="field">
+          La semana de super / hobbies empieza el
+          <select
+            value={weekStartsOn}
+            onChange={(e) => setWeekStartsOn(clampWeekStart(Number(e.target.value)))}
+          >
+            {WEEKDAY_NAMES.map((name, i) => (
+              <option key={name} value={i}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted" style={{ fontSize: 13 }}>
+          Si compras el sábado, elige sábado o viernes. Luego lo puedes cambiar en
+          Ajustes.
+        </p>
         <button className="btn full" onClick={() => setStep('envelopes')} disabled={income <= 0}>
           Seguir a los sobres
         </button>
@@ -250,29 +275,96 @@ export function Setup() {
         <h2 className="serif" style={{ fontSize: 32 }}>
           Sobres
         </h2>
-        <p className="muted">
-          Comida y fútbol se anotan el día que ocurren. No entran en el “hoy
-          puedes gastar”. Ocio y libre sí.
-        </p>
+        <div className="hint">
+          <b>Cuota</b> = alquiler, móvil: márcala pagada cuando salga.
+          <br />
+          <b>Techo diario</b> (ocio) = entra en “hoy puedes gastar”.
+          <br />
+          <b>Techo semanal</b> (super) = consejo para que dure el mes; el límite duro es el
+          mes.
+          <br />
+          <b>Fondo</b> = viaje o medicina, sin techo; si está vacío sale del ahorro.
+          <br />
+          Quita lo que no uses y pon tus importes. Libre se calcula solo.
+        </div>
         {balanced
           .filter((e) => e.kind !== 'buffer')
           .map((e) => (
             <div className="card stack" key={e.id} style={{ gap: 8 }}>
               <div className="row">
-                <strong>
-                  {e.emoji} {e.name}
-                </strong>
-                <span className="pill idle">{KIND_LABEL[e.kind]}</span>
+                <label className="field" style={{ flex: 1 }}>
+                  Nombre
+                  <input
+                    value={e.name}
+                    onChange={(ev) =>
+                      setEnvelopes((prev) =>
+                        prev.map((x) => (x.id === e.id ? { ...x, name: ev.target.value } : x)),
+                      )
+                    }
+                  />
+                </label>
+                {e.kind !== 'savings' && (
+                  <button type="button" className="back" onClick={() => removeRow(e.id)}>
+                    quitar
+                  </button>
+                )}
               </div>
-              <p className="tiny" style={{ textTransform: 'none', letterSpacing: 0 }}>
-                {e.id === 'comida'
-                  ? 'Techo semanal, no diario. Super del sábado y extras. 130 € ÷ 4,5 semanas ≈ 29 €/semana.'
-                  : e.id === 'futbol'
-                    ? 'Un partido por semana (viernes o sábado). Anotas el día que juegas. 25 €/mes ≈ 6 €/semana. Si juegas de más, el extra sale de Libre.'
-                    : KIND_HINT[e.kind]}
+              <p className="muted" style={{ fontSize: 13 }}>
+                {KIND_EXPLAIN[e.kind]?.hint ?? KIND_LABEL[e.kind]}
               </p>
+              {e.kind !== 'savings' && (
+                <label className="field">
+                  Tipo
+                  <select
+                    value={e.kind}
+                    onChange={(ev) => {
+                      const kind = ev.target.value as EnvelopeKind
+                      setEnvelopes((prev) =>
+                        prev.map((x) =>
+                          x.id === e.id
+                            ? {
+                                ...x,
+                                kind,
+                                rhythm:
+                                  kind === 'cap'
+                                    ? x.rhythm === 'weekly'
+                                      ? 'weekly'
+                                      : 'daily'
+                                    : kind === 'buffer'
+                                      ? 'daily'
+                                      : 'none',
+                              }
+                            : x,
+                        ),
+                      )
+                    }}
+                  >
+                    <option value="fixed">Cuota (marcar pagado)</option>
+                    <option value="cap">Techo (límite del ciclo)</option>
+                    <option value="fund">Fondo (sale del ahorro)</option>
+                  </select>
+                </label>
+              )}
+              {e.kind === 'cap' && (
+                <label className="field">
+                  ¿Diario o semanal?
+                  <select
+                    value={e.rhythm === 'weekly' ? 'weekly' : 'daily'}
+                    onChange={(ev) =>
+                      setEnvelopes((prev) =>
+                        prev.map((x) =>
+                          x.id === e.id ? { ...x, rhythm: ev.target.value as Rhythm } : x,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="daily">Diario — entra en “hoy puedes gastar” (ocio, café)</option>
+                    <option value="weekly">Semanal — consejo por semana (super, un hobby)</option>
+                  </select>
+                </label>
+              )}
               <label className="field">
-                {e.kind === 'fund' ? 'Asignar este ciclo (puede ser 0)' : 'Importe'}
+                {e.kind === 'fund' ? 'Apartar este ciclo (puede ser 0)' : 'Importe de este ciclo'}
                 <input
                   type="text"
                   inputMode="decimal"
@@ -282,27 +374,6 @@ export function Setup() {
                   onBlur={(ev) => setPlanned(e.id, ev.target.value)}
                 />
               </label>
-              {e.kind !== 'savings' && e.kind !== 'buffer' && (
-                <label className="field">
-                  Tipo
-                  <select
-                    value={e.kind}
-                    onChange={(ev) =>
-                      setEnvelopes((prev) =>
-                        prev.map((x) =>
-                          x.id === e.id ? { ...x, kind: ev.target.value as EnvelopeKind } : x,
-                        ),
-                      )
-                    }
-                  >
-                    {KINDS.filter((k) => k !== 'buffer' && k !== 'savings').map((k) => (
-                      <option key={k} value={k}>
-                        {KIND_LABEL[k]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
             </div>
           ))}
         <button className="btn ghost full" onClick={addRow}>
@@ -324,8 +395,8 @@ export function Setup() {
         ¿Cierra?
       </h2>
       <p className="muted">
-        Cada euro tiene trabajo. Libre es lo que queda para imprevistos, viajes o
-        ropa.
+        Cada euro tiene trabajo. Libre es lo que queda. Si no gastas un techo, al
+        cerrar el ciclo puede ir al ahorro.
       </p>
       <div className="math">
         <div className="math-row">
@@ -349,24 +420,13 @@ export function Setup() {
       </div>
       {deficit > 0 ? (
         <div className="deficit">
-          El plan pide {euros(deficit)} más que el dinero. Baja un techo o el
-          ahorro. Si este mes ya pagaste las cuotas, ponlas a 0.
-          <button type="button" className="btn full" style={{ marginTop: 10 }} onClick={zeroPaidCuotas}>
-            Poner cuotas y ahorro a 0
-          </button>
+          El plan pide {euros(deficit)} más que el dinero. Baja un techo o el ahorro.
         </div>
       ) : (
         <div className="hint">
           {buffer && buffer.planned > 0
-            ? `Libre: ${euros(buffer.planned)}. Eso es el residual. Si no lo gastas, al cerrar el ciclo puede ir a ahorro, viajes o ropa.`
-            : 'Todo el sueldo está asignado. Viajes y ropa se alimentan con lo que no gastes o moviendo dinero a propósito.'}
-          {income === ALEX_INCOME && (
-            <>
-              {' '}
-              Con 600 € de ahorro, el margen es pequeño a propósito: el control está
-              en comida, ocio y en no tocar el ahorro.
-            </>
-          )}
+            ? `Libre: ${euros(buffer.planned)}. Imprevistos chicos. Si no lo usas, puede ir al ahorro.`
+            : 'Todo el sueldo está asignado. Los fondos (viaje, medicina) salen del ahorro si están a 0.'}
         </div>
       )}
       {error ? <div className="deficit">{error}</div> : null}
@@ -376,6 +436,21 @@ export function Setup() {
       <p className="muted tiny" style={{ textTransform: 'none', letterSpacing: 0 }}>
         Empieza {startedAt} · próximo sueldo {expectedEndAt}
       </p>
+    </div>
+  )
+}
+
+export function HowItWorks() {
+  return (
+    <div className="stack">
+      {HOW_IT_WORKS.map((b) => (
+        <div className="card stack" key={b.title} style={{ gap: 6 }}>
+          <strong>{b.title}</strong>
+          <p className="muted" style={{ fontSize: 14 }}>
+            {b.body}
+          </p>
+        </div>
+      ))}
     </div>
   )
 }

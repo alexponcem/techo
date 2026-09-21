@@ -24,14 +24,11 @@ export function alexPlan(): Envelope[] {
 export function blankPlan(): Envelope[] {
   return [
     { id: 'ahorro', name: 'Ahorro', kind: 'savings', planned: 0, emoji: '🌱', opening: 0, rhythm: 'none' },
-    { id: 'arriendo', name: 'Arriendo', kind: 'fixed', planned: 0, emoji: '🏠', opening: 0, rhythm: 'none' },
-    { id: 'transporte', name: 'Transporte', kind: 'fixed', planned: 0, emoji: '🚇', opening: 0, rhythm: 'none' },
-    { id: 'movil', name: 'Plan móvil', kind: 'fixed', planned: 0, emoji: '📱', opening: 0, rhythm: 'none' },
-    { id: 'seguro', name: 'Seguro médico', kind: 'fixed', planned: 0, emoji: '🏥', opening: 0, rhythm: 'none' },
-    { id: 'comida', name: 'Comida', kind: 'cap', planned: 0, emoji: '🍽️', opening: 0, rhythm: 'weekly' },
+    { id: 'arriendo', name: 'Alquiler / arriendo', kind: 'fixed', planned: 0, emoji: '🏠', opening: 0, rhythm: 'none' },
+    { id: 'movil', name: 'Móvil / internet', kind: 'fixed', planned: 0, emoji: '📱', opening: 0, rhythm: 'none' },
+    { id: 'comida', name: 'Comida / super', kind: 'cap', planned: 0, emoji: '🍽️', opening: 0, rhythm: 'weekly' },
     { id: 'ocio', name: 'Ocio', kind: 'cap', planned: 0, emoji: '🎬', opening: 0, rhythm: 'daily' },
     { id: 'viajes', name: 'Viajes', kind: 'fund', planned: 0, emoji: '✈️', opening: 0, rhythm: 'none' },
-    { id: 'ropa', name: 'Ropa', kind: 'fund', planned: 0, emoji: '👕', opening: 0, rhythm: 'none' },
     { id: 'medicina', name: 'Medicina', kind: 'fund', planned: 0, emoji: '💊', opening: 0, rhythm: 'none' },
     { id: 'libre', name: 'Libre', kind: 'buffer', planned: 0, emoji: '💧', opening: 0, rhythm: 'daily' },
   ]
@@ -46,9 +43,9 @@ export const KIND_LABEL: Record<Envelope['kind'], string> = {
 }
 
 export const KIND_HINT: Record<Envelope['kind'], string> = {
-  savings: 'Se reserva primero y se acumula ciclo a ciclo. No se reinicia al cobrar.',
-  fixed: 'Importe conocido. Márcalo pagado cuando salga.',
-  cap: 'Límite del ciclo. Si no lo gastas, al cerrar el mes pasa al ahorro.',
-  fund: 'No tiene techo mensual. Si el fondo está vacío, el gasto sale del ahorro. Puedes apartar antes con Mover.',
-  buffer: 'Colchón pequeño para imprevistos. No es ocio. Si no lo usas, al cerrar el mes va al ahorro.',
+  savings: 'Se reserva primero y se acumula. No es “lo que sobre”.',
+  fixed: 'Importe conocido. Márcalo pagado cuando salga de la cuenta.',
+  cap: 'Límite del ciclo. Diario = entra en “hoy”. Semanal = consejo para que dure el mes.',
+  fund: 'Sin techo mensual. Si está vacío, el gasto sale del ahorro.',
+  buffer: 'Lo que queda del sueldo. Imprevistos chicos, no ocio.',
 }

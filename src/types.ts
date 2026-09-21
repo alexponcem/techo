@@ -42,6 +42,7 @@ export interface Settings {
   fixedDay: number
   /** 0 = domingo … 6 = sábado. Por defecto 5 (viernes). */
   weekStartsOn: number
+  seenHomeTour?: boolean
 }
 
 export interface AppState {

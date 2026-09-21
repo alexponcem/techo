@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { activeCycle, cycleTxs, envelopeView } from './logic'
+import { activeCycle, cycleTxs, envelopeView, rhythmOf } from './logic'
 import { euros, parseEuros } from './money'
 import { KIND_HINT, KIND_LABEL } from './template'
 import { markPaid, removeExpense, removeTx, updatePlanned, useAppState } from './store'
@@ -75,15 +75,15 @@ export function EnvelopeScreen({
         </div>
       )}
       <p className="muted">
-        {env.id === 'comida'
-          ? 'No entra en el gasto diario. El techo es el del mes. La cifra semanal es un consejo para que te dure, y se recalcula si cambias el techo o si la semana es más corta (inicio/fin de ciclo).'
-          : env.id === 'futbol'
-            ? 'Anotas cada partido. El techo es el del mes. El consejo semanal es para repartir; si un mes juegas más, avisa, y el extra puede salir de Libre.'
+        {env.kind === 'fixed'
+          ? 'Cuota: márcala pagada cuando salga de la cuenta. Hasta entonces sigue en el saldo del banco.'
+          : rhythmOf(env) === 'weekly'
+            ? 'Techo semanal: el límite duro es el del mes. La cifra de la semana es un consejo para que te dure. En Ajustes eliges qué día empieza tu semana.'
             : env.kind === 'fund'
-              ? 'Si el fondo está vacío, el gasto sale del ahorro (para eso ahorras). Si quieres apartar antes de gastar, usa Mover desde Ahorro.'
+              ? 'Fondo: si está vacío, el gasto sale del ahorro. Puedes apartar antes con Mover.'
               : env.kind === 'savings'
-              ? 'Bloqueado. Se acumula. Viajes y ropa salen de aquí. Un imprevisto también, con motivo.'
-              : KIND_HINT[env.kind]}
+                ? 'Ahorro protegido. Se acumula. Fondos y imprevistos grandes salen de aquí.'
+                : KIND_HINT[env.kind]}
       </p>
       <div className="actions">
         <button className="btn sage" onClick={onAdd}>

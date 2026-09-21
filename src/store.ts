@@ -78,6 +78,7 @@ function load(): AppState {
         payMode: parsed.settings?.payMode ?? 'last-weekday',
         fixedDay: parsed.settings?.fixedDay ?? 1,
         weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
+        seenHomeTour: parsed.settings?.seenHomeTour ?? true,
       },
       envelopes: withMissingEnvelopes(parsed.envelopes, income),
       template: withMissingEnvelopes(parsed.template, income),
@@ -133,7 +134,7 @@ export function startFirstCycle(input: {
   emit({
     version: 1,
     onboarded: true,
-    settings: input.settings,
+    settings: { ...input.settings, seenHomeTour: false },
     template: template.map((e) => ({ ...e, opening: 0 })),
     envelopes: template,
     cycles: [
@@ -439,6 +440,7 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
         payMode: parsed.settings?.payMode ?? 'last-weekday',
         fixedDay: parsed.settings?.fixedDay ?? 1,
         weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
+        seenHomeTour: parsed.settings?.seenHomeTour ?? true,
       },
       template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
       envelopes: withMissingEnvelopes(parsed.envelopes, income),
