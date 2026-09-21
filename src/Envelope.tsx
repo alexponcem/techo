@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { activeCycle, cycleTxs, envelopeView, WEEKS_PER_MONTH } from './logic'
+import { activeCycle, cycleTxs, envelopeView } from './logic'
 import { euros, parseEuros } from './money'
 import { KIND_HINT, KIND_LABEL } from './template'
 import { markPaid, removeExpense, removeTx, updatePlanned, useAppState } from './store'
@@ -36,11 +36,7 @@ export function EnvelopeScreen({
   }
   const allTxs = cycleTxs(state, cycle.id)
   const txs = allTxs.filter((t) => t.envelopeId === id || t.toEnvelopeId === id)
-  const view = envelopeView(env, allTxs, cycle)
-  const weekHint =
-    env.planned > 0
-      ? `${euros(env.planned)} ÷ ${WEEKS_PER_MONTH} semanas ≈ ${euros(Math.round(env.planned / WEEKS_PER_MONTH))}`
-      : ''
+  const view = envelopeView(env, allTxs, cycle, undefined, undefined, state.settings.weekStartsOn ?? 5)
 
   function saveTecho() {
     if (!env) return
@@ -73,15 +69,16 @@ export function EnvelopeScreen({
       </div>
       {view.week && (
         <div className="hint">
-          Esta semana ({view.week.label}): {euros(view.week.spent)} de ~{euros(view.week.target)}.
-          {weekHint ? ` Ritmo: ${weekHint}.` : ''} Anota cada vez el día que lo gastas.
+          Consejo esta semana ({view.week.label}, {view.week.daysInCycle}{' '}
+          {view.week.daysInCycle === 1 ? 'día' : 'días'} de este ciclo): ~{euros(view.week.target)}.
+          Llevas {euros(view.week.spent)}. El techo duro es el del mes ({euros(view.total)}).
         </div>
       )}
       <p className="muted">
         {env.id === 'comida'
-          ? 'No entra en el gasto diario. Compras del sábado (y extras). Techo mensual 130 € → 130 ÷ 4,5 semanas ≈ 29 €/semana.'
+          ? 'No entra en el gasto diario. El techo es el del mes. La cifra semanal es un consejo para que te dure, y se recalcula si cambias el techo o si la semana es más corta (inicio/fin de ciclo).'
           : env.id === 'futbol'
-            ? 'No se paga de golpe. Anotas cada partido (viernes o sábado). Techo 25 €/mes ≈ 6 €/semana. Si un mes juegas más, el extra sale de Libre.'
+            ? 'Anotas cada partido. El techo es el del mes. El consejo semanal es para repartir; si un mes juegas más, avisa, y el extra puede salir de Libre.'
             : env.kind === 'fund'
               ? 'Si el fondo está vacío, el gasto sale del ahorro (para eso ahorras). Si quieres apartar antes de gastar, usa Mover desde Ahorro.'
               : env.kind === 'savings'

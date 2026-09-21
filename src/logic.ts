@@ -1,4 +1,13 @@
-import { addDays, daysBetween, formatDay, localDayFromStamp, todayISO, weekStartOn } from './dates'
+import {
+  addDays,
+  clampWeekStart,
+  daysBetween,
+  daysInclusive,
+  formatDay,
+  localDayFromStamp,
+  todayISO,
+  weekStartOn,
+} from './dates'
 import type { AppState, Cycle, Envelope, EnvelopeKind, Light, Rhythm, Tx } from './types'
 
 export function rhythmOf(env: Envelope): Rhythm {
@@ -53,6 +62,8 @@ export interface WeekSlice {
   target: number
   remaining: number
   label: string
+  daysInCycle: number
+  pace: 'ok' | 'fast' | 'over'
 }
 
 export type UsageAlert = 'half' | 'near' | 'almost' | 'limit' | 'over' | null
@@ -70,7 +81,7 @@ export interface EnvelopeView {
   week?: WeekSlice
 }
 
-/** Un mes tiene ~4,5 semanas (30–31 días). De ahí el ~29 € de comida: 130 / 4,5. */
+/** Un mes tiene ~4,5 semanas. Solo para textos de ayuda, no para el consejo vivo. */
 export const WEEKS_PER_MONTH = 4.5
 
 export function weeklyTarget(env: Envelope, _cycle?: Cycle): number {
@@ -92,13 +103,13 @@ export function saveReview(
   const txs = cycleTxs(state, cycle.id)
   const when = formatDay(day)
   if (rhythmOf(env) === 'weekly') {
-    const w = weekSlice(env, txs, cycle, day)
+    const w = weekSlice(env, txs, cycle, day, remainingOf(env, txs), weekStartOf(state))
     if (!w) return { status: 'ok', title: 'Anotado', body: `Quedó en ${env.name} el ${when}.` }
     const ok = w.spent <= w.target
     return {
       status: ok ? (w.spent >= w.target * 0.85 ? 'tight' : 'ok') : 'over',
-      title: ok ? `Anotado el ${when}` : `Esa semana se pasó el techo`,
-      body: `Semana ${w.label}: ${fmt(w.spent)} de ~${fmt(w.target)} en ${env.name}. Este gasto va a esa semana, no a la de hoy.`,
+      title: ok ? `Anotado el ${when}` : `Esa semana vas por encima del consejo`,
+      body: `Semana ${w.label}: ${fmt(w.spent)} de ~${fmt(w.target)} (consejo para que dure el mes) en ${env.name}. El techo de verdad es el del mes.`,
     }
   }
   const views = viewsFor(state)
@@ -127,17 +138,45 @@ export function spentOnDay(txs: Tx[], envelopeIds: string[], day: string): numbe
   return n
 }
 
-export function weekSlice(env: Envelope, txs: Tx[], cycle: Cycle, today = todayISO()): WeekSlice | undefined {
+function remainingOf(env: Envelope, txs: Tx[]): number {
+  const n = netFor(env.id, txs)
+  return env.opening + env.planned + n.in - n.out - n.spent
+}
+
+function weekStartOf(state: AppState): number {
+  return clampWeekStart(state.settings.weekStartsOn ?? 5)
+}
+
+export function weekSlice(
+  env: Envelope,
+  txs: Tx[],
+  cycle: Cycle,
+  today = todayISO(),
+  remaining = 0,
+  weekStartsOn = 5,
+): WeekSlice | undefined {
   if (rhythmOf(env) !== 'weekly') return undefined
-  const start = weekStartOn(today)
+  const startOn = clampWeekStart(weekStartsOn)
+  const start = weekStartOn(today, startOn)
   const end = addDays(start, 6)
+  const sliceStart = start > cycle.startedAt ? start : cycle.startedAt
+  const sliceEnd = end < cycle.expectedEndAt ? end : cycle.expectedEndAt
   let spent = 0
   for (const t of txs) {
     if (t.type !== 'expense' || t.envelopeId !== env.id) continue
     const day = localDayFromStamp(t.at)
-    if (day >= start && day <= end) spent += t.amount
+    if (day >= sliceStart && day <= sliceEnd) spent += t.amount
   }
-  const target = weeklyTarget(env, cycle)
+  const ref = today < cycle.startedAt ? cycle.startedAt : today
+  const daysLeft = Math.max(1, daysInclusive(ref, cycle.expectedEndAt))
+  const restEnd = sliceEnd
+  const restDays = ref > restEnd ? 0 : daysInclusive(ref, restEnd)
+  const restAdvice = restDays <= 0 || daysLeft <= 0 ? 0 : Math.round((Math.max(0, remaining) * restDays) / daysLeft)
+  const target = Math.max(spent + restAdvice, restAdvice)
+  const daysInCycle = daysInclusive(sliceStart, sliceEnd)
+  let pace: 'ok' | 'fast' | 'over' = 'ok'
+  if (target > 0 && spent > target * 1.2) pace = 'over'
+  else if (target > 0 && spent > target) pace = 'fast'
   return {
     start,
     end,
@@ -145,13 +184,22 @@ export function weekSlice(env: Envelope, txs: Tx[], cycle: Cycle, today = todayI
     target,
     remaining: target - spent,
     label: `${formatDay(start)} → ${formatDay(end)}`,
+    daysInCycle,
+    pace,
   }
 }
 
-export function envelopeView(env: Envelope, txs: Tx[], cycle: Cycle, today = todayISO()): EnvelopeView {
+export function envelopeView(
+  env: Envelope,
+  txs: Tx[],
+  cycle: Cycle,
+  today = todayISO(),
+  remainingOverride?: number,
+  weekStartsOn = 5,
+): EnvelopeView {
   const n = netFor(env.id, txs)
   const total = env.opening + env.planned
-  const remaining = total + n.in - n.out - n.spent
+  const remaining = remainingOverride ?? total + n.in - n.out - n.spent
   const spent = n.spent
   const used = n.spent + n.out
   const base = env.kind === 'savings' ? env.opening + env.planned + n.in : total
@@ -168,7 +216,7 @@ export function envelopeView(env: Envelope, txs: Tx[], cycle: Cycle, today = tod
           : 0
         : Math.round((spent / total) * 100)
   const paid = env.kind === 'fixed' && remaining <= 0 && total > 0
-  const week = weekSlice(env, txs, cycle, today)
+  const week = weekSlice(env, txs, cycle, today, remaining, weekStartsOn)
   const status = usageStatus(ensureRhythm(env), spent, total, remaining, week)
   return {
     env: ensureRhythm(env),
@@ -188,7 +236,8 @@ export function viewsFor(state: AppState, today = todayISO()): EnvelopeView[] {
   const cycle = activeCycle(state)
   if (!cycle) return []
   const txs = cycleTxs(state, cycle.id)
-  return state.envelopes.map((env) => envelopeView(env, txs, cycle, today))
+  const weekStartsOn = weekStartOf(state)
+  return state.envelopes.map((env) => envelopeView(env, txs, cycle, today, undefined, weekStartsOn))
 }
 
 function usageStatus(
@@ -212,11 +261,9 @@ function usageStatus(
   const fromPct = band(pct)
   if (fromPct.alert) return fromPct
 
-  if (week && week.target > 0) {
-    const wp = Math.round((week.spent / week.target) * 100)
-    const weekly = band(wp)
-    if (weekly.alert === 'over') return { light: 'red', alert: 'almost' }
-    return weekly
+  if (week && week.target > 0 && week.pace !== 'ok') {
+    if (week.pace === 'over') return { light: 'orange', alert: 'near' }
+    return { light: 'yellow', alert: 'half' }
   }
   return { light: 'green', alert: null }
 }
@@ -616,13 +663,13 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number): Verd
       return {
         status: 'tight',
         remainingAfter,
-        message: `Cabe en el mes (${fmt(remainingAfter)}), pero esta semana te pasas del ritmo (~${fmt(view.week.target)}). Llevarías ${fmt(weekAfter)}.`,
+        message: `Cabe en el mes (${fmt(remainingAfter)}). Consejo de esta semana ~${fmt(view.week.target)}; con esto llevarías ${fmt(weekAfter)}.`,
       }
     }
     return {
       status: 'ok',
       remainingAfter,
-      message: `Compra de la semana: ${fmt(weekAfter)} de ~${fmt(view.week.target)}. En el mes quedarían ${fmt(remainingAfter)}.`,
+      message: `Consejo esta semana ~${fmt(view.week.target)} (llevas ${fmt(weekAfter)}). En el mes quedarían ${fmt(remainingAfter)}.`,
     }
   }
   if (view.env.kind === 'savings') {

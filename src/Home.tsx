@@ -209,7 +209,7 @@ export function Home({
                   {v.env.emoji} {v.env.name} esta semana
                 </strong>
                 <span>
-                  {euros(v.week?.spent ?? 0)} / {euros(v.week?.target ?? 0)}
+                  {euros(v.week?.spent ?? 0)} / ~{euros(v.week?.target ?? 0)}
                 </span>
               </div>
               <div className={`bar ${v.light}`}>
@@ -225,13 +225,13 @@ export function Home({
                 </div>
               )}
               <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-                {v.week?.label ?? 'viernes → jueves'}
-                {v.env.id === 'comida'
-                  ? ` · 130 € ÷ 4,5 semanas ≈ 29 € · mes ${euros(v.spent)} / ${euros(v.total)}`
-                  : v.env.id === 'futbol'
-                    ? ` · 25 € ÷ 4,5 semanas ≈ 6 €/partido · mes ${euros(v.spent)} / ${euros(v.total)}`
-                    : ` · mes ${euros(v.spent)} / ${euros(v.total)}`}
-                . Anotas el día que lo gastas.
+                {v.week?.label}
+                {v.week && v.week.daysInCycle < 7
+                  ? ` · ${v.week.daysInCycle} días de este ciclo`
+                  : ''}
+                . Consejo para que dure, no un techo. Mes {euros(v.spent)} / {euros(v.total)}.
+                {v.week?.pace === 'fast' ? ' Esta semana vas un poco rápido.' : ''}
+                {v.week?.pace === 'over' ? ' Esta semana por encima del consejo.' : ''}
               </p>
             </button>
           ))}

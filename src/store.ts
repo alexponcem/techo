@@ -57,7 +57,7 @@ const KEY = 'techo.v1'
 const empty = (): AppState => ({
   version: 1,
   onboarded: false,
-  settings: { payMode: 'last-weekday', fixedDay: 1 },
+  settings: { payMode: 'last-weekday', fixedDay: 1, weekStartsOn: 5 },
   template: alexPlan(),
   envelopes: [],
   cycles: [],
@@ -74,6 +74,11 @@ function load(): AppState {
     const income = cycle?.income ?? parsed.cycles[0]?.income ?? 139_100
     const migrated = {
       ...parsed,
+      settings: {
+        payMode: parsed.settings?.payMode ?? 'last-weekday',
+        fixedDay: parsed.settings?.fixedDay ?? 1,
+        weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
+      },
       envelopes: withMissingEnvelopes(parsed.envelopes, income),
       template: withMissingEnvelopes(parsed.template, income),
     }
@@ -430,7 +435,11 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
     emit({
       ...parsed,
       onboarded: parsed.onboarded || parsed.cycles.length > 0,
-      settings: parsed.settings ?? { payMode: 'last-weekday', fixedDay: 1 },
+      settings: {
+        payMode: parsed.settings?.payMode ?? 'last-weekday',
+        fixedDay: parsed.settings?.fixedDay ?? 1,
+        weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
+      },
       template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
       envelopes: withMissingEnvelopes(parsed.envelopes, income),
     })

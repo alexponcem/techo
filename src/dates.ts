@@ -55,6 +55,26 @@ export function daysBetween(a: string, b: string): number {
   return Math.round(ms / 86_400_000)
 }
 
+export function daysInclusive(a: string, b: string): number {
+  if (a > b) return 0
+  return daysBetween(a, b) + 1
+}
+
+export const WEEKDAY_NAMES = [
+  'domingo',
+  'lunes',
+  'martes',
+  'miércoles',
+  'jueves',
+  'viernes',
+  'sábado',
+] as const
+
+export function clampWeekStart(n: number): number {
+  if (!Number.isFinite(n) || n < 0 || n > 6) return 5
+  return Math.trunc(n)
+}
+
 export function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
   const d = new Date(year, month - 1 + delta, 1)
   return { year: d.getFullYear(), month: d.getMonth() + 1 }

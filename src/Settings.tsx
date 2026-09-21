@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { euros } from './money'
-import { exportJson, importJson, resetAll, undoLast, useAppState } from './store'
+import { WEEKDAY_NAMES, clampWeekStart } from './dates'
+import { exportJson, importJson, resetAll, undoLast, updateSettings, useAppState } from './store'
 
 export function SettingsScreen({
   onBack,
@@ -62,6 +63,28 @@ export function SettingsScreen({
         <p className="muted">
           Abre Techo siempre en Safari normal, no en incógnito: ahí no se guarda
           nada. Quitar el icono no suele borrar datos; una ventana privada sí.
+        </p>
+        <label className="field">
+          La semana de comida y fútbol empieza el
+          <select
+            value={clampWeekStart(state.settings.weekStartsOn ?? 5)}
+            onChange={(e) =>
+              updateSettings({
+                ...state.settings,
+                weekStartsOn: clampWeekStart(Number(e.target.value)),
+              })
+            }
+          >
+            {WEEKDAY_NAMES.map((name, i) => (
+              <option key={name} value={i}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted" style={{ fontSize: 13 }}>
+          Ahora: {WEEKDAY_NAMES[clampWeekStart(state.settings.weekStartsOn ?? 5)]} →{' '}
+          {WEEKDAY_NAMES[(clampWeekStart(state.settings.weekStartsOn ?? 5) + 6) % 7]}.
         </p>
       </div>
       <button className="btn secondary full" onClick={onIncome}>

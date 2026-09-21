@@ -92,7 +92,7 @@ export function Setup() {
         income,
         startedAt,
         expectedEndAt,
-        settings: { payMode, fixedDay },
+        settings: { payMode, fixedDay, weekStartsOn: 5 },
         template: balanced,
         savingsOpening,
       })

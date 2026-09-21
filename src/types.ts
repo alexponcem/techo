@@ -40,6 +40,8 @@ export interface Tx {
 export interface Settings {
   payMode: PayMode
   fixedDay: number
+  /** 0 = domingo … 6 = sábado. Por defecto 5 (viernes). */
+  weekStartsOn: number
 }
 
 export interface AppState {
