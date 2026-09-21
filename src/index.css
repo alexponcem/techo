@@ -687,6 +687,33 @@ select:focus {
   background: var(--sage);
 }
 
+.guide-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-list li {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.4;
+  box-shadow: var(--shadow);
+}
+
+.guide-list b {
+  display: inline;
+}
+
+.card .guide-list li {
+  box-shadow: none;
+  background: var(--paper);
+}
+
 .tour {
   position: fixed;
   inset: 0;

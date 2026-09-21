@@ -282,16 +282,16 @@ export function Home({
 
 const TOUR = [
   {
-    title: 'Tu cuenta',
-    body: '“En tu cuenta ahora” es lo que debería verse en el banco: ahorro, cuotas aún no pagadas y lo que no has gastado.',
+    title: 'En tu cuenta ahora',
+    body: 'Ese total es lo que debería verse en el banco: ahorro + lo no gastado + alquiler u otras cuotas que aún no hayas marcado pagadas.',
   },
   {
-    title: 'Hoy',
-    body: 'Ese número es el ritmo de los techos diarios (ocio, libre) hasta el próximo sueldo. Los semanales (super) van en su propia tarjeta.',
+    title: 'Hoy puedes gastar',
+    body: 'Solo cuenta ocio y Libre (techos diarios). El super u otros techos semanales van en la tarjeta de “esta semana”, no aquí.',
   },
   {
     title: '+ Gasto',
-    body: 'Importe, sobre, listo. Si te olvidaste, cambia la fecha. Las cuotas se marcan pagadas cuando salen.',
+    body: 'Cuánto, en qué sobre, anotar. La app te dice si cabe en ESE sobre. Las cuotas: “Marcar pagado” cuando salgan.',
   },
 ]
 

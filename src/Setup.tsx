@@ -88,12 +88,17 @@ export function Setup() {
       <div className="welcome stack">
         <p className="tiny">Control de dinero</p>
         <h1>Techo</h1>
+        <p>
+          App para <b>controlar tus gastos</b>. Hasta el último céntimo (euro, dólar
+          o lo que uses) tiene un sitio.
+        </p>
         <p className="muted">
-          Cada euro tiene un trabajo. Antes de gastar, la app te dice si cabe.
+          Antes de pagar, le dices cuánto y en qué sobre. Techo te dice si{' '}
+          <b>cabe en esa cajita</b> o si te pasas.
         </p>
         <button className="choice" onClick={() => setStep('tutorial')}>
           <b>Crear mi plan</b>
-          <span className="muted">Te explicamos en un minuto y luego pones tus números</span>
+          <span className="muted">Primero cómo se usa, luego tus números</span>
         </button>
         <input
           ref={fileRef}
@@ -138,8 +143,17 @@ export function Setup() {
         <h2 className="serif" style={{ fontSize: 30 }}>
           {page.title}
         </h2>
-        <p>{page.body}</p>
-        <div className="hint">{page.example}</div>
+        <p>{page.lead}</p>
+        {page.items && page.items.length > 0 && (
+          <ul className="guide-list">
+            {page.items.map((it) => (
+              <li key={it.k}>
+                <b>{it.k}.</b> {it.v}
+              </li>
+            ))}
+          </ul>
+        )}
+        {page.tip ? <div className="hint">{page.tip}</div> : null}
         <div className="dots">
           {TUTORIAL.map((_, i) => (
             <span key={i} className={i === tip ? 'dot on' : 'dot'} />
@@ -275,18 +289,22 @@ export function Setup() {
         <h2 className="serif" style={{ fontSize: 32 }}>
           Sobres
         </h2>
-        <div className="hint">
-          <b>Cuota</b> = alquiler, móvil: márcala pagada cuando salga.
-          <br />
-          <b>Techo diario</b> (ocio) = entra en “hoy puedes gastar”.
-          <br />
-          <b>Techo semanal</b> (super) = consejo para que dure el mes; el límite duro es el
-          mes.
-          <br />
-          <b>Fondo</b> = viaje o medicina, sin techo; si está vacío sale del ahorro.
-          <br />
-          Quita lo que no uses y pon tus importes. Libre se calcula solo.
-        </div>
+        <ul className="guide-list">
+          <li>
+            <b>Cuota.</b> Alquiler, móvil. Márcala pagada cuando salga del banco.
+          </li>
+          <li>
+            <b>Techo diario.</b> Ocio, café. Entra en “hoy puedes gastar”.
+          </li>
+          <li>
+            <b>Techo semanal.</b> Super. Consejo por semana; el límite duro es el mes.
+            Elige “Semanal” abajo y el día de inicio de semana (ya lo pedimos).
+          </li>
+          <li>
+            <b>Fondo.</b> Viaje, medicina. Sin techo. Si está a 0, sale del ahorro.
+          </li>
+        </ul>
+        <p className="muted">Quita lo que no uses y pon tus importes. Libre se calcula solo.</p>
         {balanced
           .filter((e) => e.kind !== 'buffer')
           .map((e) => (
@@ -444,11 +462,23 @@ export function HowItWorks() {
   return (
     <div className="stack">
       {HOW_IT_WORKS.map((b) => (
-        <div className="card stack" key={b.title} style={{ gap: 6 }}>
+        <div className="card stack" key={b.title} style={{ gap: 8 }}>
           <strong>{b.title}</strong>
-          <p className="muted" style={{ fontSize: 14 }}>
-            {b.body}
-          </p>
+          <p style={{ fontSize: 14 }}>{b.lead}</p>
+          {b.items && (
+            <ul className="guide-list">
+              {b.items.map((it) => (
+                <li key={it.k}>
+                  <b>{it.k}.</b> {it.v}
+                </li>
+              ))}
+            </ul>
+          )}
+          {b.tip ? (
+            <p className="muted" style={{ fontSize: 13 }}>
+              {b.tip}
+            </p>
+          ) : null}
         </div>
       ))}
     </div>

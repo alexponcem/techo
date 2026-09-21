@@ -1,68 +1,119 @@
-export const TUTORIAL = [
-  {
-    title: 'El ciclo no es el mes',
-    body: 'Empieza el día que cobras y acaba el siguiente cobro. Si pagan el viernes porque el 31 es domingo, el ciclo empieza el viernes.',
-    example: 'Ejemplo: cobras el 28. Ese dinero dura hasta el próximo 28.',
-  },
-  {
-    title: 'Tres tipos de sobre',
-    body: 'Cuota: siempre el mismo importe. Lo marcas pagado cuando sale (alquiler, móvil). Techo: un límite para el ciclo (super, ocio). Fondo: sin límite mensual; si está vacío, sale del ahorro (viaje, medicina).',
-    example: 'El ahorro se reserva primero y se acumula. No es “lo que sobre”.',
-  },
-  {
-    title: 'Diario o semanal',
-    body: 'Un techo diario (ocio, café) entra en “hoy puedes gastar”: la app reparte lo que queda entre los días hasta el sueldo. Un techo semanal (super, un hobby) no entra en ese “hoy”. Tiene un consejo por semana para que el mes te dure. El techo de verdad es el del mes; la semana es una guía.',
-    example: 'Si el super es el sábado, pon la semana a empezar el sábado (o el viernes) en Ajustes.',
-  },
-  {
-    title: 'Anota cuando pagas',
-    body: 'Importe, sobre, listo. Si te olvidaste, pon la fecha real (ayer, el domingo…). Si no gastas el techo, al cerrar el ciclo ese resto puede ir al ahorro.',
-    example: 'Tres toques. Si un sobre no alcanza, te pregunta si sale de Libre o del ahorro.',
-  },
-] as const
+export type GuideItem = { k: string; v: string }
 
-export const HOW_IT_WORKS = [
+export type GuidePage = {
+  title: string
+  lead: string
+  items?: GuideItem[]
+  tip?: string
+}
+
+export const TUTORIAL: GuidePage[] = [
   {
-    title: 'Cuotas (marcar pagado)',
-    body: 'Alquiler, seguro, gimnasio, tarifa del móvil: el importe se conoce. La app lo reserva. Cuando salga de la cuenta, Márcalo pagado. Hasta entonces sigue en “en tu cuenta ahora”, porque el banco aún no lo ha cobrado.',
+    title: 'Qué es Techo',
+    lead: 'Es una app para controlar tus gastos. Hasta el último céntimo (euro, dólar o la moneda que uses) tiene un sitio: no se gasta “de la cuenta” a ciegas.',
+    items: [
+      {
+        k: 'Sobres',
+        v: 'Partes tu sueldo en cajitas: alquiler, comida, ocio, ahorro…',
+      },
+      {
+        k: '¿Cabe?',
+        v: 'Antes de pagar, pones el importe y eliges el sobre. Techo te dice si cabe en ESA cajita o si te pasas.',
+      },
+    ],
+    tip: 'Ejemplo: un café de 3. Lo metes en Ocio. Si en ocio te quedan 20, cabe. Si te quedan 1, te avisa.',
   },
   {
-    title: 'Techos diarios',
-    body: 'Ocio, cafés, imprevistos chicos (Libre). Cada gasto baja el ritmo de “hoy”. Ese número no es un bote aparte: es lo que te queda dividido entre los días hasta el sueldo.',
+    title: 'Qué haces cada día',
+    lead: 'Solo anotas lo que pagas. Tres toques.',
+    items: [
+      { k: '1', v: 'Pulsa + Gasto.' },
+      { k: '2', v: 'Escribe cuánto y elige el sobre (comida, ocio…).' },
+      { k: '3', v: 'Lee si cabe y pulsa Anotar.' },
+    ],
+    tip: 'Si se te olvidó, pon la fecha real (ayer, el domingo…). El gasto cuenta ese día, no hoy.',
   },
   {
-    title: 'Techos semanales',
-    body: 'Comida del super, un deporte, lo que compras una o dos veces por semana. No restan del “hoy”. Ves un consejo (“para que dure, ~X esta semana”). Si te pasas esa semana, avisa suave. Si te pasas el mes, ahí sí es el techo. En Ajustes eliges si tu semana empieza el lunes, el sábado, etc.',
+    title: 'Cuotas: se marcan pagadas',
+    lead: 'Son gastos que ya sabes: el mismo importe casi todos los meses.',
+    items: [
+      { k: 'Ejemplos', v: 'Alquiler o arriendo, móvil, seguro, gimnasio.' },
+      { k: 'Qué haces', v: 'La app los reserva. Cuando salgan del banco, pulsas “Marcar pagado”.' },
+      {
+        k: 'Por qué',
+        v: 'Hasta que no los marques, siguen en “en tu cuenta ahora”: el banco aún no los ha cobrado.',
+      },
+    ],
+  },
+  {
+    title: 'Techos: lo que sí cambia',
+    lead: 'Son un límite para este cobro. Hay dos ritmos. No los mezcles.',
+    items: [
+      {
+        k: 'Diario (ocio, café, Libre)',
+        v: 'Entra en el número grande “hoy puedes gastar”. Es lo que te queda, partido entre los días hasta el próximo sueldo.',
+      },
+      {
+        k: 'Semanal (super, un hobby)',
+        v: 'NO entra en ese “hoy”. Ves un consejo: “para que te dure el mes, gasta unos X esta semana”. El límite de verdad es el del MES. La semana es una guía.',
+      },
+      {
+        k: 'Cómo se configura lo semanal',
+        v: 'Al crear el sobre, elige “Semanal”. En Ajustes dices qué día empieza tu semana (sábado si compras el sábado, lunes, etc.).',
+      },
+    ],
+    tip: 'Si no gastas todo el techo, al cerrar el ciclo ese resto puede ir al ahorro.',
   },
   {
     title: 'Ahorro y fondos',
-    body: 'El ahorro se aparta al cobrar y se acumula. Viajes, ropa o medicina no tienen techo cada mes: si no apartaste antes, el gasto sale del ahorro (con confirmación).',
+    lead: 'El ahorro no es lo que “sobra”. Se aparta al cobrar y se va juntando.',
+    items: [
+      {
+        k: 'Ahorro',
+        v: 'Lo pones tú cada ciclo (ej. 200). No se gasta en cafés. Si un día lo usas, la app pide confirmación.',
+      },
+      {
+        k: 'Fondos (viaje, ropa, medicina)',
+        v: 'No tienen techo cada mes. Si el fondo está a 0, el gasto SALE DEL AHORRO.',
+      },
+    ],
   },
   {
-    title: 'El saldo',
-    body: '“En tu cuenta ahora” suma todo lo que sigue en sobres (incluido el alquiler si aún no lo marcaste pagado). Debería parecerse al banco si anotaste todo.',
+    title: 'De un cobro al siguiente',
+    lead: 'Un “ciclo” no es el 1 al 30 del calendario. Es de sueldo a sueldo.',
+    items: [
+      { k: 'Empieza', v: 'El día que te pagan (aunque sea un viernes).' },
+      { k: 'Acaba', v: 'El día que te vuelven a pagar.' },
+      {
+        k: 'En tu cuenta ahora',
+        v: 'Ese número debe parecerse al banco: ahorro + lo no gastado + cuotas aún no pagadas.',
+      },
+    ],
+    tip: 'Cuando cobres otra vez, cierra el ciclo (↻). Lo que no gastaste puede pasar al ahorro.',
   },
-] as const
+]
+
+export const HOW_IT_WORKS: GuidePage[] = TUTORIAL
 
 export const KIND_EXPLAIN: Record<string, { label: string; hint: string }> = {
   savings: {
     label: 'Ahorro',
-    hint: 'Se reserva primero y se junta de un cobro a otro. Ejemplo: 200 € cada vez que cobras.',
+    hint: 'Se reserva primero y se junta. Ejemplo: 200 cada vez que cobras.',
   },
   fixed: {
     label: 'Cuota',
-    hint: 'Importe fijo. Márcalo pagado cuando salga. Ejemplo: alquiler o arriendo, móvil.',
+    hint: 'Importe fijo. Márcalo pagado cuando salga. Ejemplo: alquiler, móvil.',
   },
   cap: {
     label: 'Techo',
-    hint: 'Límite del ciclo. Elige si es diario (ocio) o semanal (super). Lo que no gastes puede ir al ahorro.',
+    hint: 'Límite del ciclo. Diario = “hoy puedes gastar”. Semanal = consejo para que dure el mes.',
   },
   fund: {
     label: 'Fondo',
-    hint: 'Sin techo mensual. Ejemplo: viaje, ropa, medicina. Vacío = sale del ahorro.',
+    hint: 'Sin techo mensual. Ejemplo: viaje, medicina. Si está a 0, sale del ahorro.',
   },
   buffer: {
     label: 'Libre',
-    hint: 'Lo que sobra del sueldo tras asignar el resto. Imprevistos chicos, no ocio.',
+    hint: 'Lo que sobra del sueldo. Imprevistos chicos, no ocio.',
   },
 }
