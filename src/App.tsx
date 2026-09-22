@@ -104,6 +104,14 @@ export default function App() {
         </button>
         <button
           type="button"
+          className="tab-add"
+          onClick={() => openSheet({ name: 'add' })}
+          aria-label="Añadir gasto"
+        >
+          +
+        </button>
+        <button
+          type="button"
           className={screen.name === 'stats' ? 'on' : ''}
           onClick={() => setScreen({ name: 'stats' })}
         >

@@ -127,12 +127,27 @@ p {
   bottom: 0;
   width: min(430px, 100%);
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr auto 1fr;
   gap: 8px;
-  padding: 10px 16px calc(10px + var(--safe-bottom));
+  align-items: center;
+  padding: 8px 16px calc(10px + var(--safe-bottom));
   background: var(--paper);
   box-shadow: 0 -8px 24px rgba(26, 23, 20, 0.06);
   z-index: 10;
+}
+
+.tab-add {
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sage);
+  color: #f7f3ea;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow);
 }
 
 .tabbar button {
@@ -400,7 +415,7 @@ p {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin: 16px 0 22px;
+  margin: 0 0 14px;
 }
 
 .btn {

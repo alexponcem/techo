@@ -101,6 +101,15 @@ export function Home({
         </div>
       </header>
 
+      <div className="actions">
+        <button className="btn sage" onClick={() => onOpen({ name: 'add' })}>
+          + Gasto
+        </button>
+        <button className="btn secondary" onClick={() => onOpen({ name: 'move' })}>
+          Mover
+        </button>
+      </div>
+
       {hot.length > 0 && (
         <div className={`banner ${over.length + atLimit.length + almost.length > 0 ? 'red' : 'orange'}`}>
           {over.length === 1 && <div>{over[0].env.name} superó el techo.</div>}
@@ -239,15 +248,6 @@ export function Home({
           ))}
         </section>
       )}
-
-      <div className="actions">
-        <button className="btn sage" onClick={() => onOpen({ name: 'add' })}>
-          + Gasto
-        </button>
-        <button className="btn secondary" onClick={() => onOpen({ name: 'move' })}>
-          Mover
-        </button>
-      </div>
 
       {groups.map((g) =>
         g.items.length === 0 ? null : (
