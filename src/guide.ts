@@ -1,6 +1,7 @@
 export type GuideItem = { k: string; v: string }
 
 export type GuidePage = {
+  screen: string
   title: string
   lead: string
   items?: GuideItem[]
@@ -9,150 +10,132 @@ export type GuidePage = {
 
 export const TUTORIAL: GuidePage[] = [
   {
-    title: 'Qué es Techo',
-    lead: 'Es una app para controlar tus gastos. Nació por la necesidad de Alex de querer ahorrar porque nunca sabía dónde se iba su dinero jajaja. Hasta el último céntimo (euro, dólar o lo que uses) tiene un sitio.',
+    screen: '¿Qué es Techo?',
+    title: 'Tu dinero bajo control, centavo a centavo.',
+    lead: 'Techo divide tus ingresos en Sobres para que nunca te preguntes a dónde se fue tu dinero.',
     items: [
       {
-        k: 'Sobres',
-        v: 'Partes tu sueldo en cajitas. Esas cajitas las llamamos sobres: alquiler, comida, ocio, ahorro… Cada euro va a una.',
+        k: 'Tus Sobres ilimitados',
+        v: 'Crea todas las cajitas que necesites (alquiler, comida, ahorro, viajes, etc.). Cada dólar que entra a tu cuenta va a un sobre.',
       },
       {
-        k: '¿Cabe?',
-        v: 'Antes de pagar, pones el importe y eliges el sobre. Techo te dice si ese gasto cabe en ESA cajita. Vamos: si se ajusta a lo que te habías propuesto, o si ya te empieza a poner en aprietos.',
-      },
-    ],
-    tip: 'Ejemplo: un café de 3 €. Lo metes en Ocio. Si te quedan 20 € en ocio, cabe. Si te queda 1 €, te avisa que te vas a pasar del presupuesto de ese sobre.',
-  },
-  {
-    title: 'El sueldo se parte (esto es lo importante)',
-    lead: 'Todo junto es tu sueldo, de un cobro al siguiente. No es un montón misterioso: primero se separa lo serio, y lo que queda es lo que puedes ir gastando.',
-    items: [
-      {
-        k: '1. Ahorro',
-        v: 'Se aparta el día que cobras (ej. 200 €). No es “lo que sobre a fin de mes”, porque si esperas a que sobre, nunca sobrará jaja.',
-      },
-      {
-        k: '2. Cuotas (gastos fijos)',
-        v: 'Alquiler, móvil, seguro… importes que ya conoces. Se reservan. Lo que queda después de 1 y 2 es lo gastable.',
-      },
-      {
-        k: '3. Lo que sí puedes gastar',
-        v: 'Comida, ocio, imprevistos chicos. Ahí vive el día a día. Si no lo gastas todo, al terminar el ciclo ese resto puede ir al ahorro.',
-      },
-    ],
-    tip: 'Ejemplo: entran 1.500 €. Apartas 200 € de ahorro y 700 € de alquiler + móvil. Te quedan 600 € para comida, ocio y el resto. Eso es lo que “se puede gastar”.',
-  },
-  {
-    title: 'Cuotas: gastos fijos',
-    lead: 'Son gastos que ya sabes: casi el mismo importe todos los meses. La app los deja apartados hasta que el banco los cobra.',
-    items: [
-      { k: 'Ejemplos', v: 'Alquiler o arriendo, móvil, seguro, gimnasio.' },
-      {
-        k: 'Qué haces',
-        v: 'Cuando salgan de tu cuenta del banco, pulsas “Marcar pagado”. No hace falta poner el importe otra vez.',
-      },
-      {
-        k: 'Que coincida con el banco',
-        v: 'Techo te muestra un total: el dinero que, si anotaste todo, deberías ver en tu cuenta bancaria. Mientras una cuota NO esté marcada pagada, ese dinero sigue sumando en Techo, igual que en el banco, porque aún no te lo han cobrado. El día que el banco lo cobre, lo marcas y los dos números bajan a la vez.',
+        k: 'Control en tiempo real',
+        v: 'Antes de pagar algo, miras tu sobre. Techo te dice si el gasto cabe o si te va a poner en aprietos.',
       },
     ],
   },
   {
-    title: 'Qué haces cada día',
-    lead: 'Esto es lo variable: café, super, un capricho. Se te escapan si no los anotas. En Techo los registras en unos 10 segundos y ya están controlados. Nada de “luego lo apunto”: los gastos hormiga son los más peligrosos, hay que tenerlos controlados.',
-    items: [
-      { k: '1', v: 'Pulsa + Gasto.' },
-      { k: '2', v: 'Escribe cuántos € y elige el sobre (comida, ocio…).' },
-      { k: '3', v: 'Lee si cabe en ese sobre y pulsa Anotar.' },
-    ],
-    tip: 'Si se te olvidó, pon la fecha real (ayer, el domingo…). Cuenta ese día, no como si lo hubieras gastado hoy.',
-  },
-  {
-    title: 'Techos: diario y semanal (no es lo mismo)',
-    lead: 'Un techo es un límite para este cobro. Lo importante: comida (y similares) se APARTA desde el inicio. No se suma a lo que puedes gastar cada día.',
+    screen: 'Los 3 tipos de Sobres que usarás',
+    title: 'Todo tu dinero vive en alguno de estos 3 sobres:',
+    lead: '',
     items: [
       {
-        k: 'Primero se reserva',
-        v: 'Ahorro, alquiler, móvil y también el super (comida) se quitan del sueldo al empezar. Ese dinero ya tiene dueño. No está “suelto” para el café de hoy.',
+        k: 'Sobres de Cuota (fijos)',
+        v: 'Pagos obligatorios que ocurren en el mes. Incluye tus gastos fijos (alquiler, gym) y tu sobre de Ahorro. Se reservan al cobrar, al igual que el ahorro ya que este no es “lo que sobre a fin de mes”, porque si esperas a que sobre, nunca lo hará jaja.',
       },
       {
-        k: 'Lo diario es SOLO lo que sobra',
-        v: 'Cuando ya apartaste ahorro + fijos + comida, lo que queda (ocio, imprevistos chicos) es lo gastable día a día. La app parte ESO entre los días hasta el próximo sueldo. Eso es “cuánto te queda hoy”. Un café de 3 € sale de ahí. No es todo el sueldo ÷ 30.',
+        k: 'Sobres de Techo (límites)',
+        v: 'Tus gastos variables (comida, ocio, café). Tienen un límite que se va consumiendo a medida que gastas.',
       },
       {
-        k: 'Lo semanal (super, un hobby)',
-        v: 'El super del sábado sale de su cajita de comida, no de lo diario. Techo te da un consejo: “para que te dure el mes, unos 28 € esta semana”. Si te pasas esa semana, aviso suave. El límite de verdad es el del MES.',
-      },
-      {
-        k: 'Cómo se configura lo semanal',
-        v: 'Al crear el sobre, elige “Semanal”. Luego dices qué día empieza tu semana (sábado si compras el sábado). Eso también está en Ajustes.',
-      },
-    ],
-    tip: 'Resumen: el diario = lo que queda DESPUÉS de separar ahorro, cuotas y comida.',
-  },
-  {
-    title: 'Ahorro y fondos',
-    lead: 'El ahorro se junta. Tocar el colchón no es un café más.',
-    items: [
-      {
-        k: 'Ahorro',
-        v: 'Lo apartas cada vez que cobras. Si quieres usarlo, Techo te para y te pide una razón. Así sabes que no es cosa sencilla: no sale “sin querer”.',
-      },
-      {
-        k: 'Fondos',
-        v: 'Son como una extensión del ahorro. Puedes ir separando una parte para un viaje, para ropa, para medicina… y ver cuánto quieres destinar a ese plan, sin sacarlo del montón general de ahorro a ciegas.',
-      },
-      {
-        k: 'Si el fondo está a 0 €',
-        v: 'El gasto sale del ahorro (Techo te lo dice y te pide que aceptes). Para eso ahorrabas, no para el café del martes.',
+        k: 'Sobres de Fondo (metas)',
+        v: 'No tienen un límite, pero salen exclusivamente de tu sobre de Ahorro para compras o planes específicos (un viaje, ropa, emergencias).',
       },
     ],
   },
   {
-    title: 'Un ciclo entero (números fáciles)',
-    lead: 'Cobras 1.000 €. El próximo sueldo es dentro de 30 días. Mira el ciclo de punta a punta:',
+    screen: 'Cómo se reparte tu sueldo',
+    title: 'De tus sobres fijos a tu presupuesto diario.',
+    lead: '',
     items: [
       {
-        k: 'Día 1 — se parte',
-        v: '100 € ahorro + 400 € alquiler + 50 € móvil + 150 € comida = 700 € ya apartados. Te quedan 300 € para ocio y Libre. Eso, entre 30 días, es unos 10 €/día. La comida NO está en esos 10 €: ya tiene su cajita de 150 €.',
+        k: 'Paso 1 — Protege tus sobres de Cuota',
+        v: 'El día que cobras, se reservan tus gastos fijos y tu sobre de Ahorro. Ejemplo: de 1.000 $ cobrados, separas 600 $ en Cuotas + 100 $ en Ahorro = te quedan 300 $.',
       },
       {
-        k: 'Una semana — se gasta',
-        v: 'Super 35 € → sale de comida (quedan 115 € en comida). Café 3 € → sale de ocio y los ~10 €/día bajan un poquito. El alquiler aún no lo han cobrado: Techo y el banco siguen mostrando esos 400 €.',
+        k: 'Paso 2 — Define tu Techo diario',
+        v: 'Ese valor restante se divide entre los días del mes. Ejemplo: esos 300 $ ÷ 30 días = ~10 $/día para gastar libremente.',
       },
       {
-        k: 'El banco cobra el alquiler',
-        v: 'Marcas “pagado”. El total de Techo baja 400 €, igual que el banco. Los 10 €/día no cambian por eso: el alquiler nunca fue dinero “de hoy”.',
+        k: 'Paso 3 — Si gastas de más',
+        v: 'Se recalcula solo el resto de la semana para compensar rápido, sin arruinar todo el mes.',
       },
       {
-        k: 'Cierre — llega el siguiente sueldo',
-        v: 'Comida: gastaste 120 € de 150 € → sobran 30 €. Ocio: 80 € de 100 € → sobran 20 €. Esos 50 € pueden ir al ahorro. Empiezas el ciclo nuevo con 100 € + 50 € de ahorro, y otro sueldo de 1.000 €.',
+        k: 'Paso 3 — Si gastas de menos',
+        v: 'El dinero no gastado en la semana se acumula para tu fin de semana. Lo que te sobre al final del ciclo pasará a tus Ahorros.',
       },
     ],
-    tip: 'Café = diario. Super = cajita de comida. Alquiler = marcar pagado. Lo que no gastes en techos puede volver al ahorro.',
   },
   {
-    title: 'Antes de que te lances…',
-    lead: 'No te preocupes: esta app aún no está “terminada-terminada”. Va en tu navegador, no en la nube.',
+    screen: 'Registra tus Sobres de Techo en 5 segundos',
+    title: 'El control de tu día a día.',
+    lead: '',
     items: [
+      { k: '1', v: 'Toca en + Gasto.' },
+      { k: '2', v: 'Ingresa el monto y elige su sobre de Techo (ej. Comida u Ocio).' },
       {
-        k: 'Lo bueno',
-        v: 'Alex no puede ver nada de lo que gastes ni lo que registres. Menos mal, ¿no? Jajaja. Nadie te espía ni te juzga. Anota ese sándwich con tranquilidad.',
+        k: '3 — ¿Cabe en el sobre?',
+        v: 'Si pides un café de 3 € y te quedan 10 €, Techo te dará luz verde.',
       },
       {
-        k: 'Lo no tan bueno',
-        v: 'Como no está en la nube, si usas incógnito o borras datos del sitio, se puede ir todo al carajo. Nadie dijo que fuera perfecta :( pero lo será algún día: este solo es el comienzo y tú serás parte de esto.',
-      },
-      {
-        k: 'El plan (copias)',
-        v: 'De vez en cuando: Ajustes → Exportar copia, y guarda el archivo (Drive, o envíatelo a ti mismo). Si un día se borra por accidente, con esa copia se puede restaurar. Un minuto que te ahorra un drama.',
-      },
-      {
-        k: 'Gracias',
-        v: 'De verdad: tu uso, tus quejas y tus ideas van a construir la app definitiva. Sin testers como tú, esto se quedaría en la cabeza de Alex.',
+        k: 'Si no cabe',
+        v: 'Techo te avisará que te pasas del límite y te preguntará si deseas tomar el faltante de tus Ahorros. La decisión final siempre es tuya; la app te lo muestra para que tú analices si vale la pena.',
       },
     ],
-    tip: 'Si te atascas, pregúntale a Alex. Él está detrás de esto (para bien y para las bromas). ¡A controlar ese sueldo!',
+    tip: 'Si olvidaste anotar un gasto ayer, pon la fecha real para que no afecte el presupuesto de hoy.',
+  },
+  {
+    screen: 'Tus Sobres de Cuota y tu Banco',
+    title: 'Tu app alineada con tu cuenta bancaria.',
+    lead: 'Tus sobres de Cuota (alquiler, suscripciones, etc.) separan el dinero desde un principio en la app hasta que el banco realiza el cobro: es intocable y no está incluido en tus gastos libres.',
+    items: [
+      {
+        k: 'Marcar pagado',
+        v: 'Cuando veas el cobro en tu banco, toca “Marcar pagado” en ese sobre y solito se te actualiza todo.',
+      },
+      {
+        k: 'El objetivo',
+        v: 'Mientras no los marques, ese dinero sigue sumando en la app igual que en el banco (porque aún no se cobra). Al marcarlos, ambos saldos bajan a la vez. Si anotaste todo bien, el total en Techo y tu cuenta bancaria coincidirán al centavo.',
+      },
+    ],
+  },
+  {
+    screen: 'De tu Ahorro a tus sobres de Fondo',
+    title: 'Premia tu control y pon a trabajar tu dinero.',
+    lead: '',
+    items: [
+      {
+        k: 'Tus Sobres de Fondo',
+        v: 'Para planes grandes (fiestas, viajes, ropa), usa tus sobres de Fondo, que se alimentan de tu Ahorro. Así no afectas tu presupuesto diario. Cada mes puedes destinar una parte del ahorro a viajes, ropa, etc., o, cuando lo necesites, pasar dinero directo del ahorro y saber en qué se fue.',
+      },
+      {
+        k: 'Cierre de mes (tu premio)',
+        v: 'Todo lo que te haya sobrado en tus sobres de Techo durante el mes se consolida para llenar tus Fondos o hacer crecer tu Ahorro. ¡Genial, no?',
+      },
+    ],
+  },
+  {
+    screen: 'Antes de que te lances…',
+    title: 'Tu información es 100% tuya y privada.',
+    lead: 'Techo aún no está terminada, así que funciona directamente en tu navegador, no en un servidor o la nube.',
+    items: [
+      {
+        k: 'Privacidad total',
+        v: 'Alex (ni nadie más) puede ver tus gastos, tus sobres o lo que ingresas. Nadie te espía ni te juzga; anota tus gustos con total libertad ;).',
+      },
+      {
+        k: 'Guarda tus datos en tu móvil',
+        v: 'Al no usar la nube, tus datos se guardan únicamente en tu dispositivo. Evita el modo incógnito o borrar el historial del navegador para no perder tu información.',
+      },
+      {
+        k: 'El plan: copias de seguridad',
+        v: 'De vez en cuando ve a Ajustes → Exportar copia y guárdala en tu teléfono o Drive. Si cambias de móvil o algo falla, podrás restaurarlo en un clic y evitar dramas.',
+      },
+      {
+        k: '¡Gracias por probar Techo!',
+        v: 'Tus ideas, quejas y comentarios van a construir la versión definitiva. Sin testers como tú, esto se quedaría en la cabeza de Alex. Si te atascas en algo, escríbele a él: te ayudará encantado.',
+      },
+    ],
   },
 ]
 

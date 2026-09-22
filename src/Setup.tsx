@@ -144,12 +144,12 @@ export function Setup() {
           ← Atrás
         </button>
         <p className="tiny">
-          {tip + 1} / {TUTORIAL.length}
+          {tip + 1} / {TUTORIAL.length} · {page.screen}
         </p>
-        <h2 className="serif" style={{ fontSize: 30 }}>
+        <h2 className="serif" style={{ fontSize: 28 }}>
           {page.title}
         </h2>
-        <p>{page.lead}</p>
+        {page.lead ? <p>{page.lead}</p> : null}
         {page.items && page.items.length > 0 && (
           <ul className="guide-list">
             {page.items.map((it) => (
@@ -473,9 +473,10 @@ export function HowItWorks() {
   return (
     <div className="stack">
       {HOW_IT_WORKS.map((b) => (
-        <div className="card stack" key={b.title} style={{ gap: 8 }}>
+        <div className="card stack" key={b.screen} style={{ gap: 8 }}>
+          <p className="tiny">{b.screen}</p>
           <strong>{b.title}</strong>
-          <p style={{ fontSize: 14 }}>{b.lead}</p>
+          {b.lead ? <p style={{ fontSize: 14 }}>{b.lead}</p> : null}
           {b.items && (
             <ul className="guide-list">
               {b.items.map((it) => (
