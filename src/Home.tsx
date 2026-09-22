@@ -54,7 +54,7 @@ export function Home({
 
   if (!cycle) return null
 
-  const pace = paceFor(views, cycle)
+  const pace = paceFor(state)
   const todayLogged = spentOnDay(
     cycleTxs(state, cycle.id),
     views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id),
@@ -127,32 +127,33 @@ export function Home({
       )}
 
       <section className="hero">
-        <div className="label">Te queda para el día a día</div>
-        <div className="amount">{euros(pace.remaining)}</div>
+        <div className="label">Hoy puedes gastar</div>
+        <div className="amount">{euros(pace.daily)}</div>
         <div className="sub">
-          techos diarios · {pace.days} {pace.days === 1 ? 'día' : 'días'} · los semanales van aparte
+          techos diarios (ocio, libre) · techo del día ~{euros(pace.fairDaily)} · los semanales van
+          aparte
         </div>
         <div className="hero-pills">
           <div className="hero-pill">
             <div className="k">Hoy</div>
             <div className="v">{euros(pace.daily)}</div>
             <div className="s">
-              {todayLogged > 0 ? `hoy ya ${euros(todayLogged)}` : 'ritmo para que alcance'}
+              {todayLogged > 0 ? `hoy ya ${euros(todayLogged)}` : 'si te pasas, se resta esta semana'}
             </div>
           </div>
           <div className="hero-pill">
-            <div className="k">{pace.weekDays < 7 ? 'Hasta el sueldo' : 'Esta semana'}</div>
+            <div className="k">Resto de la semana</div>
             <div className="v">{euros(pace.weekly)}</div>
             <div className="s">
-              {pace.weekDays < 7
-                ? 'lo que queda del ciclo'
-                : `máximo en 7 días`}
+              {pace.days > 1
+                ? `${pace.days - 1} días · ~${euros(pace.futureDaily)}/día`
+                : 'último día de la semana'}
             </div>
           </div>
         </div>
         <div className="hero-break">
           <b>Libre {euros(pace.libre)}</b>
-          {': si no lo gastas, al cerrar el ciclo puede ir a ahorro, viajes o ropa.'}
+          {': lo que no gastes esta semana no infla la siguiente; al cerrar el ciclo puede ir a ahorro.'}
           {capLine ? (
             <>
               <br />

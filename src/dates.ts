@@ -60,6 +60,17 @@ export function daysInclusive(a: string, b: string): number {
   return daysBetween(a, b) + 1
 }
 
+export function eachDay(from: string, to: string): string[] {
+  const out: string[] = []
+  if (!from || !to || from > to) return out
+  let d = from
+  while (d <= to) {
+    out.push(d)
+    d = addDays(d, 1)
+  }
+  return out
+}
+
 export const WEEKDAY_NAMES = [
   'domingo',
   'lunes',

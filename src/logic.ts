@@ -3,6 +3,7 @@ import {
   clampWeekStart,
   daysBetween,
   daysInclusive,
+  eachDay,
   formatDay,
   localDayFromStamp,
   todayISO,
@@ -112,20 +113,15 @@ export function saveReview(
       body: `Semana ${w.label}: ${fmt(w.spent)} de ~${fmt(w.target)} (consejo para que dure el mes) en ${env.name}. El techo de verdad es el del mes.`,
     }
   }
-  const views = viewsFor(state)
-  const dailyIds = views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id)
+  const p = paceFor(state, day)
   const thatDay = spentOnDay(txs, [envelopeId], day)
-  const rem = views.filter((v) => dailyIds.includes(v.env.id)).reduce((s, v) => s + Math.max(0, v.remaining), 0)
-  const days = Math.max(1, daysBetween(day, cycle.expectedEndAt))
-  const pace = Math.floor(rem / days)
-  const over = thatDay > pace && pace > 0
+  const over = p.fairDaily > 0 && thatDay > p.fairDaily
   return {
     status: over ? 'tight' : 'ok',
     title: `Anotado el ${when}`,
-    body:
-      day === todayISO()
-        ? `Hoy en ${env.name}: ${fmt(thatDay)}. Ritmo ~${fmt(pace)}/día.`
-        : `Ese día en ${env.name} llevas ${fmt(thatDay)}. El ritmo era ~${fmt(pace)}/día. El cupo de hoy no se come por un gasto de otro día; el dinero sí sale del sobre.`,
+    body: over
+      ? `Ese día el techo era ~${fmt(p.fairDaily)} y gastaste ${fmt(thatDay)}. El exceso se resta de los días que quedan de ESTA semana, no de todo el mes.`
+      : `Ese día en ${env.name}: ${fmt(thatDay)}. Techo del día ~${fmt(p.fairDaily)}. Lo que no uses hoy suma a los días que quedan de esta semana (finde); al cerrar la semana no infla la siguiente.`,
   }
 }
 
@@ -152,41 +148,56 @@ export function weekSlice(
   txs: Tx[],
   cycle: Cycle,
   today = todayISO(),
-  remaining = 0,
+  _remaining = 0,
   weekStartsOn = 5,
 ): WeekSlice | undefined {
   if (rhythmOf(env) !== 'weekly') return undefined
+  const w = weekWindow(cycle, today, weekStartsOn)
+  const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
+  const target = Math.round((env.planned * w.daysInWeek) / cycleDays)
+  const spent = spentInRange(txs, [env.id], w.sliceStart, w.sliceEnd)
+  let pace: 'ok' | 'fast' | 'over' = 'ok'
+  if (target > 0 && spent > target * 1.2) pace = 'over'
+  else if (target > 0 && spent > target) pace = 'fast'
+  return {
+    start: w.start,
+    end: w.end,
+    spent,
+    target,
+    remaining: target - spent,
+    label: `${formatDay(w.start)} → ${formatDay(w.end)}`,
+    daysInCycle: w.daysInWeek,
+    pace,
+  }
+}
+
+export function weekWindow(cycle: Cycle, today: string, weekStartsOn: number) {
   const startOn = clampWeekStart(weekStartsOn)
   const start = weekStartOn(today, startOn)
   const end = addDays(start, 6)
   const sliceStart = start > cycle.startedAt ? start : cycle.startedAt
   const sliceEnd = end < cycle.expectedEndAt ? end : cycle.expectedEndAt
-  let spent = 0
+  const daysInWeek = daysInclusive(sliceStart, sliceEnd)
+  let daysBefore = 0
+  let daysAfter = 0
+  const days = eachDay(sliceStart, sliceEnd)
+  for (const d of days) {
+    if (d < today) daysBefore += 1
+    else if (d > today) daysAfter += 1
+  }
+  const todayIn = today >= sliceStart && today <= sliceEnd
+  return { start, end, sliceStart, sliceEnd, daysInWeek, daysBefore, daysAfter, todayIn }
+}
+
+export function spentInRange(txs: Tx[], envelopeIds: string[], from: string, to: string): number {
+  if (!from || !to || from > to) return 0
+  let n = 0
   for (const t of txs) {
-    if (t.type !== 'expense' || t.envelopeId !== env.id) continue
+    if (t.type !== 'expense' || !envelopeIds.includes(t.envelopeId)) continue
     const day = localDayFromStamp(t.at)
-    if (day >= sliceStart && day <= sliceEnd) spent += t.amount
+    if (day >= from && day <= to) n += t.amount
   }
-  const ref = today < cycle.startedAt ? cycle.startedAt : today
-  const daysLeft = Math.max(1, daysInclusive(ref, cycle.expectedEndAt))
-  const restEnd = sliceEnd
-  const restDays = ref > restEnd ? 0 : daysInclusive(ref, restEnd)
-  const restAdvice = restDays <= 0 || daysLeft <= 0 ? 0 : Math.round((Math.max(0, remaining) * restDays) / daysLeft)
-  const target = Math.max(spent + restAdvice, restAdvice)
-  const daysInCycle = daysInclusive(sliceStart, sliceEnd)
-  let pace: 'ok' | 'fast' | 'over' = 'ok'
-  if (target > 0 && spent > target * 1.2) pace = 'over'
-  else if (target > 0 && spent > target) pace = 'fast'
-  return {
-    start,
-    end,
-    spent,
-    target,
-    remaining: target - spent,
-    label: `${formatDay(start)} → ${formatDay(end)}`,
-    daysInCycle,
-    pace,
-  }
+  return n
 }
 
 export function envelopeView(
@@ -339,8 +350,8 @@ export function spendableRemaining(views: EnvelopeView[]): number {
   return spendableViews(views).reduce((s, v) => s + Math.max(0, v.remaining), 0)
 }
 
-export function dailyBudget(views: EnvelopeView[], cycle: Cycle, today = todayISO()): number {
-  return paceFor(views, cycle, today).daily
+export function dailyBudget(state: AppState, today = todayISO()): number {
+  return paceFor(state, today).daily
 }
 
 export function daysLeft(cycle: Cycle, today = todayISO()): number {
@@ -353,26 +364,75 @@ export interface Pace {
   weekly: number
   days: number
   weekDays: number
+  fairDaily: number
+  futureDaily: number
+  weekPool: number
+  weekSpent: number
   libre: number
   caps: { name: string; remaining: number }[]
 }
 
-export function paceFor(views: EnvelopeView[], cycle: Cycle, today = todayISO()): Pace {
+export function paceFor(state: AppState, today = todayISO()): Pace {
+  const cycle = activeCycle(state)
+  const views = viewsFor(state, today)
   const remaining = spendableRemaining(views)
-  const days = Math.max(1, daysBetween(today, cycle.expectedEndAt))
-  const daily = Math.floor(remaining / days)
-  const weekDays = Math.min(7, days)
-  const weekly = Math.min(remaining, daily * weekDays)
   const libre = views.find((v) => v.env.kind === 'buffer')
   const caps = views
     .filter((v) => rhythmOf(v.env) === 'daily' && v.env.kind === 'cap')
     .map((v) => ({ name: v.env.name, remaining: Math.max(0, v.remaining) }))
+  const empty = {
+    remaining,
+    daily: 0,
+    weekly: 0,
+    days: 1,
+    weekDays: 1,
+    fairDaily: 0,
+    futureDaily: 0,
+    weekPool: 0,
+    weekSpent: 0,
+    libre: Math.max(0, libre?.remaining ?? 0),
+    caps,
+  }
+  if (!cycle) return empty
+
+  const dailyIds = views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id)
+  const planned = views
+    .filter((v) => rhythmOf(v.env) === 'daily')
+    .reduce((s, v) => s + Math.max(0, v.env.planned), 0)
+  const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
+  const fairDaily = Math.floor(planned / cycleDays)
+  const w = weekWindow(cycle, today, weekStartOf(state))
+  const txs = cycleTxs(state, cycle.id)
+  const weekPool = fairDaily * Math.max(0, w.daysInWeek)
+  const weekSpent = spentInRange(txs, dailyIds, w.sliceStart, w.sliceEnd)
+  const spentToday = spentOnDay(txs, dailyIds, today)
+  const remainingWeek = weekPool - weekSpent
+  const todayLimit = fairDaily
+  let daily = todayLimit - spentToday
+  let futureDaily = fairDaily
+  const daysAfter = w.daysAfter
+
+  if (daily < 0) {
+    daily = 0
+    futureDaily = daysAfter > 0 ? Math.floor(remainingWeek / daysAfter) : remainingWeek
+  } else if (daysAfter > 0) {
+    futureDaily = Math.floor((remainingWeek - daily) / daysAfter)
+  } else {
+    daily = remainingWeek
+    futureDaily = 0
+  }
+
+  const daysFromToday = (w.todayIn ? 1 : 0) + daysAfter
   return {
     remaining,
-    daily,
-    weekly,
-    days,
-    weekDays,
+    daily: Math.max(0, daily),
+    weekly: Math.max(0, remainingWeek),
+    days: Math.max(1, daysFromToday),
+    weekDays: Math.max(1, daysFromToday),
+    fairDaily,
+    futureDaily: Math.max(0, futureDaily),
+    weekPool,
+    weekSpent,
     libre: Math.max(0, libre?.remaining ?? 0),
     caps,
   }
