@@ -395,44 +395,39 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
   }
   if (!cycle) return empty
 
-  const dailyIds = views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id)
   const planned = views
     .filter((v) => rhythmOf(v.env) === 'daily')
     .reduce((s, v) => s + Math.max(0, v.env.planned), 0)
   const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
   const fairDaily = Math.floor(planned / cycleDays)
-  const w = weekWindow(cycle, today, weekStartOf(state))
-  const txs = cycleTxs(state, cycle.id)
-  const weekPool = fairDaily * Math.max(0, w.daysInWeek)
-  const weekSpent = spentInRange(txs, dailyIds, w.sliceStart, w.sliceEnd)
-  const spentToday = spentOnDay(txs, dailyIds, today)
-  const remainingWeek = weekPool - weekSpent
-  const todayLimit = fairDaily
-  let daily = todayLimit - spentToday
-  let futureDaily = fairDaily
+  const dailyWeekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
+  const w = weekWindow(cycle, today, dailyWeekStart)
+  const weekEnd = w.sliceEnd
+  const cycleEnd = cycle.expectedEndAt
+  const weekDaysLeft = Math.max(1, daysInclusive(today > w.sliceStart ? today : w.sliceStart, weekEnd))
+  const afterWeekStart = addDays(w.end, 1)
+  const futureDays =
+    afterWeekStart <= cycleEnd ? daysInclusive(afterWeekStart, cycleEnd) : 0
+  const futureReserve = Math.min(remaining, fairDaily * futureDays)
+  const weekCap = fairDaily * weekDaysLeft
+  const thisWeekLeft = Math.max(0, Math.min(weekCap, remaining - futureReserve))
+  let daily = Math.floor(thisWeekLeft / weekDaysLeft)
   const daysAfter = w.daysAfter
-
-  if (daily < 0) {
-    daily = 0
-    futureDaily = daysAfter > 0 ? Math.floor(remainingWeek / daysAfter) : remainingWeek
-  } else if (daysAfter > 0) {
-    futureDaily = Math.floor((remainingWeek - daily) / daysAfter)
-  } else {
-    daily = remainingWeek
+  let futureDaily = daily
+  if (daysAfter === 0) {
+    daily = thisWeekLeft
     futureDaily = 0
   }
-
-  const daysFromToday = (w.todayIn ? 1 : 0) + daysAfter
   return {
     remaining,
     daily: Math.max(0, daily),
-    weekly: Math.max(0, remainingWeek),
-    days: Math.max(1, daysFromToday),
-    weekDays: Math.max(1, daysFromToday),
+    weekly: Math.max(0, thisWeekLeft),
+    days: weekDaysLeft,
+    weekDays: weekDaysLeft,
     fairDaily,
     futureDaily: Math.max(0, futureDaily),
-    weekPool,
-    weekSpent,
+    weekPool: weekCap,
+    weekSpent: Math.max(0, weekCap - thisWeekLeft),
     libre: Math.max(0, libre?.remaining ?? 0),
     caps,
   }

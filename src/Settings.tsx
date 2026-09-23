@@ -70,7 +70,29 @@ export function SettingsScreen({
           nada. Quitar el icono no suele borrar datos; una ventana privada sí.
         </p>
         <label className="field">
-          La semana de comida y fútbol empieza el
+          Semana del gasto diario (ocio, libre)
+          <select
+            value={clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)}
+            onChange={(e) =>
+              updateSettings({
+                ...state.settings,
+                dailyWeekStartsOn: clampWeekStart(Number(e.target.value)),
+              })
+            }
+          >
+            {WEEKDAY_NAMES.map((name, i) => (
+              <option key={name} value={i}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted" style={{ fontSize: 13 }}>
+          Por defecto lunes → domingo. Si te pasas un día, se recalcula solo el resto
+          de esta semana.
+        </p>
+        <label className="field">
+          Semana de sobres semanales (comida, fútbol…)
           <select
             value={clampWeekStart(state.settings.weekStartsOn ?? 5)}
             onChange={(e) =>
@@ -88,8 +110,8 @@ export function SettingsScreen({
           </select>
         </label>
         <p className="muted" style={{ fontSize: 13 }}>
-          Ahora: {WEEKDAY_NAMES[clampWeekStart(state.settings.weekStartsOn ?? 5)]} →{' '}
-          {WEEKDAY_NAMES[(clampWeekStart(state.settings.weekStartsOn ?? 5) + 6) % 7]}.
+          Independiente de la semana diaria. Si compras el sábado, elige sábado o
+          viernes.
         </p>
       </div>
       <button className="btn secondary full" onClick={onIncome}>

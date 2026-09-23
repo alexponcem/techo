@@ -40,8 +40,10 @@ export interface Tx {
 export interface Settings {
   payMode: PayMode
   fixedDay: number
-  /** 0 = domingo … 6 = sábado. Por defecto 5 (viernes). */
+  /** Semana de sobres semanales (comida, fútbol). 0 = domingo … 6 = sábado. */
   weekStartsOn: number
+  /** Semana del techo diario (ocio, libre). Por defecto 1 = lunes. */
+  dailyWeekStartsOn: number
   seenHomeTour?: boolean
 }
 

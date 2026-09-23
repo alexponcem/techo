@@ -10,7 +10,7 @@ import {
   type EnvelopeView,
 } from './logic'
 import { useState } from 'react'
-import { formatRange, todayISO } from './dates'
+import { WEEKDAY_NAMES, clampWeekStart, formatRange, todayISO } from './dates'
 import { euros } from './money'
 import { KIND_LABEL } from './template'
 import { markPaid, updateSettings, useAppState } from './store'
@@ -139,8 +139,9 @@ export function Home({
         <div className="label">Hoy puedes gastar</div>
         <div className="amount">{euros(pace.daily)}</div>
         <div className="sub">
-          techos diarios (ocio, libre) · techo del día ~{euros(pace.fairDaily)} · los semanales van
-          aparte
+          ocio + libre {euros(pace.remaining)} · semana{' '}
+          {WEEKDAY_NAMES[clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)]}–
+          {WEEKDAY_NAMES[(clampWeekStart(state.settings.dailyWeekStartsOn ?? 1) + 6) % 7]}
         </div>
         <div className="hero-pills">
           <div className="hero-pill">
@@ -151,12 +152,10 @@ export function Home({
             </div>
           </div>
           <div className="hero-pill">
-            <div className="k">Resto de la semana</div>
+            <div className="k">Esta semana</div>
             <div className="v">{euros(pace.weekly)}</div>
             <div className="s">
-              {pace.days > 1
-                ? `${pace.days - 1} días · ~${euros(pace.futureDaily)}/día`
-                : 'último día de la semana'}
+              {pace.days} {pace.days === 1 ? 'día' : 'días'} · ~{euros(pace.daily)}/día
             </div>
           </div>
         </div>

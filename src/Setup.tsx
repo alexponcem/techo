@@ -74,7 +74,12 @@ export function Setup() {
         income,
         startedAt,
         expectedEndAt,
-        settings: { payMode, fixedDay, weekStartsOn: clampWeekStart(weekStartsOn) },
+        settings: {
+          payMode,
+          fixedDay,
+          weekStartsOn: clampWeekStart(weekStartsOn),
+          dailyWeekStartsOn: 1,
+        },
         template: balanced,
         savingsOpening,
       })
