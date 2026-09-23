@@ -51,6 +51,44 @@ export function lastSpendDay(cycle: Cycle): string {
   return last < cycle.startedAt ? cycle.startedAt : last
 }
 
+export function splitPlanned(envelopes: Envelope[]): number {
+  return envelopes.filter(inDailySplit).reduce((s, e) => s + Math.max(0, e.planned), 0)
+}
+
+/** Si el cobro ya pasó, el diario empieza el día que abres el ciclo. */
+export function paceStartedAt(startedAt: string, today = todayISO()): string {
+  return startedAt > today ? startedAt : today
+}
+
+export function openDailyPace(
+  envelopes: Envelope[],
+  startedAt: string,
+  expectedEndAt: string,
+  today = todayISO(),
+): { fairDaily: number; paceStartedAt: string } {
+  const origin = paceStartedAt(startedAt, today)
+  const days = Math.max(1, daysBetween(origin, expectedEndAt))
+  return { fairDaily: Math.round(splitPlanned(envelopes) / days), paceStartedAt: origin }
+}
+
+/** Ciclos viejos sin techo congelado: se tratan como “me uno hoy” con lo que queda. */
+export function withFrozenDailyPace(state: AppState, today = todayISO()): AppState {
+  const cycle = activeCycle(state)
+  if (!cycle || cycle.fairDaily != null) return state
+  const views = viewsFor(state, today)
+  const remaining = spendableRemaining(views)
+  const origin = paceStartedAt(cycle.startedAt, today)
+  const days = Math.max(1, daysBetween(origin, cycle.expectedEndAt))
+  return {
+    ...state,
+    cycles: state.cycles.map((c) =>
+      c.id === cycle.id
+        ? { ...c, fairDaily: Math.round(remaining / days), paceStartedAt: origin }
+        : c,
+    ),
+  }
+}
+
 export function uid(): string {
   const c = globalThis.crypto
   if (c && typeof c.randomUUID === 'function') {
@@ -338,10 +376,11 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
   const views = viewsFor(state, today)
   const remaining = spendableRemaining(views)
   const splitViews = views.filter((v) => inDailySplit(v.env))
-  const plannedSplit = splitViews.reduce((s, v) => s + Math.max(0, v.env.planned), 0)
   const dailyIds = splitViews.map((v) => v.env.id)
-  const cycleDays = cycleSpendDays(cycle)
-  const fairDaily = Math.round(plannedSplit / cycleDays)
+  const origin = cycle.paceStartedAt ?? paceStartedAt(cycle.startedAt, today)
+  const paceDays = Math.max(1, daysBetween(origin, cycle.expectedEndAt))
+  const fairDaily =
+    cycle.fairDaily != null ? cycle.fairDaily : Math.round(splitPlanned(state.envelopes) / paceDays)
   const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
   const w = weekWindow(cycle, today, weekStart)
   const txs = cycleTxs(state, cycle.id)

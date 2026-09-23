@@ -442,7 +442,7 @@ export function Setup() {
             </div>
             <p className="muted" style={{ fontSize: 13 }}>
               Se crea solo. Es lo que queda después de cuotas, ahorro y techos.
-              Ese dinero se reparte entre los días del ciclo
+              Ese dinero se reparte entre los días que quedan hasta el próximo sueldo
               {balanced.some((e) => e.kind === 'cap' && e.splitDaily)
                 ? ', junto con los techos que hayas marcado para el diario'
                 : ''}
@@ -499,7 +499,7 @@ export function Setup() {
       ) : (
         <div className="hint">
           {buffer && buffer.planned > 0
-            ? `Libre: ${euros(buffer.planned)}. Se reparte entre los días del ciclo${
+            ? `Libre: ${euros(buffer.planned)}. Se reparte entre los días que quedan hasta el próximo sueldo${
                 balanced.some((e) => e.kind === 'cap' && e.splitDaily)
                   ? ', junto con los techos marcados para el diario'
                   : ''

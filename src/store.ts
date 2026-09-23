@@ -5,10 +5,12 @@ import {
   assigned,
   carryKinds,
   ensureRhythm,
+  openDailyPace,
   reportFor,
   takesFromPay,
   uid,
   withBalancedBuffer,
+  withFrozenDailyPace,
 } from './logic'
 import { alexPlan } from './template'
 import type { AppState, Envelope, Settings, Tx } from './types'
@@ -85,8 +87,9 @@ function load(): AppState {
       envelopes: withMissingEnvelopes(parsed.envelopes, income),
       template: withMissingEnvelopes(parsed.template, income),
     }
-    localStorage.setItem(KEY, JSON.stringify(migrated))
-    return migrated
+    const next = withFrozenDailyPace(migrated)
+    localStorage.setItem(KEY, JSON.stringify(next))
+    return next
   } catch {
     return empty()
   }
@@ -133,6 +136,7 @@ export function startFirstCycle(input: {
     opening: e.kind === 'savings' ? saved : 0,
   }))
   const cycleId = uid()
+  const pace = openDailyPace(template, input.startedAt, input.expectedEndAt)
   emit({
     version: 1,
     onboarded: true,
@@ -145,6 +149,8 @@ export function startFirstCycle(input: {
         startedAt: input.startedAt,
         expectedEndAt: input.expectedEndAt,
         income: input.income,
+        fairDaily: pace.fairDaily,
+        paceStartedAt: pace.paceStartedAt,
       },
     ],
     txs: [],
@@ -402,6 +408,7 @@ export function startNextCycle(
 
   const snap = reportFor(state, current)
   const cycleId = uid()
+  const pace = openDailyPace(envelopes, startedAt, end)
   emit({
     ...state,
     template,
@@ -419,7 +426,14 @@ export function startNextCycle(
             }
           : c,
       ),
-      { id: cycleId, startedAt, expectedEndAt: end, income },
+      {
+        id: cycleId,
+        startedAt,
+        expectedEndAt: end,
+        income,
+        fairDaily: pace.fairDaily,
+        paceStartedAt: pace.paceStartedAt,
+      },
     ],
   })
 }
@@ -443,19 +457,21 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
     }
     const cycle = [...parsed.cycles].reverse().find((c) => !c.closedAt)
     const income = cycle?.income ?? parsed.cycles[0]?.income ?? 139_100
-    emit({
-      ...parsed,
-      onboarded: parsed.onboarded || parsed.cycles.length > 0,
-      settings: {
-        payMode: parsed.settings?.payMode ?? 'last-weekday',
-        fixedDay: parsed.settings?.fixedDay ?? 1,
-        weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
-        dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
-        seenHomeTour: parsed.settings?.seenHomeTour ?? true,
-      },
-      template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
-      envelopes: withMissingEnvelopes(parsed.envelopes, income),
-    })
+    emit(
+      withFrozenDailyPace({
+        ...parsed,
+        onboarded: parsed.onboarded || parsed.cycles.length > 0,
+        settings: {
+          payMode: parsed.settings?.payMode ?? 'last-weekday',
+          fixedDay: parsed.settings?.fixedDay ?? 1,
+          weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
+          dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
+          seenHomeTour: parsed.settings?.seenHomeTour ?? true,
+        },
+        template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
+        envelopes: withMissingEnvelopes(parsed.envelopes, income),
+      }),
+    )
     return { ok: true }
   } catch {
     return { ok: false, error: 'No pude leer el archivo. ¿Es el techo-backup.json?' }

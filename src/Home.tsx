@@ -153,7 +153,7 @@ export function Home({
             <div className="k">Esta semana</div>
             <div className="v">{euros(pace.weekly)}</div>
             <div className="s">
-              techo inicial {euros(pace.weekAssigned)} · {pace.days}{' '}
+              ~{euros(pace.fairDaily)}/día · techo {euros(pace.weekAssigned)} · {pace.days}{' '}
               {pace.days === 1 ? 'día' : 'días'}
             </div>
           </div>

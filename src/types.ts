@@ -26,6 +26,10 @@ export interface Cycle {
   savedNet?: number
   savingsUsed?: number
   savingsGoal?: number
+  /** Día desde el que se parte el diario (hoy si te unes a mitad de ciclo). */
+  paceStartedAt?: string
+  /** Techo diario original, congelado al abrir: (Libre + techos marcados) / días que quedaban. */
+  fairDaily?: number
 }
 
 export interface Tx {
