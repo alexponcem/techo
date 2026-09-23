@@ -34,6 +34,24 @@ export function blankPlan(): Envelope[] {
   ]
 }
 
+export const EMOJI_PICK = [
+  '✦',
+  '🏠',
+  '📱',
+  '🍽️',
+  '🎬',
+  '⚽',
+  '🏋️',
+  '☕',
+  '🚌',
+  '✈️',
+  '👕',
+  '💊',
+  '🎮',
+  '🎁',
+  '💧',
+]
+
 export const KIND_LABEL: Record<Envelope['kind'], string> = {
   savings: 'Ahorro protegido',
   fixed: 'Cuota',

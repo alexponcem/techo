@@ -7,7 +7,7 @@ import {
   todayISO,
   yesterdayISO,
 } from './dates'
-import { KIND_LABEL } from './template'
+import { EMOJI_PICK, KIND_LABEL } from './template'
 import {
   activeCycle,
   coverPlan,
@@ -15,12 +15,14 @@ import {
   inDailySplit,
   kindOrder,
   saveReview,
+  uid,
   verdictFor,
   viewsFor,
   type EnvelopeView,
 } from './logic'
 import { euros, parseEuros } from './money'
 import {
+  addEnvelope,
   addExpense,
   addIncome,
   coverAndSpend,
@@ -29,6 +31,7 @@ import {
   updateExpense,
   useAppState,
 } from './store'
+import type { EnvelopeKind, Rhythm } from './types'
 
 const QUICK = [2, 5, 10, 15, 20, 25, 30, 50]
 
@@ -503,6 +506,125 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
       <SelectEnv label="Sobre" value={envelopeId} views={views} onChange={setEnvelopeId} />
       <button className="btn full sage" disabled={!envelopeId || cents <= 0} onClick={save}>
         Añadir ingreso
+      </button>
+    </Sheet>
+  )
+}
+
+export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState('')
+  const [kind, setKind] = useState<EnvelopeKind>('cap')
+  const [rhythm, setRhythm] = useState<Rhythm>('weekly')
+  const [splitDaily, setSplit] = useState(false)
+  const [amount, setAmount] = useState('')
+  const [emoji, setEmoji] = useState('✦')
+  const [error, setError] = useState('')
+  const cents = parseEuros(amount) ?? 0
+
+  function save() {
+    setError('')
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setError('Pon un nombre.')
+      return
+    }
+    if (amount.trim() && parseEuros(amount) === null) {
+      setError('Pon un importe válido.')
+      return
+    }
+    const result = addEnvelope({
+      id: uid(),
+      name: trimmed,
+      kind,
+      planned: cents,
+      emoji,
+      opening: 0,
+      rhythm: kind === 'cap' ? (splitDaily ? 'daily' : rhythm) : 'none',
+      splitDaily: kind === 'cap' && splitDaily,
+    })
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    onClose()
+  }
+
+  return (
+    <Sheet title="Nuevo sobre" onClose={onClose}>
+      <p className="muted">
+        Cuota, techo o fondo. Libre se crea solo. Si el techo se suma al diario,
+        aparece en Día a día.
+      </p>
+      <label className="field">
+        Nombre
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Café, Netflix…" />
+      </label>
+      <div className="chips" style={{ flexWrap: 'wrap' }}>
+        {EMOJI_PICK.map((e) => (
+          <button
+            key={e}
+            type="button"
+            className={`chip ${emoji === e ? 'on' : ''}`}
+            onClick={() => setEmoji(e)}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+      <label className="field">
+        Tipo
+        <select
+          value={kind}
+          onChange={(e) => {
+            const next = e.target.value as EnvelopeKind
+            setKind(next)
+            if (next !== 'cap') setSplit(false)
+          }}
+        >
+          <option value="cap">Techo (límite del ciclo)</option>
+          <option value="fixed">Cuota (marcar pagado)</option>
+          <option value="fund">Fondo (sale del ahorro)</option>
+        </select>
+      </label>
+      {kind === 'cap' && (
+        <>
+          <label className="field" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={splitDaily}
+              onChange={(e) => setSplit(e.target.checked)}
+              style={{ marginTop: 4 }}
+            />
+            <span>
+              <span style={{ fontWeight: 500 }}>Sumar al diario del mes</span>
+              <span className="muted" style={{ display: 'block', fontSize: 13 }}>
+                Se junta con Libre. El sobre va a Día a día.
+              </span>
+            </span>
+          </label>
+          {!splitDaily && (
+            <label className="field">
+              ¿Diario o semanal?
+              <select value={rhythm === 'weekly' ? 'weekly' : 'daily'} onChange={(e) => setRhythm(e.target.value as Rhythm)}>
+                <option value="weekly">Semanal — consejo por semana (super, fútbol)</option>
+                <option value="daily">Límite del ciclo (sin consejo semanal)</option>
+              </select>
+            </label>
+          )}
+        </>
+      )}
+      <label className="field">
+        {kind === 'fund' ? 'Apartar este ciclo (puede ser 0)' : 'Importe de este ciclo'}
+        <input
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={kind === 'fund' ? '0' : '0'}
+        />
+      </label>
+      {error ? <p className="deficit">{error}</p> : null}
+      <button type="button" className="btn full sage" onClick={save}>
+        Crear sobre
       </button>
     </Sheet>
   )

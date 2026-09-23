@@ -828,6 +828,24 @@ export function kindOrder(kind: EnvelopeKind): number {
   return { savings: 0, fixed: 1, cap: 2, buffer: 3, fund: 4 }[kind]
 }
 
+export type HomeGroupId = 'daily' | 'cap' | 'fixed' | 'fund' | 'savings'
+
+export const HOME_GROUPS: { id: HomeGroupId; title: string; hint: string }[] = [
+  { id: 'daily', title: 'Día a día', hint: 'Libre y techos que se parten entre los días' },
+  { id: 'cap', title: 'Techos', hint: 'Límite del ciclo. Comida, fútbol y lo que no va al diario' },
+  { id: 'fixed', title: 'Cuotas', hint: 'Reservadas al cobrar. Márcalas pagadas' },
+  { id: 'fund', title: 'Fondos', hint: 'Salen del ahorro' },
+  { id: 'savings', title: 'Ahorro', hint: 'Se acumula y se protege' },
+]
+
+export function homeGroupOf(env: Envelope): HomeGroupId {
+  if (inDailySplit(env)) return 'daily'
+  if (env.kind === 'fixed') return 'fixed'
+  if (env.kind === 'fund') return 'fund'
+  if (env.kind === 'savings') return 'savings'
+  return 'cap'
+}
+
 export interface Verdict {
   status: 'ok' | 'tight' | 'over' | 'empty'
   remainingAfter: number

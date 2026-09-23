@@ -340,16 +340,26 @@ export function renameEnvelope(id: string, name: string) {
   })
 }
 
-export function addEnvelope(env: Envelope) {
+export function addEnvelope(env: Envelope): { ok: true } | { ok: false; error: string } {
   const cycle = activeCycle(state)
-  if (!cycle) return
-  const row = ensureRhythm(env)
+  if (!cycle) return { ok: false, error: 'No hay un ciclo abierto.' }
+  const name = env.name.trim()
+  if (!name) return { ok: false, error: 'Pon un nombre.' }
+  if (env.kind === 'savings' || env.kind === 'buffer') {
+    return { ok: false, error: 'Ahorro y Libre ya están en el plan.' }
+  }
+  const row = ensureRhythm({ ...env, name, id: env.id || uid() })
   const envelopes = withBalancedBuffer([...state.envelopes, row], cycle.income)
+  const buffer = envelopes.find((e) => e.kind === 'buffer')
+  if ((buffer?.planned ?? 0) < 0) {
+    return { ok: false, error: 'Ese importe no cabe: Libre quedaría en negativo. Baja el importe.' }
+  }
   emit({
     ...state,
     envelopes,
     template: withBalancedBuffer([...state.template, { ...row, opening: 0 }], cycle.income),
   })
+  return { ok: true }
 }
 
 export function startNextCycle(

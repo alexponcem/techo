@@ -2,7 +2,15 @@ import { useState } from 'react'
 import { activeCycle, cycleTxs, envelopeView, rhythmOf } from './logic'
 import { euros, parseEuros } from './money'
 import { KIND_HINT, KIND_LABEL } from './template'
-import { markPaid, removeExpense, removeTx, setSplitDaily, updatePlanned, useAppState } from './store'
+import {
+  markPaid,
+  removeExpense,
+  removeTx,
+  renameEnvelope,
+  setSplitDaily,
+  updatePlanned,
+  useAppState,
+} from './store'
 import type { Tx } from './types'
 
 export function EnvelopeScreen({
@@ -21,6 +29,8 @@ export function EnvelopeScreen({
   const env = state.envelopes.find((e) => e.id === id)
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [editingName, setEditingName] = useState(false)
   const [msg, setMsg] = useState('')
   const [pending, setPending] = useState<Tx | null>(null)
 
@@ -97,6 +107,48 @@ export function EnvelopeScreen({
       </div>
       {env.kind !== 'buffer' && (
         <div className="card stack">
+          {editingName ? (
+            <>
+              <label className="field">
+                Nombre
+                <input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn full"
+                onClick={() => {
+                  const next = nameDraft.trim()
+                  if (!next) {
+                    setMsg('Pon un nombre.')
+                    return
+                  }
+                  renameEnvelope(env.id, next)
+                  setEditingName(false)
+                  setMsg('Nombre actualizado.')
+                }}
+              >
+                Guardar nombre
+              </button>
+              <button type="button" className="btn ghost full" onClick={() => setEditingName(false)}>
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn ghost full"
+              onClick={() => {
+                setNameDraft(env.name)
+                setEditingName(true)
+                setMsg('')
+              }}
+            >
+              Cambiar nombre
+            </button>
+          )}
           <div className="row">
             <strong>Techo de este ciclo</strong>
             <span>{euros(env.planned)}</span>
@@ -131,14 +183,19 @@ export function EnvelopeScreen({
           )}
           {msg ? <p className="muted">{msg}</p> : null}
           {env.kind === 'cap' && (
-            <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <label className="field" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
               <input
                 type="checkbox"
                 checked={Boolean(env.splitDaily)}
                 onChange={(e) => setSplitDaily(env.id, e.target.checked)}
+                style={{ marginTop: 4 }}
               />
-              <span style={{ fontWeight: 500 }}>
-                Sumar al diario del mes (se junta con Libre y se parte entre los días)
+              <span>
+                <span style={{ fontWeight: 500 }}>Sumar al diario del mes</span>
+                <span className="muted" style={{ display: 'block', fontSize: 13 }}>
+                  Se junta con Libre y se parte entre los días. El sobre pasa a Día a día
+                  en Inicio.
+                </span>
               </span>
             </label>
           )}

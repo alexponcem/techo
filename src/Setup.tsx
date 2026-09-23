@@ -414,7 +414,7 @@ export function Setup() {
                       }
                     />
                     <span style={{ fontWeight: 500 }}>
-                      Sumar al diario del mes (se junta con Libre y se parte entre los días)
+                      Sumar al diario del mes (pasa a Día a día, junto con Libre)
                     </span>
                   </label>
                 </>

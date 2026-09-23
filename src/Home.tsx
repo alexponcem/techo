@@ -1,14 +1,14 @@
 import {
   accountSnapshot,
   cycleTxs,
+  HOME_GROUPS,
+  homeGroupOf,
   inDailySplit,
-  kindOrder,
   paceFor,
-  rhythmOf,
   spentOnDay,
   viewsFor,
-  weeklyViews,
   type EnvelopeView,
+  type HomeGroupId,
 } from './logic'
 import { useState } from 'react'
 import { WEEKDAY_NAMES, clampWeekStart, formatRange, todayISO } from './dates'
@@ -74,21 +74,12 @@ export function Home({
     .filter((c) => c.remaining > 0)
     .map((c) => `${c.name} ${euros(c.remaining)}`)
     .join(' · ')
-  const weekly = weeklyViews(views)
   const snap = accountSnapshot(views)
   const unpaidNames = snap.unpaid.map((v) => v.env.name).join(', ')
-  const groups: { title: string; items: EnvelopeView[] }[] = [
-    { title: 'Ahorro (se acumula)', items: views.filter((v) => v.env.kind === 'savings') },
-    { title: 'Cuotas', items: views.filter((v) => v.env.kind === 'fixed') },
-    {
-      title: 'Día a día',
-      items: views.filter((v) => rhythmOf(v.env) === 'daily'),
-    },
-    {
-      title: 'Fondos (salen del ahorro)',
-      items: views.filter((v) => v.env.kind === 'fund'),
-    },
-  ]
+  const groups = HOME_GROUPS.map((g) => ({
+    ...g,
+    items: views.filter((v) => homeGroupOf(v.env) === g.id),
+  }))
 
   return (
     <div>
@@ -210,73 +201,38 @@ export function Home({
         )}
       </section>
 
-      {weekly.length > 0 && (
-        <section className="food-panel">
-          {weekly.map((v) => (
-            <button
-              type="button"
-              className="food-row"
-              id={`sobre-${v.env.id}`}
-              key={v.env.id}
-              onClick={() => onEnvelope(v.env.id)}
-            >
-              <div className="row">
-                <strong>
-                  {v.env.emoji} {v.env.name} esta semana
-                </strong>
-                <span>
-                  {euros(v.week?.spent ?? 0)} / ~{euros(v.week?.target ?? 0)}
-                </span>
-              </div>
-              <div className={`bar ${v.light}`}>
-                <span
-                  style={{
-                    width: `${Math.min(100, v.week && v.week.target > 0 ? Math.round(((v.week.spent) / v.week.target) * 100) : 0)}%`,
-                  }}
-                />
-              </div>
-              {v.alert && (
-                <div className={`env-warn pill ${v.light}`} style={{ marginTop: 8, display: 'inline-flex' }}>
-                  {alertLine(v.alert, v.pct)}
-                </div>
-              )}
-              <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-                {v.week?.label}
-                {v.week && v.week.daysInCycle < 7
-                  ? ` · ${v.week.daysInCycle} días de este ciclo`
-                  : ''}
-                . Consejo para que dure, no un techo. Mes {euros(v.spent)} / {euros(v.total)}.
-                {v.week?.pace === 'fast' ? ' Esta semana vas un poco rápido.' : ''}
-                {v.week?.pace === 'over' ? ' Esta semana por encima del consejo.' : ''}
-              </p>
-            </button>
-          ))}
-        </section>
-      )}
-
       {groups.map((g) =>
         g.items.length === 0 ? null : (
-          <section key={g.title} style={{ marginBottom: 18 }}>
+          <section key={g.id} style={{ marginBottom: 18 }}>
             <div className="section-title">
               <span>{g.title}</span>
             </div>
+            <p className="muted" style={{ fontSize: 13, margin: '-4px 2px 10px' }}>
+              {g.hint}
+            </p>
             <div className="stack">
-              {g.items
-                .slice()
-                .sort((a, b) => kindOrder(a.env.kind) - kindOrder(b.env.kind))
-                .map((v) => (
-                  <EnvelopeCard
-                    key={v.env.id}
-                    view={v}
-                    onOpen={() => onEnvelope(v.env.id)}
-                    onPay={() => markPaid(v.env.id, v.remaining)}
-                    onSpend={() => onOpen({ name: 'add', envelopeId: v.env.id })}
-                  />
-                ))}
+              {g.items.map((v) => (
+                <EnvelopeCard
+                  key={v.env.id}
+                  view={v}
+                  group={g.id}
+                  onOpen={() => onEnvelope(v.env.id)}
+                  onPay={() => markPaid(v.env.id, v.remaining)}
+                  onSpend={() => onOpen({ name: 'add', envelopeId: v.env.id })}
+                />
+              ))}
             </div>
           </section>
         ),
       )}
+      <button
+        type="button"
+        className="btn ghost full"
+        style={{ margin: '4px 0 24px' }}
+        onClick={() => onOpen({ name: 'new-envelope' })}
+      >
+        + Nuevo sobre
+      </button>
       {state.settings.seenHomeTour === false && (
         <HomeTour
           onSkip={() => updateSettings({ ...state.settings, seenHomeTour: true })}
@@ -334,30 +290,38 @@ function HomeTour({ onSkip }: { onSkip: () => void }) {
 
 function EnvelopeCard({
   view,
+  group,
   onOpen,
   onPay,
   onSpend,
 }: {
   view: EnvelopeView
+  group: HomeGroupId
   onOpen: () => void
   onPay: () => void
   onSpend: () => void
 }) {
   const { env, remaining, total, pct, light, paid } = view
+  const week = view.week
+  const weekPct =
+    week && week.target > 0 ? Math.min(100, Math.round((week.spent / week.target) * 100)) : 0
+  const barPct = group === 'cap' && week ? weekPct : Math.min(100, pct)
   return (
     <button className="env" id={`sobre-${env.id}`} onClick={onOpen}>
       <div className="emoji">{env.emoji}</div>
       <div>
         <div className="name">{env.name}</div>
         <div className="meta">
-          {env.kind === 'savings'
-            ? `Usado ${euros(view.used)} este mes`
-            : env.kind === 'fund'
-            ? `Fondo · gastado ${euros(view.spent)} este ciclo`
-            : rhythmOf(env) === 'weekly'
-              ? `Semanal · mes ${euros(view.spent)} / ${euros(total)}`
-              : KIND_LABEL[env.kind]}
-          {env.kind !== 'fund' && rhythmOf(env) !== 'weekly' && total > 0 ? ` · ${pct}% usado` : ''}
+          {group === 'daily'
+            ? 'En el diario'
+            : env.kind === 'savings'
+              ? `Usado ${euros(view.used)} este mes`
+              : env.kind === 'fund'
+                ? `Fondo · gastado ${euros(view.spent)} este ciclo`
+                : week
+                  ? `Esta semana ${euros(week.spent)} / ~${euros(week.target)} · mes ${euros(view.spent)} / ${euros(total)}`
+                  : KIND_LABEL[env.kind]}
+          {env.kind !== 'fund' && !week && total > 0 ? ` · ${pct}% usado` : ''}
           {env.opening > 0 ? ` · traes ${euros(env.opening)}` : ''}
         </div>
       </div>
@@ -366,8 +330,17 @@ function EnvelopeCard({
         <span className={`pill ${light}`}>{pillLabel(view)}</span>
       </div>
       <div className={`bar ${light}`}>
-        <span style={{ width: `${Math.min(100, pct)}%` }} />
+        <span style={{ width: `${barPct}%` }} />
       </div>
+      {week && group === 'cap' && (
+        <p className="muted" style={{ fontSize: 13, gridColumn: '1 / -1', margin: 0 }}>
+          {week.label}
+          {week.daysInCycle < 7 ? ` · ${week.daysInCycle} días de este ciclo` : ''}.
+          Consejo para que dure, no un techo.
+          {week.pace === 'fast' ? ' Esta semana vas un poco rápido.' : ''}
+          {week.pace === 'over' ? ' Esta semana por encima del consejo.' : ''}
+        </p>
+      )}
       {view.alert && (
         <div className={`env-warn pill ${light}`} style={{ justifySelf: 'start' }}>
           {alertLine(view.alert, pct)}

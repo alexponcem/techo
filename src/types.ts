@@ -76,4 +76,5 @@ export type Sheet =
   | { name: 'edit'; txId: string }
   | { name: 'move' }
   | { name: 'income' }
+  | { name: 'new-envelope' }
   | null

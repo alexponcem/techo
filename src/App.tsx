@@ -4,7 +4,7 @@ import { EnvelopeScreen } from './Envelope'
 import { Home } from './Home'
 import { SettingsScreen } from './Settings'
 import { Setup } from './Setup'
-import { AddSheet, EditSheet, IncomeSheet, MoveSheet } from './Sheets'
+import { AddSheet, EditSheet, IncomeSheet, MoveSheet, NewEnvelopeSheet } from './Sheets'
 import { StatsScreen } from './Stats'
 import { useAppState } from './store'
 import type { Screen, Sheet } from './types'
@@ -130,6 +130,7 @@ export default function App() {
       )}
       {sheet?.name === 'move' && <MoveSheet onClose={() => closeSheet()} />}
       {sheet?.name === 'income' && <IncomeSheet onClose={() => closeSheet()} />}
+      {sheet?.name === 'new-envelope' && <NewEnvelopeSheet onClose={() => closeSheet()} />}
     </div>
   )
 }
