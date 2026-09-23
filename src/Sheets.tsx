@@ -11,7 +11,9 @@ import { KIND_LABEL } from './template'
 import {
   activeCycle,
   coverPlan,
+  dailyWeekBudget,
   kindOrder,
+  rhythmOf,
   saveReview,
   verdictFor,
   viewsFor,
@@ -56,7 +58,11 @@ export function AddSheet({
   const verdict = verdictFor(view, cents)
   const isSavings = view?.env.kind === 'savings'
   const reasonOk = (isSavings ? note : reason).trim().length >= 4
-  const plan = envelopeId ? coverPlan(views, envelopeId, cents) : null
+  const week = dailyWeekBudget(state)
+  const isDaily = Boolean(view && rhythmOf(view.env) === 'daily')
+  const plan = envelopeId ? coverPlan(views, envelopeId, cents, week) : null
+  const dayOver =
+    isDaily && week && cents > week.hoy && !(plan && plan.weekExhausted)
 
   const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
 
@@ -72,7 +78,7 @@ export function AddSheet({
       finish()
       return
     }
-    if (plan) {
+    if (plan || dayOver) {
       setConfirm(true)
       return
     }
@@ -81,7 +87,13 @@ export function AddSheet({
   }
 
   function acceptCover() {
-    if (!envelopeId || !plan || !plan.possible) return
+    if (!envelopeId) return
+    if (!plan) {
+      addExpense(envelopeId, cents, note, at)
+      finish()
+      return
+    }
+    if (!plan.possible) return
     if (plan.needsSavingsReason && reason.trim().length < 4) return
     coverAndSpend({
       envelopeId,
@@ -213,9 +225,36 @@ export function AddSheet({
         </div>
       )}
       <div className={`verdict ${verdict.status}`}>{verdict.message}</div>
+      {confirm && !plan && dayOver && week && (
+        <div className="hint">
+          <p>
+            Te pasas del techo de hoy ({euros(week.hoy)}). Si anotas, este día se cierra y el resto
+            de <b>esta semana</b> bajará a ~{euros(
+              week.daysAfter > 0
+                ? Math.floor(Math.max(0, week.weekLeft - cents) / week.daysAfter)
+                : 0,
+            )}
+            /día. La semana que viene no se toca.
+          </p>
+          <div className="actions" style={{ marginBottom: 0 }}>
+            <button type="button" className="btn ghost" onClick={() => setConfirm(false)}>
+              Denegar
+            </button>
+            <button type="button" className="btn sage" onClick={acceptCover}>
+              Anotar igual
+            </button>
+          </div>
+        </div>
+      )}
       {confirm && plan && (
         <div className={plan.possible ? 'hint' : 'deficit'}>
-          {plan.goalFromSavings ? (
+          {plan.weekExhausted ? (
+            <p>
+              Esta semana de diario ya no da más. El extra (<b>{euros(plan.fromSavings)}</b>)
+              saldría del <b>ahorro</b>, no de la semana que viene. Duele más a propósito: así se
+              controla. ¿Vale la pena?
+            </p>
+          ) : plan.goalFromSavings ? (
             <p>
               {view?.env.name}: no hay dinero apartado en este fondo. Se descontarán{' '}
               <b>{euros(plan.fromSavings)}</b> del ahorro. ¿De acuerdo?
@@ -243,7 +282,7 @@ export function AddSheet({
           )}
           {!plan.possible && (
             <p style={{ marginTop: 8 }}>
-              {plan.goalFromSavings
+              {plan.goalFromSavings || plan.weekExhausted
                 ? 'No hay suficiente ahorro para este gasto.'
                 : 'No hay suficiente en Libre + Ahorro para cubrir el extra.'}
             </p>
@@ -281,11 +320,13 @@ export function AddSheet({
         >
           {isSavings
             ? 'Usar ahorro con este motivo'
-            : plan?.goalFromSavings
-              ? 'Continuar (sale del ahorro)'
-              : plan
-                ? 'Continuar (hay extra)'
-                : 'Anotar gasto'}
+            : plan?.weekExhausted
+              ? 'Continuar (la semana no da)'
+              : plan?.goalFromSavings
+                ? 'Continuar (sale del ahorro)'
+                : plan || dayOver
+                  ? 'Continuar (hay extra)'
+                  : 'Anotar gasto'}
         </button>
       )}
     </Sheet>

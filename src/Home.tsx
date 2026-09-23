@@ -148,7 +148,11 @@ export function Home({
             <div className="k">Hoy</div>
             <div className="v">{euros(pace.daily)}</div>
             <div className="s">
-              {todayLogged > 0 ? `hoy ya ${euros(todayLogged)}` : 'si te pasas, se resta esta semana'}
+              {pace.daily <= 0 && pace.weekly > 0
+                ? 'hoy cerrado · el resto de la semana baja'
+                : todayLogged > 0
+                  ? `hoy ya ${euros(todayLogged)}`
+                  : 'si te pasas, se cierra el día'}
             </div>
           </div>
           <div className="hero-pill">

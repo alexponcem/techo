@@ -288,6 +288,66 @@ function band(pct: number): { light: Light; alert: UsageAlert } {
   return { light: 'green', alert: null }
 }
 
+export interface DailyWeekBudget {
+  hoy: number
+  weekLeft: number
+  fairDaily: number
+  futureDaily: number
+  daysAfter: number
+  closedToday: boolean
+  weekPool: number
+  weekSpent: number
+}
+
+export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekBudget | null {
+  const cycle = activeCycle(state)
+  if (!cycle) return null
+  const views = viewsFor(state, today)
+  const remaining = spendableRemaining(views)
+  const planned = views
+    .filter((v) => rhythmOf(v.env) === 'daily')
+    .reduce((s, v) => s + Math.max(0, v.env.planned), 0)
+  const dailyIds = views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id)
+  const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
+  const fairDaily = Math.floor(planned / cycleDays)
+  const w = weekWindow(cycle, today, clampWeekStart(state.settings.dailyWeekStartsOn ?? 1))
+  const txs = cycleTxs(state, cycle.id)
+  const spentToday = spentOnDay(txs, dailyIds, today)
+  const spentWeek = spentInRange(txs, dailyIds, w.sliceStart, w.sliceEnd)
+  const spentBefore = Math.max(0, spentWeek - spentToday)
+  const afterWeekStart = addDays(w.end, 1)
+  const futureDays =
+    afterWeekStart <= cycle.expectedEndAt ? daysInclusive(afterWeekStart, cycle.expectedEndAt) : 0
+  const futureReserve = fairDaily * futureDays
+  const weekPool = fairDaily * Math.max(0, w.daysInWeek)
+  const maxThisWeek = Math.max(0, Math.min(weekPool, remaining + spentWeek - futureReserve))
+  const daysFromToday = (w.todayIn ? 1 : 0) + w.daysAfter
+  const todayCap =
+    daysFromToday > 0 ? Math.floor((maxThisWeek - spentBefore) / daysFromToday) : 0
+  const closedToday = spentToday > todayCap
+  const weekLeft = Math.max(0, maxThisWeek - spentWeek)
+  let hoy = 0
+  let futureDaily = 0
+  if (closedToday) {
+    hoy = 0
+    futureDaily = w.daysAfter > 0 ? Math.floor(weekLeft / w.daysAfter) : 0
+  } else {
+    hoy = Math.max(0, todayCap - spentToday)
+    futureDaily =
+      w.daysAfter > 0 ? Math.floor((maxThisWeek - spentBefore - todayCap) / w.daysAfter) : 0
+  }
+  return {
+    hoy,
+    weekLeft,
+    fairDaily,
+    futureDaily: Math.max(0, futureDaily),
+    daysAfter: w.daysAfter,
+    closedToday,
+    weekPool: maxThisWeek,
+    weekSpent: spentWeek,
+  }
+}
+
 export interface CoverPlan {
   overflow: number
   fromLibre: number
@@ -297,14 +357,23 @@ export interface CoverPlan {
   possible: boolean
   needsSavingsReason: boolean
   goalFromSavings: boolean
+  weekExhausted?: boolean
+  dayOver?: boolean
 }
 
-export function coverPlan(views: EnvelopeView[], envelopeId: string, amount: number): CoverPlan | null {
+export function coverPlan(
+  views: EnvelopeView[],
+  envelopeId: string,
+  amount: number,
+  week?: DailyWeekBudget | null,
+): CoverPlan | null {
   const view = views.find((v) => v.env.id === envelopeId)
   if (!view || amount <= 0) return null
   if (view.env.kind === 'savings') return null
   const overflow = amount - Math.max(0, view.remaining)
-  if (overflow <= 0) return null
+  const weekExtra =
+    week && rhythmOf(view.env) === 'daily' ? Math.max(0, amount - week.weekLeft) : 0
+  if (overflow <= 0 && weekExtra <= 0) return null
 
   const libre = views.find((v) => v.env.kind === 'buffer')
   const savings = views.find((v) => v.env.kind === 'savings')
@@ -329,9 +398,9 @@ export function coverPlan(views: EnvelopeView[], envelopeId: string, amount: num
     fromLibre = Math.min(rest, Math.max(0, libre.remaining))
     rest -= fromLibre
   }
-  const fromSavings = rest
+  const fromSavings = rest + weekExtra
   return {
-    overflow,
+    overflow: overflow + weekExtra,
     fromLibre,
     fromSavings,
     libreId: libre?.env.id,
@@ -339,6 +408,8 @@ export function coverPlan(views: EnvelopeView[], envelopeId: string, amount: num
     possible: fromSavings <= savingsLeft,
     needsSavingsReason: fromSavings > 0,
     goalFromSavings: false,
+    weekExhausted: weekExtra > 0,
+    dayOver: Boolean(week && rhythmOf(view.env) === 'daily' && amount > week.hoy && weekExtra <= 0),
   }
 }
 
@@ -394,40 +465,19 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
     caps,
   }
   if (!cycle) return empty
-
-  const planned = views
-    .filter((v) => rhythmOf(v.env) === 'daily')
-    .reduce((s, v) => s + Math.max(0, v.env.planned), 0)
-  const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
-  const fairDaily = Math.floor(planned / cycleDays)
-  const dailyWeekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
-  const w = weekWindow(cycle, today, dailyWeekStart)
-  const weekEnd = w.sliceEnd
-  const cycleEnd = cycle.expectedEndAt
-  const weekDaysLeft = Math.max(1, daysInclusive(today > w.sliceStart ? today : w.sliceStart, weekEnd))
-  const afterWeekStart = addDays(w.end, 1)
-  const futureDays =
-    afterWeekStart <= cycleEnd ? daysInclusive(afterWeekStart, cycleEnd) : 0
-  const futureReserve = Math.min(remaining, fairDaily * futureDays)
-  const weekCap = fairDaily * weekDaysLeft
-  const thisWeekLeft = Math.max(0, Math.min(weekCap, remaining - futureReserve))
-  let daily = Math.floor(thisWeekLeft / weekDaysLeft)
-  const daysAfter = w.daysAfter
-  let futureDaily = daily
-  if (daysAfter === 0) {
-    daily = thisWeekLeft
-    futureDaily = 0
-  }
+  const w = dailyWeekBudget(state, today)
+  if (!w) return empty
+  const daysFromToday = w.closedToday ? Math.max(1, w.daysAfter) : Math.max(1, w.daysAfter + 1)
   return {
     remaining,
-    daily: Math.max(0, daily),
-    weekly: Math.max(0, thisWeekLeft),
-    days: weekDaysLeft,
-    weekDays: weekDaysLeft,
-    fairDaily,
-    futureDaily: Math.max(0, futureDaily),
-    weekPool: weekCap,
-    weekSpent: Math.max(0, weekCap - thisWeekLeft),
+    daily: w.hoy,
+    weekly: w.weekLeft,
+    days: daysFromToday,
+    weekDays: daysFromToday,
+    fairDaily: w.fairDaily,
+    futureDaily: w.futureDaily,
+    weekPool: w.weekPool,
+    weekSpent: w.weekSpent,
     libre: Math.max(0, libre?.remaining ?? 0),
     caps,
   }
