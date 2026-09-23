@@ -70,7 +70,7 @@ export function SettingsScreen({
           nada. Quitar el icono no suele borrar datos; una ventana privada sí.
         </p>
         <label className="field">
-          Semana del gasto diario (ocio, libre)
+          Semana del gasto diario (Libre y techos marcados)
           <select
             value={clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)}
             onChange={(e) =>
@@ -92,7 +92,7 @@ export function SettingsScreen({
           de esta semana.
         </p>
         <label className="field">
-          Semana de sobres semanales (comida, fútbol…)
+          Día por defecto de los techos semanales
           <select
             value={clampWeekStart(state.settings.weekStartsOn ?? 5)}
             onChange={(e) =>
@@ -110,8 +110,8 @@ export function SettingsScreen({
           </select>
         </label>
         <p className="muted" style={{ fontSize: 13 }}>
-          Independiente de la semana diaria. Si compras el sábado, elige sábado o
-          viernes.
+          Independiente del diario. Cada techo semanal puede elegir el suyo (ej. el
+          día que haces la compra). Si no elige, usa este.
         </p>
       </div>
       <button className="btn secondary full" onClick={onIncome}>

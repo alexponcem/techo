@@ -162,7 +162,7 @@ export function Home({
           {capLine ? (
             <>
               <br />
-              Ocio: {capLine}
+              {capLine}
             </>
           ) : null}
         </div>
@@ -195,8 +195,7 @@ export function Home({
         )}
         {snap.floor > 0 && snap.unpaidTotal > 0 && (
           <p className="muted" style={{ fontSize: 13 }}>
-            Si agotas comida, ocio, fútbol y libre, te quedarían {euros(snap.floor)}{' '}
-            (ahorro + fondos).
+            Si agotas techos y Libre, te quedarían {euros(snap.floor)} (ahorro + fondos).
           </p>
         )}
       </section>
@@ -249,7 +248,7 @@ const TOUR = [
   },
   {
     title: 'Hoy puedes gastar',
-    body: 'Cuenta Libre y los techos que marques para el diario. El super u otros techos semanales van en la tarjeta de “esta semana”, no aquí.',
+    body: 'Cuenta Libre y los techos que marques para el diario. Los techos semanales van en su propio grupo.',
   },
   {
     title: '+ Gasto',

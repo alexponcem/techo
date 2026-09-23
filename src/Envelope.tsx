@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { activeCycle, cycleTxs, envelopeView, rhythmOf } from './logic'
+import { activeCycle, cycleTxs, envelopeView, rhythmOf, weekStartOfEnv } from './logic'
+import { WeekStartSelect } from './WeekStartSelect'
 import { euros, parseEuros } from './money'
 import { KIND_HINT, KIND_LABEL } from './template'
 import {
@@ -7,6 +8,7 @@ import {
   removeExpense,
   removeTx,
   renameEnvelope,
+  setEnvelopeWeekStart,
   setSplitDaily,
   updatePlanned,
   useAppState,
@@ -46,7 +48,7 @@ export function EnvelopeScreen({
   }
   const allTxs = cycleTxs(state, cycle.id)
   const txs = allTxs.filter((t) => t.envelopeId === id || t.toEnvelopeId === id)
-  const view = envelopeView(env, allTxs, cycle, undefined, undefined, state.settings.weekStartsOn ?? 5)
+  const view = envelopeView(env, allTxs, cycle, undefined, undefined, weekStartOfEnv(env, state))
 
   function saveTecho() {
     if (!env) return
@@ -88,7 +90,7 @@ export function EnvelopeScreen({
         {env.kind === 'fixed'
           ? 'Cuota: márcala pagada cuando salga de la cuenta. Hasta entonces sigue en el saldo del banco.'
           : rhythmOf(env) === 'weekly'
-            ? 'Techo semanal: el límite duro es el del mes. La cifra de la semana es un consejo para que te dure. En Ajustes eliges qué día empieza tu semana.'
+            ? 'Techo semanal: el límite duro es el del mes. La cifra de la semana es un consejo para que te dure. Tú eliges el día en que empieza esa semana.'
             : env.kind === 'fund'
               ? 'Fondo: si está vacío, el gasto sale del ahorro. Puedes apartar antes con Mover.'
               : env.kind === 'savings'
@@ -182,6 +184,12 @@ export function EnvelopeScreen({
             </button>
           )}
           {msg ? <p className="muted">{msg}</p> : null}
+          {env.kind === 'cap' && rhythmOf(env) === 'weekly' && !env.splitDaily && (
+            <WeekStartSelect
+              value={weekStartOfEnv(env, state)}
+              onChange={(day) => setEnvelopeWeekStart(env.id, day)}
+            />
+          )}
           {env.kind === 'cap' && (
             <label className="field" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
               <input

@@ -13,7 +13,9 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
   const [expectedEndAt, setExpectedEndAt] = useState(() =>
     suggestedNextPay(todayISO(), state.settings.payMode, state.settings.fixedDay),
   )
-  const [leftoverTo, setLeftoverTo] = useState('ahorro')
+  const [leftoverTo, setLeftoverTo] = useState(
+    () => viewsFor(state).find((v) => v.env.kind === 'savings')?.env.id ?? 'ahorro',
+  )
 
   if (!cycle) return null
 
@@ -22,7 +24,13 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
     .filter((v) => v.env.kind !== 'fund' && v.env.kind !== 'savings')
     .reduce((s, v) => s + Math.max(0, v.remaining), 0)
   const savings = views.find((v) => v.env.kind === 'savings')
-  const funds = views.filter((v) => v.env.kind === 'fund' && v.remaining > 0)
+  const funds = views.filter((v) => v.env.kind === 'fund')
+  const leftoverTargets = [
+    ...(savings
+      ? [{ id: savings.env.id, label: `${savings.env.emoji} ${savings.env.name}` }]
+      : []),
+    ...funds.map((f) => ({ id: f.env.id, label: `${f.env.emoji} ${f.env.name}` })),
+  ]
   const savingsNow = savings?.remaining ?? 0
   const carried = savingsNow + leftover
   const pot = carried + cents
@@ -49,9 +57,9 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
         Cerrar ciclo
       </h2>
       <p className="muted">
-        Si no llegas al techo de comida, fútbol u ocio, ese dinero no se pierde: al
-        cerrar el ciclo pasa al ahorro (o a viajes/ropa, si lo eliges). Viajes y
-        ropa, si están vacíos, los gastos ya salieron del ahorro.
+        Si no llegas al techo de un sobre, ese dinero no se pierde: al cerrar el
+        ciclo pasa al ahorro o al fondo que elijas. Los fondos que ya tenían
+        apartado se quedan como están.
       </p>
       <div className="math">
         {views.map((v) => (
@@ -66,8 +74,11 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
       <div className="hint">
         Ahorro ahora: {euros(savingsNow)}.
         Residual de techos/cuotas/libre: {euros(leftover)}.
-        {funds.length > 0
-          ? ` Fondos (viajes/ropa) se quedan como están: ${funds.map((f) => `${f.env.name} ${euros(f.remaining)}`).join(', ')}.`
+        {funds.some((f) => f.remaining > 0)
+          ? ` Fondos se quedan como están: ${funds
+              .filter((f) => f.remaining > 0)
+              .map((f) => `${f.env.name} ${euros(f.remaining)}`)
+              .join(', ')}.`
           : ''}
         <br />
         <b>
@@ -78,14 +89,14 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
       </div>
       <p className="tiny">¿A dónde va lo que sobró?</p>
       <div className="chips">
-        {['ahorro', 'viajes', 'ropa'].map((id) => (
+        {leftoverTargets.map((t) => (
           <button
-            key={id}
+            key={t.id}
             type="button"
-            className={`chip ${leftoverTo === id ? 'on' : ''}`}
-            onClick={() => setLeftoverTo(id)}
+            className={`chip ${leftoverTo === t.id ? 'on' : ''}`}
+            onClick={() => setLeftoverTo(t.id)}
           >
-            {id === 'ahorro' ? '🌱 Ahorro' : id === 'viajes' ? '✈️ Viajes' : '👕 Ropa'}
+            {t.label}
           </button>
         ))}
       </div>

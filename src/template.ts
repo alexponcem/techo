@@ -63,7 +63,7 @@ export const KIND_LABEL: Record<Envelope['kind'], string> = {
 export const KIND_HINT: Record<Envelope['kind'], string> = {
   savings: 'Se reserva primero y se acumula. No es “lo que sobre”.',
   fixed: 'Importe conocido. Márcalo pagado cuando salga de la cuenta.',
-  cap: 'Límite del ciclo. Márcalo “sumar al diario” si quieres que se parta con Libre entre los días.',
+  cap: 'Límite del ciclo. Márcalo “sumar al diario” si quieres que se parta con Libre entre los días. Si es semanal, eliges el día en que empieza esa semana.',
   fund: 'Sin techo mensual. No resta del sueldo: si está vacío, el gasto sale del ahorro.',
   buffer: 'Lo que queda del sueldo. Se reparte solo por los días del ciclo.',
 }

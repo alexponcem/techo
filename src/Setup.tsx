@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { WEEKDAY_NAMES, clampWeekStart, lastPaydayGuess, suggestedNextPay } from './dates'
+import { WeekStartSelect } from './WeekStartSelect'
 import { HOW_IT_WORKS, KIND_EXPLAIN, TUTORIAL } from './guide'
 import { assigned, takesFromPay, withBalancedBuffer } from './logic'
 import { euros, parseEuros } from './money'
@@ -274,7 +275,7 @@ export function Setup() {
           <input type="date" value={expectedEndAt} onChange={(e) => setExpectedEndAt(e.target.value)} />
         </label>
         <label className="field">
-          La semana de super / hobbies empieza el
+          Día por defecto de los techos semanales
           <select
             value={weekStartsOn}
             onChange={(e) => setWeekStartsOn(clampWeekStart(Number(e.target.value)))}
@@ -287,8 +288,8 @@ export function Setup() {
           </select>
         </label>
         <p className="muted" style={{ fontSize: 13 }}>
-          Si compras el sábado, elige sábado o viernes. Luego lo puedes cambiar en
-          Ajustes.
+          Independiente del diario (lunes a domingo). Ej.: el día que sueles hacer
+          la compra. Luego cada sobre semanal puede elegir el suyo.
         </p>
         <button className="btn full" onClick={() => setStep('envelopes')} disabled={income <= 0}>
           Seguir a los sobres
@@ -311,20 +312,21 @@ export function Setup() {
             <b>Cuota.</b> Alquiler, móvil. Márcala pagada cuando salga del banco.
           </li>
           <li>
-            <b>Techo diario.</b> Ocio, café. Entra en “hoy puedes gastar”.
+            <b>Techo diario.</b> Ej.: ocio o café. Entra en “hoy puedes gastar”.
           </li>
           <li>
-            <b>Techo semanal.</b> Super. Consejo por semana; el límite duro es el mes.
-            Elige “Semanal” abajo y el día de inicio de semana (ya lo pedimos).
+            <b>Techo semanal.</b> Ej.: super o un hobby. Consejo por semana; el límite
+            duro es el mes. Eliges el día en que empieza esa semana.
           </li>
           <li>
-            <b>Fondo.</b> Viaje, medicina. Sin techo. Si está a 0, sale del ahorro.
+            <b>Fondo.</b> Ej.: un viaje o un curso. Sin techo. Si está a 0, sale del
+            ahorro.
           </li>
         </ul>
         <p className="muted">
           Quita lo que no uses y pon tus importes. Cuotas y techos se reservan al
           cobrar. Libre se crea solo con lo que queda y se reparte por los días
-          del ciclo. Un techo (ocio, café…) puede sumarse a ese diario con el
+          del ciclo. Un techo (ej. ocio o café) puede sumarse a ese diario con el
           check.
         </p>
         {balanced
@@ -391,18 +393,38 @@ export function Setup() {
                     ¿Diario o semanal?
                     <select
                       value={e.rhythm === 'weekly' ? 'weekly' : 'daily'}
-                      onChange={(ev) =>
+                      onChange={(ev) => {
+                        const rhythm = ev.target.value as Rhythm
                         setEnvelopes((prev) =>
                           prev.map((x) =>
-                            x.id === e.id ? { ...x, rhythm: ev.target.value as Rhythm } : x,
+                            x.id === e.id
+                              ? {
+                                  ...x,
+                                  rhythm,
+                                  weekStartsOn:
+                                    rhythm === 'weekly'
+                                      ? (x.weekStartsOn ?? weekStartsOn)
+                                      : x.weekStartsOn,
+                                }
+                              : x,
                           ),
                         )
-                      }
+                      }}
                     >
-                      <option value="weekly">Semanal — consejo por semana (super)</option>
-                      <option value="daily">Cajita del ciclo (sin consejo semanal)</option>
+                      <option value="weekly">Semanal — consejo por semana (ej. super o hobby)</option>
+                      <option value="daily">Límite del ciclo (sin consejo semanal)</option>
                     </select>
                   </label>
+                  {e.rhythm === 'weekly' && !e.splitDaily && (
+                    <WeekStartSelect
+                      value={e.weekStartsOn ?? weekStartsOn}
+                      onChange={(day) =>
+                        setEnvelopes((prev) =>
+                          prev.map((x) => (x.id === e.id ? { ...x, weekStartsOn: day } : x)),
+                        )
+                      }
+                    />
+                  )}
                   <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <input
                       type="checkbox"
@@ -504,7 +526,7 @@ export function Setup() {
                   ? ', junto con los techos marcados para el diario'
                   : ''
               }. Si no lo usas, puede ir al ahorro.`
-            : 'Todo el sueldo está asignado. Los fondos (viaje, medicina) salen del ahorro si están a 0.'}
+            : 'Todo el sueldo está asignado. Los fondos salen del ahorro si están a 0.'}
         </div>
       )}
       {error ? <div className="deficit">{error}</div> : null}

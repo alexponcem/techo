@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { suggestedNextPay, todayISO } from './dates'
+import { clampWeekStart, suggestedNextPay, todayISO } from './dates'
 import {
   activeCycle,
   assigned,
@@ -329,6 +329,15 @@ export function setSplitDaily(id: string, splitDaily: boolean) {
     ...state,
     envelopes: state.envelopes.map((e) => (e.id === id ? { ...e, splitDaily } : e)),
     template: state.template.map((e) => (e.id === id ? { ...e, splitDaily } : e)),
+  })
+}
+
+export function setEnvelopeWeekStart(id: string, weekStartsOn: number) {
+  const day = clampWeekStart(weekStartsOn)
+  emit({
+    ...state,
+    envelopes: state.envelopes.map((e) => (e.id === id ? { ...e, weekStartsOn: day } : e)),
+    template: state.template.map((e) => (e.id === id ? { ...e, weekStartsOn: day } : e)),
   })
 }
 

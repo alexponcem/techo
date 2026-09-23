@@ -24,11 +24,6 @@ En internet (móvil, sin el PC): https://alexponcem.github.io/techo/
 4. En iPhone: Compartir → **Añadir a pantalla de inicio**.
 5. En Android: menú → **Instalar app** / Añadir a pantalla de inicio.
 
-## Plan de Alex (precargado)
+## Cómo se usa
 
-- Sueldo 1.391 €
-- Ahorro 600 €
-- Cuotas: arriendo 430, transporte 49,20, móvil 16, fútbol 25, GYM 25
-- Techos: comida 130, ocio 100
-- Fondos: viajes y ropa (sin techo mensual)
-- Libre: 15,80 €
+Al crear el plan, el sueldo se reparte en cuotas, techos y fondos. Libre se calcula solo con lo que queda. Los techos semanales eligen el día en que empieza su semana; el diario va de lunes a domingo (se puede cambiar en Ajustes).

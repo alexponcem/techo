@@ -14,6 +14,8 @@ export interface Envelope {
   rhythm: Rhythm
   /** Si true, este techo se suma a Libre y se reparte en el “hoy”. Libre siempre cuenta. */
   splitDaily?: boolean
+  /** Día de inicio de la semana de este techo semanal. 0 = domingo … 6 = sábado. */
+  weekStartsOn?: number
 }
 
 export interface Cycle {
@@ -46,9 +48,9 @@ export interface Tx {
 export interface Settings {
   payMode: PayMode
   fixedDay: number
-  /** Semana de sobres semanales (comida, fútbol). 0 = domingo … 6 = sábado. */
+  /** Día por defecto de los techos semanales, si el sobre no trae el suyo. 0 = domingo … 6 = sábado. */
   weekStartsOn: number
-  /** Semana del techo diario (ocio, libre). Por defecto 1 = lunes. */
+  /** Semana del gasto diario (Libre y techos marcados). Por defecto 1 = lunes. */
   dailyWeekStartsOn: number
   seenHomeTour?: boolean
 }

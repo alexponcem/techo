@@ -106,7 +106,7 @@ function LiveReport({ report }: { report: CycleReport }) {
         <div>
           <strong>Variables: en qué se fue el techo</strong>
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Comida, ocio, fútbol y libre. Si no gastaste nada, no hay gráfico.
+            Techos y Libre de este ciclo. Si no gastaste nada, no hay gráfico.
           </p>
         </div>
         {report.variableSpent <= 0 ? (
@@ -126,7 +126,7 @@ function LiveReport({ report }: { report: CycleReport }) {
         <div>
           <strong>Si tocaste el ahorro</strong>
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Viajes, ropa y medicina. Aquí ves cuánto salió y a qué se fue.
+            Aquí ves cuánto salió del ahorro y a qué fondo o gasto se fue.
           </p>
         </div>
         {report.savingsUsed <= 0 ? (

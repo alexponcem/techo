@@ -21,6 +21,7 @@ import {
   type EnvelopeView,
 } from './logic'
 import { euros, parseEuros } from './money'
+import { WeekStartSelect } from './WeekStartSelect'
 import {
   addEnvelope,
   addExpense,
@@ -217,7 +218,7 @@ export function AddSheet({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={
-            isSavings ? 'Ej. urgente médico, arreglo del piso…' : 'café, super, partido…'
+            isSavings ? 'Ej. urgente, reparación…' : 'ej. café, super, hobby…'
           }
         />
       </label>
@@ -443,7 +444,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title="Mover dinero" onClose={onClose}>
       <p className="muted">
-        Para un viaje, una prenda o para reforzar el ahorro. El dinero no
+        Para un fondo, un extra o para reforzar el ahorro. El dinero no
         desaparece: cambia de sobre.
       </p>
       <SelectEnv label="De" value={from} views={views} onChange={setFrom} />
@@ -512,10 +513,12 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
 }
 
 export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
+  const state = useAppState()
   const [name, setName] = useState('')
   const [kind, setKind] = useState<EnvelopeKind>('cap')
   const [rhythm, setRhythm] = useState<Rhythm>('weekly')
   const [splitDaily, setSplit] = useState(false)
+  const [weekStartsOn, setWeekStartsOn] = useState(() => state.settings.weekStartsOn ?? 5)
   const [amount, setAmount] = useState('')
   const [emoji, setEmoji] = useState('✦')
   const [error, setError] = useState('')
@@ -541,6 +544,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
       opening: 0,
       rhythm: kind === 'cap' ? (splitDaily ? 'daily' : rhythm) : 'none',
       splitDaily: kind === 'cap' && splitDaily,
+      weekStartsOn: kind === 'cap' && !splitDaily && rhythm === 'weekly' ? weekStartsOn : undefined,
     })
     if (!result.ok) {
       setError(result.error)
@@ -606,10 +610,13 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
             <label className="field">
               ¿Diario o semanal?
               <select value={rhythm === 'weekly' ? 'weekly' : 'daily'} onChange={(e) => setRhythm(e.target.value as Rhythm)}>
-                <option value="weekly">Semanal — consejo por semana (super, fútbol)</option>
+                <option value="weekly">Semanal — consejo por semana (ej. super o hobby)</option>
                 <option value="daily">Límite del ciclo (sin consejo semanal)</option>
               </select>
             </label>
+          )}
+          {kind === 'cap' && !splitDaily && rhythm === 'weekly' && (
+            <WeekStartSelect value={weekStartsOn} onChange={setWeekStartsOn} />
           )}
         </>
       )}

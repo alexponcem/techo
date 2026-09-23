@@ -170,7 +170,7 @@ export function saveReview(
   const txs = cycleTxs(state, cycle.id)
   const when = formatDay(day)
   if (rhythmOf(env) === 'weekly') {
-    const w = weekSlice(env, txs, cycle, day, remainingOf(env, txs), weekStartOf(state))
+    const w = weekSlice(env, txs, cycle, day, remainingOf(env, txs), weekStartOfEnv(env, state))
     if (!w) return { status: 'ok', title: 'Anotado', body: `Quedó en ${env.name} el ${when}.` }
     const ok = w.spent <= w.target
     return {
@@ -207,6 +207,11 @@ function remainingOf(env: Envelope, txs: Tx[]): number {
 
 function weekStartOf(state: AppState): number {
   return clampWeekStart(state.settings.weekStartsOn ?? 5)
+}
+
+export function weekStartOfEnv(env: Envelope, state: AppState): number {
+  if (env.weekStartsOn != null) return clampWeekStart(env.weekStartsOn)
+  return weekStartOf(state)
 }
 
 export function weekSlice(
@@ -315,8 +320,9 @@ export function viewsFor(state: AppState, today = todayISO()): EnvelopeView[] {
   const cycle = activeCycle(state)
   if (!cycle) return []
   const txs = cycleTxs(state, cycle.id)
-  const weekStartsOn = weekStartOf(state)
-  return state.envelopes.map((env) => envelopeView(env, txs, cycle, today, undefined, weekStartsOn))
+  return state.envelopes.map((env) =>
+    envelopeView(env, txs, cycle, today, undefined, weekStartOfEnv(env, state)),
+  )
 }
 
 function usageStatus(
@@ -760,7 +766,7 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   } else if (goalPct >= 100) {
     verdict = 'good'
     title = 'Mes bueno'
-    detail = 'La meta se cumple, aunque parte del ahorro se usó (viaje, medicina…).'
+    detail = 'La meta se cumple, aunque parte del ahorro se usó en un fondo o un imprevisto.'
   } else if (goalPct >= 70) {
     verdict = 'ok'
     title = 'Mes correcto'
@@ -831,8 +837,8 @@ export function kindOrder(kind: EnvelopeKind): number {
 export type HomeGroupId = 'daily' | 'cap' | 'fixed' | 'fund' | 'savings'
 
 export const HOME_GROUPS: { id: HomeGroupId; title: string; hint: string }[] = [
-  { id: 'daily', title: 'Día a día', hint: 'Libre y techos que se parten entre los días' },
-  { id: 'cap', title: 'Techos', hint: 'Límite del ciclo. Comida, fútbol y lo que no va al diario' },
+  { id: 'daily', title: 'Día a día', hint: 'Libre y techos marcados para partir entre los días' },
+  { id: 'cap', title: 'Techos', hint: 'Límite del ciclo. Ej.: super, un hobby, un curso…' },
   { id: 'fixed', title: 'Cuotas', hint: 'Reservadas al cobrar. Márcalas pagadas' },
   { id: 'fund', title: 'Fondos', hint: 'Salen del ahorro' },
   { id: 'savings', title: 'Ahorro', hint: 'Se acumula y se protege' },

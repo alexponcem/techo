@@ -35,7 +35,7 @@ export const TUTORIAL: GuidePage[] = [
       },
       {
         k: 'Sobres de Techo (límites)',
-        v: 'Tus gastos variables (comida, ocio, café). Tienen un límite que se va consumiendo a medida que gastas.',
+        v: 'Tus gastos variables (ej. super, ocio, café). Tienen un límite que se va consumiendo a medida que gastas.',
       },
       {
         k: 'Sobres de Fondo (metas)',
@@ -54,7 +54,7 @@ export const TUTORIAL: GuidePage[] = [
       },
       {
         k: 'Paso 2 — Define tu Techo diario',
-        v: 'Lo que queda es Libre: se divide entre los días hasta el próximo sueldo. Ejemplo: 300 $ ÷ 30 días = ~10 $/día. Si un techo (ocio) se marca “sumar al diario”, se junta con Libre antes de partir.',
+        v: 'Lo que queda es Libre: se divide entre los días hasta el próximo sueldo. Ejemplo: 300 $ ÷ 30 días = ~10 $/día. Si un techo (ej. ocio o café) se marca “sumar al diario”, se junta con Libre antes de partir.',
       },
       {
         k: 'Paso 3 — Si gastas de más',
@@ -72,7 +72,7 @@ export const TUTORIAL: GuidePage[] = [
     lead: '',
     items: [
       { k: '1', v: 'Toca en + Gasto.' },
-      { k: '2', v: 'Ingresa el monto y elige su sobre de Techo (ej. Comida u Ocio).' },
+      { k: '2', v: 'Ingresa el monto y elige su sobre de Techo (ej. super u ocio).' },
       {
         k: '3 — ¿Cabe en el sobre?',
         v: 'Si pides un café de 3 € y te quedan 10 €, Techo te dará luz verde.',
@@ -152,11 +152,11 @@ export const KIND_EXPLAIN: Record<string, { label: string; hint: string }> = {
   },
   cap: {
     label: 'Techo',
-    hint: 'Límite del ciclo. Semanal = consejo para que dure (super). Si marcas “sumar al diario”, se parte con Libre entre los días.',
+    hint: 'Límite del ciclo. Semanal = consejo para que dure (ej. super o un hobby). Si marcas “sumar al diario”, se parte con Libre entre los días.',
   },
   fund: {
     label: 'Fondo',
-    hint: 'Una parte del ahorro con nombre (viaje, medicina). Si está a 0 €, sale del ahorro general.',
+    hint: 'Una parte del ahorro con nombre (ej. un viaje o un curso). Si está a 0 €, sale del ahorro general.',
   },
   buffer: {
     label: 'Libre',

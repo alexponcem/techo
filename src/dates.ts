@@ -114,8 +114,13 @@ export function suggestedNextPay(startISO: string, mode: PayMode, fixedDay: numb
   return toISODate(lastWeekdayOfMonth(next.year, next.month))
 }
 
-/** 5 = viernes: el fin de semana (viernes+sábado) cuenta junto para comida y fútbol. */
+/** Por defecto viernes: el fin de semana (vie–sáb) queda en la misma semana de techos. */
 export const FOOD_WEEK_START = 5
+
+export function weekSpanLabel(startOn: number): string {
+  const s = clampWeekStart(startOn)
+  return `${WEEKDAY_NAMES[s]} → ${WEEKDAY_NAMES[(s + 6) % 7]}`
+}
 
 export function localDayFromStamp(iso: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
