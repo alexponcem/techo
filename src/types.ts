@@ -12,6 +12,8 @@ export interface Envelope {
   emoji: string
   opening: number
   rhythm: Rhythm
+  /** Si true, este techo se suma a Libre y se reparte en el “hoy”. Libre siempre cuenta. */
+  splitDaily?: boolean
 }
 
 export interface Cycle {

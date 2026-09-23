@@ -6,6 +6,7 @@ import {
   carryKinds,
   ensureRhythm,
   reportFor,
+  takesFromPay,
   uid,
   withBalancedBuffer,
 } from './logic'
@@ -317,6 +318,14 @@ export function updatePlanned(id: string, planned: number) {
   })
 }
 
+export function setSplitDaily(id: string, splitDaily: boolean) {
+  emit({
+    ...state,
+    envelopes: state.envelopes.map((e) => (e.id === id ? { ...e, splitDaily } : e)),
+    template: state.template.map((e) => (e.id === id ? { ...e, splitDaily } : e)),
+  })
+}
+
 export function renameEnvelope(id: string, name: string) {
   emit({
     ...state,
@@ -454,5 +463,5 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
 }
 
 export function planFits(envelopes: Envelope[], income: number): boolean {
-  return assigned(envelopes.filter((e) => e.kind !== 'buffer')) <= income
+  return assigned(envelopes.filter(takesFromPay)) <= income
 }

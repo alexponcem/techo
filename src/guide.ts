@@ -54,7 +54,7 @@ export const TUTORIAL: GuidePage[] = [
       },
       {
         k: 'Paso 2 — Define tu Techo diario',
-        v: 'Ese valor restante se divide entre los días del mes. Ejemplo: esos 300 $ ÷ 30 días = ~10 $/día para gastar libremente.',
+        v: 'Lo que queda es Libre: se divide entre los días hasta el próximo sueldo. Ejemplo: 300 $ ÷ 30 días = ~10 $/día. Si un techo (ocio) se marca “sumar al diario”, se junta con Libre antes de partir.',
       },
       {
         k: 'Paso 3 — Si gastas de más',
@@ -152,7 +152,7 @@ export const KIND_EXPLAIN: Record<string, { label: string; hint: string }> = {
   },
   cap: {
     label: 'Techo',
-    hint: 'Límite del ciclo. Diario = cuánto te queda hoy. Semanal = consejo para que dure el mes (super).',
+    hint: 'Límite del ciclo. Semanal = consejo para que dure (super). Si marcas “sumar al diario”, se parte con Libre entre los días.',
   },
   fund: {
     label: 'Fondo',
@@ -160,6 +160,6 @@ export const KIND_EXPLAIN: Record<string, { label: string; hint: string }> = {
   },
   buffer: {
     label: 'Libre',
-    hint: 'Lo que sobra del sueldo después de ahorro y cuotas. Imprevistos chicos, no ocio.',
+    hint: 'Lo que queda del sueldo después de cuotas, ahorro y techos. Se crea solo y se reparte entre los días del ciclo.',
   },
 }

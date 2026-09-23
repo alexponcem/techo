@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { activeCycle, cycleTxs, envelopeView, rhythmOf } from './logic'
 import { euros, parseEuros } from './money'
 import { KIND_HINT, KIND_LABEL } from './template'
-import { markPaid, removeExpense, removeTx, updatePlanned, useAppState } from './store'
+import { markPaid, removeExpense, removeTx, setSplitDaily, updatePlanned, useAppState } from './store'
 import type { Tx } from './types'
 
 export function EnvelopeScreen({
@@ -130,6 +130,18 @@ export function EnvelopeScreen({
             </button>
           )}
           {msg ? <p className="muted">{msg}</p> : null}
+          {env.kind === 'cap' && (
+            <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(env.splitDaily)}
+                onChange={(e) => setSplitDaily(env.id, e.target.checked)}
+              />
+              <span style={{ fontWeight: 500 }}>
+                Sumar al diario del mes (se junta con Libre y se parte entre los días)
+              </span>
+            </label>
+          )}
         </div>
       )}
       <div className="section-title">

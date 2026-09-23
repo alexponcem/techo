@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { WEEKDAY_NAMES, clampWeekStart, lastPaydayGuess, suggestedNextPay } from './dates'
 import { HOW_IT_WORKS, KIND_EXPLAIN, TUTORIAL } from './guide'
-import { assigned, withBalancedBuffer } from './logic'
+import { assigned, takesFromPay, withBalancedBuffer } from './logic'
 import { euros, parseEuros } from './money'
 import { importJson, startFirstCycle } from './store'
 import { KIND_LABEL, blankPlan } from './template'
@@ -28,7 +28,7 @@ export function Setup() {
   const income = parseEuros(incomeText) ?? 0
   const savingsOpening = parseEuros(savedText) ?? 0
   const balanced = useMemo(() => withBalancedBuffer(envelopes, income), [envelopes, income])
-  const plannedOthers = assigned(balanced.filter((e) => e.kind !== 'buffer'))
+  const plannedOthers = assigned(balanced.filter((e) => takesFromPay(e)))
   const deficit = plannedOthers - income
   const buffer = balanced.find((e) => e.kind === 'buffer')
 
@@ -50,6 +50,7 @@ export function Setup() {
         emoji: '✦',
         opening: 0,
         rhythm: 'daily',
+        splitDaily: false,
       },
       ...prev.filter((e) => e.kind === 'buffer'),
     ])
@@ -320,7 +321,12 @@ export function Setup() {
             <b>Fondo.</b> Viaje, medicina. Sin techo. Si está a 0, sale del ahorro.
           </li>
         </ul>
-        <p className="muted">Quita lo que no uses y pon tus importes. Libre se calcula solo.</p>
+        <p className="muted">
+          Quita lo que no uses y pon tus importes. Cuotas y techos se reservan al
+          cobrar. Libre se crea solo con lo que queda y se reparte por los días
+          del ciclo. Un techo (ocio, café…) puede sumarse a ese diario con el
+          check.
+        </p>
         {balanced
           .filter((e) => e.kind !== 'buffer')
           .map((e) => (
@@ -380,22 +386,38 @@ export function Setup() {
                 </label>
               )}
               {e.kind === 'cap' && (
-                <label className="field">
-                  ¿Diario o semanal?
-                  <select
-                    value={e.rhythm === 'weekly' ? 'weekly' : 'daily'}
-                    onChange={(ev) =>
-                      setEnvelopes((prev) =>
-                        prev.map((x) =>
-                          x.id === e.id ? { ...x, rhythm: ev.target.value as Rhythm } : x,
-                        ),
-                      )
-                    }
-                  >
-                    <option value="daily">Diario — entra en “hoy puedes gastar” (ocio, café)</option>
-                    <option value="weekly">Semanal — consejo por semana (super, un hobby)</option>
-                  </select>
-                </label>
+                <>
+                  <label className="field">
+                    ¿Diario o semanal?
+                    <select
+                      value={e.rhythm === 'weekly' ? 'weekly' : 'daily'}
+                      onChange={(ev) =>
+                        setEnvelopes((prev) =>
+                          prev.map((x) =>
+                            x.id === e.id ? { ...x, rhythm: ev.target.value as Rhythm } : x,
+                          ),
+                        )
+                      }
+                    >
+                      <option value="weekly">Semanal — consejo por semana (super)</option>
+                      <option value="daily">Cajita del ciclo (sin consejo semanal)</option>
+                    </select>
+                  </label>
+                  <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(e.splitDaily)}
+                      onChange={(ev) =>
+                        setEnvelopes((prev) =>
+                          prev.map((x) => (x.id === e.id ? { ...x, splitDaily: ev.target.checked } : x)),
+                        )
+                      }
+                    />
+                    <span style={{ fontWeight: 500 }}>
+                      Sumar al diario del mes (se junta con Libre y se parte entre los días)
+                    </span>
+                  </label>
+                </>
               )}
               <label className="field">
                 {e.kind === 'fund' ? 'Apartar este ciclo (puede ser 0)' : 'Importe de este ciclo'}
@@ -410,6 +432,24 @@ export function Setup() {
               </label>
             </div>
           ))}
+        {buffer ? (
+          <div className="card stack" style={{ gap: 8 }}>
+            <div className="row">
+              <strong>
+                {buffer.emoji} {buffer.name}
+              </strong>
+              <span>{euros(buffer.planned)}</span>
+            </div>
+            <p className="muted" style={{ fontSize: 13 }}>
+              Se crea solo. Es lo que queda después de cuotas, ahorro y techos.
+              Ese dinero se reparte entre los días del ciclo
+              {balanced.some((e) => e.kind === 'cap' && e.splitDaily)
+                ? ', junto con los techos que hayas marcado para el diario'
+                : ''}
+              .
+            </p>
+          </div>
+        ) : null}
         <button className="btn ghost full" onClick={addRow}>
           + Añadir sobre
         </button>
@@ -459,7 +499,11 @@ export function Setup() {
       ) : (
         <div className="hint">
           {buffer && buffer.planned > 0
-            ? `Libre: ${euros(buffer.planned)}. Imprevistos chicos. Si no lo usas, puede ir al ahorro.`
+            ? `Libre: ${euros(buffer.planned)}. Se reparte entre los días del ciclo${
+                balanced.some((e) => e.kind === 'cap' && e.splitDaily)
+                  ? ', junto con los techos marcados para el diario'
+                  : ''
+              }. Si no lo usas, puede ir al ahorro.`
             : 'Todo el sueldo está asignado. Los fondos (viaje, medicina) salen del ahorro si están a 0.'}
         </div>
       )}

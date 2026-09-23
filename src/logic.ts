@@ -18,9 +18,37 @@ export function rhythmOf(env: Envelope): Rhythm {
   return 'none'
 }
 
+export function inDailySplit(env: Envelope): boolean {
+  if (env.kind === 'buffer') return true
+  if (env.kind !== 'cap') return false
+  if (env.splitDaily === true) return true
+  if (env.splitDaily === false) return false
+  return rhythmOf(env) === 'daily'
+}
+
 export function ensureRhythm(env: Envelope): Envelope {
-  if (env.id === 'futbol') return { ...env, kind: 'cap', rhythm: 'weekly' }
-  return { ...env, rhythm: rhythmOf(env) }
+  let next: Envelope = env.id === 'futbol' ? { ...env, kind: 'cap', rhythm: 'weekly' } : { ...env, rhythm: rhythmOf(env) }
+  if (next.kind === 'buffer') return { ...next, splitDaily: true, rhythm: 'daily' }
+  if (next.splitDaily === true || next.splitDaily === false) return next
+  return {
+    ...next,
+    splitDaily: next.kind === 'cap' && next.rhythm === 'daily',
+  }
+}
+
+/** Cuotas, ahorro y techos se reservan al cobrar. Fondos salen del ahorro. */
+export function takesFromPay(env: Envelope): boolean {
+  return env.kind === 'savings' || env.kind === 'fixed' || env.kind === 'cap'
+}
+
+/** Días de gasto: del cobro al día anterior del siguiente sueldo. */
+export function cycleSpendDays(cycle: Cycle): number {
+  return Math.max(1, daysBetween(cycle.startedAt, cycle.expectedEndAt))
+}
+
+export function lastSpendDay(cycle: Cycle): string {
+  const last = addDays(cycle.expectedEndAt, -1)
+  return last < cycle.startedAt ? cycle.startedAt : last
 }
 
 export function uid(): string {
@@ -153,7 +181,8 @@ export function weekSlice(
 ): WeekSlice | undefined {
   if (rhythmOf(env) !== 'weekly') return undefined
   const w = weekWindow(cycle, today, weekStartsOn)
-  const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
+  if (w.daysInWeek <= 0) return undefined
+  const cycleDays = cycleSpendDays(cycle)
   const target = Math.round((env.planned * w.daysInWeek) / cycleDays)
   const spent = spentInRange(txs, [env.id], w.sliceStart, w.sliceEnd)
   let pace: 'ok' | 'fast' | 'over' = 'ok'
@@ -175,9 +204,10 @@ export function weekWindow(cycle: Cycle, today: string, weekStartsOn: number) {
   const startOn = clampWeekStart(weekStartsOn)
   const start = weekStartOn(today, startOn)
   const end = addDays(start, 6)
+  const last = lastSpendDay(cycle)
   const sliceStart = start > cycle.startedAt ? start : cycle.startedAt
-  const sliceEnd = end < cycle.expectedEndAt ? end : cycle.expectedEndAt
-  const daysInWeek = daysInclusive(sliceStart, sliceEnd)
+  const sliceEnd = end < last ? end : last
+  const daysInWeek = sliceStart <= sliceEnd ? daysInclusive(sliceStart, sliceEnd) : 0
   let daysBefore = 0
   let daysAfter = 0
   const days = eachDay(sliceStart, sliceEnd)
@@ -296,7 +326,10 @@ export interface DailyWeekBudget {
   daysAfter: number
   closedToday: boolean
   weekPool: number
+  weekAssigned: number
   weekSpent: number
+  nextWeekDays: number
+  nextWeekNeed: number
 }
 
 export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekBudget | null {
@@ -304,22 +337,33 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
   if (!cycle) return null
   const views = viewsFor(state, today)
   const remaining = spendableRemaining(views)
-  const plannedLibre = views
-    .filter((v) => rhythmOf(v.env) === 'daily')
-    .reduce((s, v) => s + Math.max(0, v.env.planned), 0)
-  const dailyIds = views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id)
-  const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
-  const fairDaily = Math.floor(plannedLibre / cycleDays)
-  const w = weekWindow(cycle, today, clampWeekStart(state.settings.dailyWeekStartsOn ?? 1))
+  const splitViews = views.filter((v) => inDailySplit(v.env))
+  const plannedSplit = splitViews.reduce((s, v) => s + Math.max(0, v.env.planned), 0)
+  const dailyIds = splitViews.map((v) => v.env.id)
+  const cycleDays = cycleSpendDays(cycle)
+  const fairDaily = Math.round(plannedSplit / cycleDays)
+  const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
+  const w = weekWindow(cycle, today, weekStart)
   const txs = cycleTxs(state, cycle.id)
   const spentToday = spentOnDay(txs, dailyIds, today)
   const spentWeek = spentInRange(txs, dailyIds, w.sliceStart, w.sliceEnd)
   const weekDaysLeft = w.todayIn
     ? Math.max(1, daysInclusive(today, w.sliceEnd))
     : Math.max(1, w.daysAfter || 1)
+  const nextStart = addDays(w.end, 1)
+  const last = lastSpendDay(cycle)
+  const nextW = weekWindow(cycle, nextStart, weekStart)
+  const nextWeekDays = nextStart <= last ? nextW.daysInWeek : 0
   const assigned = fairDaily * weekDaysLeft
-  const weekPool = Math.min(assigned, remaining + spentToday)
-  const todayCap = Math.floor(weekPool / weekDaysLeft)
+  const nextWeekNeed = fairDaily * nextWeekDays
+  const available = remaining + spentToday
+  let weekPool = assigned
+  if (available < assigned + nextWeekNeed) {
+    const nextReserve = Math.min(nextWeekNeed, available)
+    weekPool = Math.max(0, available - nextReserve)
+  }
+  weekPool = Math.min(weekPool, available)
+  const todayCap = weekDaysLeft > 0 ? Math.round(weekPool / weekDaysLeft) : 0
   const closedToday = spentToday > todayCap
   const weekLeft = Math.max(0, weekPool - spentToday)
   let hoy = 0
@@ -339,7 +383,10 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
     daysAfter: w.daysAfter,
     closedToday,
     weekPool,
+    weekAssigned: assigned,
     weekSpent: spentWeek,
+    nextWeekDays,
+    nextWeekNeed,
   }
 }
 
@@ -367,7 +414,7 @@ export function coverPlan(
   if (view.env.kind === 'savings') return null
   const overflow = amount - Math.max(0, view.remaining)
   const weekExtra =
-    week && rhythmOf(view.env) === 'daily' ? Math.max(0, amount - week.weekLeft) : 0
+    week && inDailySplit(view.env) ? Math.max(0, amount - week.weekLeft) : 0
   if (overflow <= 0 && weekExtra <= 0) return null
 
   const libre = views.find((v) => v.env.kind === 'buffer')
@@ -404,12 +451,12 @@ export function coverPlan(
     needsSavingsReason: fromSavings > 0,
     goalFromSavings: false,
     weekExhausted: weekExtra > 0,
-    dayOver: Boolean(week && rhythmOf(view.env) === 'daily' && amount > week.hoy && weekExtra <= 0),
+    dayOver: Boolean(week && inDailySplit(view.env) && amount > week.hoy && weekExtra <= 0),
   }
 }
 
 export function spendableViews(views: EnvelopeView[]): EnvelopeView[] {
-  return views.filter((v) => rhythmOf(v.env) === 'daily')
+  return views.filter((v) => inDailySplit(v.env))
 }
 
 export function spendableRemaining(views: EnvelopeView[]): number {
@@ -433,6 +480,7 @@ export interface Pace {
   fairDaily: number
   futureDaily: number
   weekPool: number
+  weekAssigned: number
   weekSpent: number
   libre: number
   caps: { name: string; remaining: number }[]
@@ -455,6 +503,7 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
     fairDaily: 0,
     futureDaily: 0,
     weekPool: 0,
+    weekAssigned: 0,
     weekSpent: 0,
     libre: Math.max(0, libre?.remaining ?? 0),
     caps,
@@ -472,6 +521,7 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
     fairDaily: w.fairDaily,
     futureDaily: w.futureDaily,
     weekPool: w.weekPool,
+    weekAssigned: w.weekAssigned,
     weekSpent: w.weekSpent,
     libre: Math.max(0, libre?.remaining ?? 0),
     caps,
@@ -712,9 +762,9 @@ export function assigned(envelopes: Envelope[]): number {
 }
 
 export function withBalancedBuffer(envelopes: Envelope[], income: number): Envelope[] {
-  const others = envelopes.filter((e) => e.kind !== 'buffer')
+  const charged = envelopes.filter((e) => e.kind !== 'buffer' && takesFromPay(e)).reduce((s, e) => s + e.planned, 0)
+  const rest = income - charged
   const buffer = envelopes.find((e) => e.kind === 'buffer')
-  const rest = income - others.reduce((s, e) => s + e.planned, 0)
   if (!buffer) {
     return [
       ...envelopes,
@@ -726,10 +776,13 @@ export function withBalancedBuffer(envelopes: Envelope[], income: number): Envel
         emoji: '💧',
         opening: 0,
         rhythm: 'daily',
+        splitDaily: true,
       },
     ]
   }
-  return envelopes.map((e) => (e.kind === 'buffer' ? { ...e, planned: rest } : e))
+  return envelopes.map((e) =>
+    e.kind === 'buffer' ? { ...e, planned: rest, rhythm: 'daily', splitDaily: true } : e,
+  )
 }
 
 export function kindOrder(kind: EnvelopeKind): number {

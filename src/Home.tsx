@@ -1,6 +1,7 @@
 import {
   accountSnapshot,
   cycleTxs,
+  inDailySplit,
   kindOrder,
   paceFor,
   rhythmOf,
@@ -55,11 +56,13 @@ export function Home({
   if (!cycle) return null
 
   const pace = paceFor(state)
+  const splitViews = views.filter((v) => inDailySplit(v.env))
   const todayLogged = spentOnDay(
     cycleTxs(state, cycle.id),
-    views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id),
+    splitViews.map((v) => v.env.id),
     todayISO(),
   )
+  const splitNames = splitViews.map((v) => v.env.name).join(' + ') || 'Libre'
   const hot = views.filter(
     (v) => v.alert === 'near' || v.alert === 'almost' || v.alert === 'limit' || v.alert === 'over',
   )
@@ -143,21 +146,21 @@ export function Home({
             ? 'hoy cerrado · el resto de la semana se recalcula'
             : todayLogged > 0
               ? `hoy ya ${euros(todayLogged)}`
-              : 'ocio y libre · si te pasas, se cierra el día'}
+              : `${splitNames} · si te pasas, se cierra el día`}
         </div>
         <div className="hero-pills">
           <div className="hero-pill">
             <div className="k">Esta semana</div>
             <div className="v">{euros(pace.weekly)}</div>
             <div className="s">
-              techo inicial {euros(pace.weekPool)} · {pace.days}{' '}
+              techo inicial {euros(pace.weekAssigned)} · {pace.days}{' '}
               {pace.days === 1 ? 'día' : 'días'}
             </div>
           </div>
           <div className="hero-pill">
             <div className="k">Al mes</div>
             <div className="v">{euros(pace.remaining)}</div>
-            <div className="s">ocio + libre · lo que queda del ciclo</div>
+            <div className="s">{splitNames}</div>
           </div>
         </div>
         <div className="hero-break">
@@ -290,7 +293,7 @@ const TOUR = [
   },
   {
     title: 'Hoy puedes gastar',
-    body: 'Solo cuenta ocio y Libre (techos diarios). El super u otros techos semanales van en la tarjeta de “esta semana”, no aquí.',
+    body: 'Cuenta Libre y los techos que marques para el diario. El super u otros techos semanales van en la tarjeta de “esta semana”, no aquí.',
   },
   {
     title: '+ Gasto',

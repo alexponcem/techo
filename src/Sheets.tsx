@@ -12,8 +12,8 @@ import {
   activeCycle,
   coverPlan,
   dailyWeekBudget,
+  inDailySplit,
   kindOrder,
-  rhythmOf,
   saveReview,
   verdictFor,
   viewsFor,
@@ -59,7 +59,7 @@ export function AddSheet({
   const isSavings = view?.env.kind === 'savings'
   const reasonOk = (isSavings ? note : reason).trim().length >= 4
   const week = dailyWeekBudget(state)
-  const isDaily = Boolean(view && rhythmOf(view.env) === 'daily')
+  const isDaily = Boolean(view && inDailySplit(view.env))
   const plan = envelopeId ? coverPlan(views, envelopeId, cents, week) : null
   const dayOver =
     isDaily && week && cents > week.hoy && !(plan && plan.weekExhausted)
