@@ -139,33 +139,32 @@ export function Home({
         <div className="label">Hoy puedes gastar</div>
         <div className="amount">{euros(pace.daily)}</div>
         <div className="sub">
-          ocio + libre {euros(pace.remaining)} · semana{' '}
-          {WEEKDAY_NAMES[clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)]}–
-          {WEEKDAY_NAMES[(clampWeekStart(state.settings.dailyWeekStartsOn ?? 1) + 6) % 7]}
+          {pace.daily <= 0 && pace.weekly > 0
+            ? 'hoy cerrado · el resto de la semana se recalcula'
+            : todayLogged > 0
+              ? `hoy ya ${euros(todayLogged)}`
+              : 'ocio y libre · si te pasas, se cierra el día'}
         </div>
         <div className="hero-pills">
-          <div className="hero-pill">
-            <div className="k">Hoy</div>
-            <div className="v">{euros(pace.daily)}</div>
-            <div className="s">
-              {pace.daily <= 0 && pace.weekly > 0
-                ? 'hoy cerrado · el resto de la semana baja'
-                : todayLogged > 0
-                  ? `hoy ya ${euros(todayLogged)}`
-                  : 'si te pasas, se cierra el día'}
-            </div>
-          </div>
           <div className="hero-pill">
             <div className="k">Esta semana</div>
             <div className="v">{euros(pace.weekly)}</div>
             <div className="s">
-              {pace.days} {pace.days === 1 ? 'día' : 'días'} · ~{euros(pace.daily)}/día
+              techo inicial {euros(pace.weekPool)} · {pace.days}{' '}
+              {pace.days === 1 ? 'día' : 'días'}
             </div>
+          </div>
+          <div className="hero-pill">
+            <div className="k">Al mes</div>
+            <div className="v">{euros(pace.remaining)}</div>
+            <div className="s">ocio + libre · lo que queda del ciclo</div>
           </div>
         </div>
         <div className="hero-break">
-          <b>Libre {euros(pace.libre)}</b>
-          {': lo que no gastes esta semana no infla la siguiente; al cerrar el ciclo puede ir a ahorro.'}
+          Semana {WEEKDAY_NAMES[clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)]}–
+          {WEEKDAY_NAMES[(clampWeekStart(state.settings.dailyWeekStartsOn ?? 1) + 6) % 7]}.
+          Lo que no gastes esta semana no se suma a la siguiente; al cierre puede ir a
+          ahorro.
           {capLine ? (
             <>
               <br />

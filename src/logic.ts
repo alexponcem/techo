@@ -304,28 +304,21 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
   if (!cycle) return null
   const views = viewsFor(state, today)
   const remaining = spendableRemaining(views)
-  const planned = views
-    .filter((v) => rhythmOf(v.env) === 'daily')
-    .reduce((s, v) => s + Math.max(0, v.env.planned), 0)
   const dailyIds = views.filter((v) => rhythmOf(v.env) === 'daily').map((v) => v.env.id)
-  const cycleDays = Math.max(1, daysInclusive(cycle.startedAt, cycle.expectedEndAt))
-  const fairDaily = Math.floor(planned / cycleDays)
   const w = weekWindow(cycle, today, clampWeekStart(state.settings.dailyWeekStartsOn ?? 1))
   const txs = cycleTxs(state, cycle.id)
   const spentToday = spentOnDay(txs, dailyIds, today)
   const spentWeek = spentInRange(txs, dailyIds, w.sliceStart, w.sliceEnd)
-  const spentBefore = Math.max(0, spentWeek - spentToday)
-  const afterWeekStart = addDays(w.end, 1)
-  const futureDays =
-    afterWeekStart <= cycle.expectedEndAt ? daysInclusive(afterWeekStart, cycle.expectedEndAt) : 0
-  const futureReserve = fairDaily * futureDays
-  const weekPool = fairDaily * Math.max(0, w.daysInWeek)
-  const maxThisWeek = Math.max(0, Math.min(weekPool, remaining + spentWeek - futureReserve))
-  const daysFromToday = (w.todayIn ? 1 : 0) + w.daysAfter
-  const todayCap =
-    daysFromToday > 0 ? Math.floor((maxThisWeek - spentBefore) / daysFromToday) : 0
+  const daysLeftCycle = Math.max(1, daysInclusive(today, cycle.expectedEndAt))
+  const weekDaysLeft = w.todayIn
+    ? Math.max(1, daysInclusive(today, w.sliceEnd))
+    : Math.max(1, w.daysAfter || 1)
+  const atStartOfDay = remaining + spentToday
+  const fairDaily = Math.floor(atStartOfDay / daysLeftCycle)
+  const weekPool = fairDaily * weekDaysLeft
+  const todayCap = fairDaily
   const closedToday = spentToday > todayCap
-  const weekLeft = Math.max(0, maxThisWeek - spentWeek)
+  const weekLeft = Math.max(0, weekPool - spentToday)
   let hoy = 0
   let futureDaily = 0
   if (closedToday) {
@@ -334,7 +327,7 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
   } else {
     hoy = Math.max(0, todayCap - spentToday)
     futureDaily =
-      w.daysAfter > 0 ? Math.floor((maxThisWeek - spentBefore - todayCap) / w.daysAfter) : 0
+      w.daysAfter > 0 ? Math.floor((weekPool - todayCap) / w.daysAfter) : 0
   }
   return {
     hoy,
@@ -343,7 +336,7 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
     futureDaily: Math.max(0, futureDaily),
     daysAfter: w.daysAfter,
     closedToday,
-    weekPool: maxThisWeek,
+    weekPool,
     weekSpent: spentWeek,
   }
 }
