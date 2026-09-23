@@ -1,8 +1,11 @@
 import { useRef, useState } from 'react'
+import { clampWeekStart } from './dates'
+import { weekdayName } from './i18n'
 import { euros } from './money'
-import { WEEKDAY_NAMES, clampWeekStart } from './dates'
 import { HowItWorks } from './Setup'
 import { exportJson, importJson, resetAll, undoLast, updateSettings, useAppState } from './store'
+import { useLocale, useT } from './useT'
+import type { Locale } from './types'
 
 export function SettingsScreen({
   onBack,
@@ -12,6 +15,8 @@ export function SettingsScreen({
   onIncome: () => void
 }) {
   const state = useAppState()
+  const t = useT()
+  const locale = useLocale()
   const cycle = [...state.cycles].reverse().find((c) => !c.closedAt)
   const fileRef = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
@@ -32,45 +37,56 @@ export function SettingsScreen({
     reader.onload = () => {
       const text = typeof reader.result === 'string' ? reader.result : ''
       const result = importJson(text)
-      if (result.ok) setMsg('Copia restaurada. Ya deberías ver tu ciclo en Inicio.')
+      if (result.ok) setMsg(t('settings.restored'))
       else setMsg(result.error)
     }
-    reader.onerror = () => setMsg('No pude abrir ese archivo.')
+    reader.onerror = () => setMsg(t('settings.fileFail'))
     reader.readAsText(file)
   }
 
   return (
     <div className="stack">
       <button className="back" onClick={onBack}>
-        ← Inicio
+        {t('cycle.home')}
       </button>
       <h2 className="serif" style={{ fontSize: 32 }}>
-        Ajustes
+        {t('settings.title')}
       </h2>
       <div className="section-title">
-        <span>Cómo funciona</span>
+        <span>{t('setup.how')}</span>
       </div>
       <HowItWorks />
       <div className="card stack">
         <p>
-          <b>Cobro:</b>{' '}
+          <b>{t('settings.pay')}</b>{' '}
           {state.settings.payMode === 'last-weekday'
-            ? 'último día laborable'
+            ? t('setup.payLast')
             : state.settings.payMode === 'fixed-day'
-              ? `día ${state.settings.fixedDay}`
-              : 'manual'}
+              ? `${t('setup.dayOfMonth')} ${state.settings.fixedDay}`
+              : t('setup.payManual')}
         </p>
         {cycle && (
           <p>
-            <b>Este ciclo:</b> {euros(cycle.income)}
+            <b>{t('settings.thisCycle')}</b> {euros(cycle.income, locale)}
           </p>
         )}
         <p className="muted">
-          Abre Techo siempre en Safari normal, no en incógnito: ahí no se guarda
-          nada. Quitar el icono no suele borrar datos; una ventana privada sí.
+          {t('settings.safari')}
         </p>
         <label className="field">
-          Semana del gasto diario (Libre y techos marcados)
+          {t('settings.language')}
+          <select
+            value={locale}
+            onChange={(e) =>
+              updateSettings({ ...state.settings, locale: e.target.value as Locale })
+            }
+          >
+            <option value="es">{t('lang.es')}</option>
+            <option value="en">{t('lang.en')}</option>
+          </select>
+        </label>
+        <label className="field">
+          {t('settings.dailyWeek')}
           <select
             value={clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)}
             onChange={(e) =>
@@ -80,19 +96,18 @@ export function SettingsScreen({
               })
             }
           >
-            {WEEKDAY_NAMES.map((name, i) => (
-              <option key={name} value={i}>
-                {name}
+            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              <option key={i} value={i}>
+                {weekdayName(locale, i)}
               </option>
             ))}
           </select>
         </label>
         <p className="muted" style={{ fontSize: 13 }}>
-          Por defecto lunes → domingo. Si te pasas un día, se recalcula solo el resto
-          de esta semana.
+          {t('settings.dailyWeekHint')}
         </p>
         <label className="field">
-          Día por defecto de los techos semanales
+          {t('settings.weeklyDefault')}
           <select
             value={clampWeekStart(state.settings.weekStartsOn ?? 5)}
             onChange={(e) =>
@@ -102,26 +117,25 @@ export function SettingsScreen({
               })
             }
           >
-            {WEEKDAY_NAMES.map((name, i) => (
-              <option key={name} value={i}>
-                {name}
+            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              <option key={i} value={i}>
+                {weekdayName(locale, i)}
               </option>
             ))}
           </select>
         </label>
         <p className="muted" style={{ fontSize: 13 }}>
-          Independiente del diario. Cada techo semanal puede elegir el suyo (ej. el
-          día que haces la compra). Si no elige, usa este.
+          {t('settings.weeklyDefaultHint')}
         </p>
       </div>
       <button className="btn secondary full" onClick={onIncome}>
-        Registrar ingreso extra
+        {t('settings.extraIncome')}
       </button>
       <button className="btn secondary full" onClick={undoLast}>
-        Deshacer último movimiento
+        {t('settings.undo')}
       </button>
       <button className="btn secondary full" onClick={download}>
-        Exportar copia (JSON)
+        {t('settings.export')}
       </button>
       <input
         ref={fileRef}
@@ -136,20 +150,20 @@ export function SettingsScreen({
       <button
         className="btn sage full"
         onClick={() => {
-          if (state.onboarded && !confirm('Esto sustituye lo que hay ahora por la copia.')) return
+          if (state.onboarded && !confirm(t('settings.restoreConfirm'))) return
           fileRef.current?.click()
         }}
       >
-        Restaurar copia (JSON)
+        {t('settings.restore')}
       </button>
-      {msg ? <p className={msg.startsWith('Copia') ? 'hint' : 'deficit'}>{msg}</p> : null}
+      {msg ? <p className={msg === t('settings.restored') ? 'hint' : 'deficit'}>{msg}</p> : null}
       <button
         className="btn danger full"
         onClick={() => {
-          if (confirm('Se borra el plan y los movimientos de este dispositivo.')) resetAll()
+          if (confirm(t('settings.wipeConfirm'))) resetAll()
         }}
       >
-        Borrar todo y empezar de cero
+        {t('settings.wipe')}
       </button>
     </div>
   )

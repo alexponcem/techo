@@ -1,4 +1,5 @@
-import type { PayMode } from './types'
+import { intlTag, weekdayName } from './i18n'
+import type { Locale, PayMode } from './types'
 
 export function toISODate(d: Date): string {
   const y = d.getFullYear()
@@ -38,16 +39,16 @@ export function lastWeekdayOfMonth(year: number, month: number): Date {
   return d
 }
 
-export function formatDay(iso: string): string {
+export function formatDay(iso: string, locale: Locale = 'es'): string {
   const d = parseISODate(iso)
-  return new Intl.DateTimeFormat('es-ES', {
+  return new Intl.DateTimeFormat(intlTag(locale), {
     day: 'numeric',
     month: 'short',
   }).format(d)
 }
 
-export function formatRange(start: string, end: string): string {
-  return `${formatDay(start)} → ${formatDay(end)}`
+export function formatRange(start: string, end: string, locale: Locale = 'es'): string {
+  return `${formatDay(start, locale)} → ${formatDay(end, locale)}`
 }
 
 export function daysBetween(a: string, b: string): number {
@@ -117,9 +118,9 @@ export function suggestedNextPay(startISO: string, mode: PayMode, fixedDay: numb
 /** Por defecto viernes: el fin de semana (vie–sáb) queda en la misma semana de techos. */
 export const FOOD_WEEK_START = 5
 
-export function weekSpanLabel(startOn: number): string {
+export function weekSpanLabel(startOn: number, locale: Locale = 'es'): string {
   const s = clampWeekStart(startOn)
-  return `${WEEKDAY_NAMES[s]} → ${WEEKDAY_NAMES[(s + 6) % 7]}`
+  return `${weekdayName(locale, s)} → ${weekdayName(locale, (s + 6) % 7)}`
 }
 
 export function localDayFromStamp(iso: string): string {

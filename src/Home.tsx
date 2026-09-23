@@ -1,8 +1,8 @@
 import {
   accountSnapshot,
   cycleTxs,
-  HOME_GROUPS,
   homeGroupOf,
+  homeGroups,
   inDailySplit,
   paceFor,
   spentOnDay,
@@ -11,30 +11,36 @@ import {
   type HomeGroupId,
 } from './logic'
 import { useState } from 'react'
-import { WEEKDAY_NAMES, clampWeekStart, formatRange, todayISO } from './dates'
+import { clampWeekStart, formatRange, todayISO } from './dates'
+import { weekdayName, type MsgKey } from './i18n'
 import { euros } from './money'
-import { KIND_LABEL } from './template'
+import { kindLabel } from './template'
 import { markPaid, updateSettings, useAppState } from './store'
+import { useLocale, useT } from './useT'
 import type { Sheet as SheetState } from './types'
 
-function pillLabel(view: EnvelopeView): string {
-  if (view.paid) return 'Pagado'
-  if (view.env.kind === 'savings') return view.used > 0 ? `${view.pct}%` : 'Bien'
+function pillLabel(view: EnvelopeView, tr: (k: MsgKey, vars?: Record<string, string | number>) => string): string {
+  if (view.paid) return tr('home.pillPaid')
+  if (view.env.kind === 'savings') return view.used > 0 ? `${view.pct}%` : tr('home.pillOk')
   if (view.env.kind === 'fund') {
-    return view.remaining > 0 ? 'Apartado' : view.spent > 0 ? 'Del ahorro' : 'Vacío'
+    return view.remaining > 0 ? tr('home.pillSet') : view.spent > 0 ? tr('home.pillFromSav') : tr('home.pillEmpty')
   }
-  if (view.light === 'green') return 'Bien'
+  if (view.light === 'green') return tr('home.pillOk')
   if (view.light === 'idle') return '—'
-  if (view.alert === 'limit') return '100%'
+  if (view.alert === 'limit') return tr('home.pillLimit')
   return `${Math.max(0, view.pct)}%`
 }
 
-function alertLine(alert: EnvelopeView['alert'], pct: number): string {
-  if (alert === 'half') return `Pasó el 50% (${pct}%)`
-  if (alert === 'near') return `Se acerca al límite (${pct}%)`
-  if (alert === 'almost') return `Casi al límite (${pct}%)`
-  if (alert === 'limit') return 'Al límite'
-  if (alert === 'over') return 'Superó el techo'
+function alertLine(
+  alert: EnvelopeView['alert'],
+  pct: number,
+  tr: (k: MsgKey, vars?: Record<string, string | number>) => string,
+): string {
+  if (alert === 'half') return tr('home.alertHalf', { pct })
+  if (alert === 'near') return tr('home.alertNear', { pct })
+  if (alert === 'almost') return tr('home.alertAlmost', { pct })
+  if (alert === 'limit') return tr('home.alertLimit')
+  if (alert === 'over') return tr('home.alertOver')
   return ''
 }
 
@@ -50,6 +56,8 @@ export function Home({
   onCycle: () => void
 }) {
   const state = useAppState()
+  const t = useT()
+  const locale = useLocale()
   const cycle = [...state.cycles].reverse().find((c) => !c.closedAt)
   const views = viewsFor(state)
 
@@ -62,7 +70,7 @@ export function Home({
     splitViews.map((v) => v.env.id),
     todayISO(),
   )
-  const splitNames = splitViews.map((v) => v.env.name).join(' + ') || 'Libre'
+  const splitNames = splitViews.map((v) => v.env.name).join(' + ') || t('names.free')
   const hot = views.filter(
     (v) => v.alert === 'near' || v.alert === 'almost' || v.alert === 'limit' || v.alert === 'over',
   )
@@ -72,11 +80,11 @@ export function Home({
   const near = hot.filter((v) => v.alert === 'near')
   const capLine = pace.caps
     .filter((c) => c.remaining > 0)
-    .map((c) => `${c.name} ${euros(c.remaining)}`)
+    .map((c) => `${c.name} ${euros(c.remaining, locale)}`)
     .join(' · ')
   const snap = accountSnapshot(views)
   const unpaidNames = snap.unpaid.map((v) => v.env.name).join(', ')
-  const groups = HOME_GROUPS.map((g) => ({
+  const groups = homeGroups(locale).map((g) => ({
     ...g,
     items: views.filter((v) => homeGroupOf(v.env) === g.id),
   }))
@@ -86,10 +94,10 @@ export function Home({
       <header className="topbar">
         <div className="brand">Techo</div>
         <div className="row" style={{ gap: 8 }}>
-          <button className="icon-btn" onClick={onCycle} aria-label="Ciclo">
+          <button className="icon-btn" onClick={onCycle} aria-label={t('nav.cycle')}>
             ↻
           </button>
-          <button className="icon-btn" onClick={onSettings} aria-label="Ajustes">
+          <button className="icon-btn" onClick={onSettings} aria-label={t('nav.settings')}>
             ⚙
           </button>
         </div>
@@ -97,68 +105,70 @@ export function Home({
 
       <div className="actions">
         <button className="btn sage" onClick={() => onOpen({ name: 'add' })}>
-          + Gasto
+          {t('home.spend')}
         </button>
         <button className="btn secondary" onClick={() => onOpen({ name: 'move' })}>
-          Mover
+          {t('home.move')}
         </button>
       </div>
 
       {hot.length > 0 && (
         <div className={`banner ${over.length + atLimit.length + almost.length > 0 ? 'red' : 'orange'}`}>
-          {over.length === 1 && <div>{over[0].env.name} superó el techo.</div>}
-          {over.length > 1 && <div>Superaron el techo: {over.map((v) => v.env.name).join(', ')}.</div>}
-          {atLimit.length === 1 && <div>{atLimit[0].env.name} está al límite.</div>}
-          {atLimit.length > 1 && <div>Al límite: {atLimit.map((v) => v.env.name).join(', ')}.</div>}
+          {over.length === 1 && <div>{t('home.overOne', { name: over[0].env.name })}</div>}
+          {over.length > 1 && <div>{t('home.overMany', { names: over.map((v) => v.env.name).join(', ') })}</div>}
+          {atLimit.length === 1 && <div>{t('home.atLimitOne', { name: atLimit[0].env.name })}</div>}
+          {atLimit.length > 1 && (
+            <div>{t('home.atLimitMany', { names: atLimit.map((v) => v.env.name).join(', ') })}</div>
+          )}
           {almost.length === 1 && (
-            <div>
-              {almost[0].env.name} está casi al límite ({almost[0].pct}%).
-            </div>
+            <div>{t('home.almostOne', { name: almost[0].env.name, pct: almost[0].pct })}</div>
           )}
           {almost.length > 1 && (
-            <div>Casi al límite: {almost.map((v) => v.env.name).join(', ')}.</div>
+            <div>{t('home.almostMany', { names: almost.map((v) => v.env.name).join(', ') })}</div>
           )}
           {near.length === 1 && (
-            <div>
-              {near[0].env.name} se acerca al límite ({near[0].pct}%).
-            </div>
+            <div>{t('home.nearOne', { name: near[0].env.name, pct: near[0].pct })}</div>
           )}
           {near.length > 1 && (
-            <div>Cerca del límite: {near.map((v) => v.env.name).join(', ')}.</div>
+            <div>{t('home.nearMany', { names: near.map((v) => v.env.name).join(', ') })}</div>
           )}
         </div>
       )}
 
       <section className="hero">
-        <div className="label">Hoy puedes gastar</div>
-        <div className="amount">{euros(pace.daily)}</div>
+        <div className="label">{t('home.today')}</div>
+        <div className="amount">{euros(pace.daily, locale)}</div>
         <div className="sub">
           {pace.daily <= 0 && pace.weekly > 0
-            ? 'hoy cerrado · el resto de la semana se recalcula'
+            ? t('home.todayClosed')
             : todayLogged > 0
-              ? `hoy ya ${euros(todayLogged)}`
-              : `${splitNames} · si te pasas, se cierra el día`}
+              ? t('home.todayLogged', { amount: euros(todayLogged, locale) })
+              : t('home.todayHint', { names: splitNames })}
         </div>
         <div className="hero-pills">
           <div className="hero-pill">
-            <div className="k">Esta semana</div>
-            <div className="v">{euros(pace.weekly)}</div>
+            <div className="k">{t('home.thisWeek')}</div>
+            <div className="v">{euros(pace.weekly, locale)}</div>
             <div className="s">
-              ~{euros(pace.fairDaily)}/día · techo {euros(pace.weekAssigned)} · {pace.days}{' '}
-              {pace.days === 1 ? 'día' : 'días'}
+              {t('home.weekMeta', {
+                daily: euros(pace.fairDaily, locale),
+                cap: euros(pace.weekAssigned, locale),
+                days: pace.days,
+                dayWord: pace.days === 1 ? t('common.day') : t('common.days'),
+              })}
             </div>
           </div>
           <div className="hero-pill">
-            <div className="k">Al mes</div>
-            <div className="v">{euros(pace.remaining)}</div>
+            <div className="k">{t('home.month')}</div>
+            <div className="v">{euros(pace.remaining, locale)}</div>
             <div className="s">{splitNames}</div>
           </div>
         </div>
         <div className="hero-break">
-          Semana {WEEKDAY_NAMES[clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)]}–
-          {WEEKDAY_NAMES[(clampWeekStart(state.settings.dailyWeekStartsOn ?? 1) + 6) % 7]}.
-          Lo que no gastes esta semana no se suma a la siguiente; al cierre puede ir a
-          ahorro.
+          {t('home.weekBreak', {
+            from: weekdayName(locale, clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)),
+            to: weekdayName(locale, (clampWeekStart(state.settings.dailyWeekStartsOn ?? 1) + 6) % 7),
+          })}
           {capLine ? (
             <>
               <br />
@@ -167,35 +177,35 @@ export function Home({
           ) : null}
         </div>
         <div className="hero-meta">
-          <span>{formatRange(cycle.startedAt, cycle.expectedEndAt)}</span>
-          <span>Entraron {euros(cycle.income)}</span>
+          <span>{formatRange(cycle.startedAt, cycle.expectedEndAt, locale)}</span>
+          <span>{t('home.cameIn', { amount: euros(cycle.income, locale) })}</span>
         </div>
       </section>
 
       <section className="saldo">
-        <div className="tiny">En tu cuenta ahora</div>
-        <div className="saldo-amount">{euros(snap.inAccount)}</div>
+        <div className="tiny">{t('home.inAccount')}</div>
+        <div className="saldo-amount">{euros(snap.inAccount, locale)}</div>
         <p className="muted" style={{ fontSize: 13 }}>
-          Debería coincidir con el banco si anotaste todo (un solo bolsillo).
+          {t('home.inAccountHint')}
         </p>
         {snap.unpaidTotal > 0 ? (
           <div className="saldo-next">
             <div className="row">
-              <span>Cuando salgan las cuotas pendientes</span>
-              <b>{euros(snap.afterFixed)}</b>
+              <span>{t('home.whenBillsLeave')}</span>
+              <b>{euros(snap.afterFixed, locale)}</b>
             </div>
             <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              Falta: {unpaidNames}. Eso que queda es ahorro + variables + fondos.
+              {t('home.billsLeft', { names: unpaidNames })}
             </p>
           </div>
         ) : (
           <p className="muted" style={{ fontSize: 13 }}>
-            Cuotas de este ciclo ya marcadas. Este es el saldo que te queda.
+            {t('home.billsDone')}
           </p>
         )}
         {snap.floor > 0 && snap.unpaidTotal > 0 && (
           <p className="muted" style={{ fontSize: 13 }}>
-            Si agotas techos y Libre, te quedarían {euros(snap.floor)} (ahorro + fondos).
+            {t('home.floor', { amount: euros(snap.floor, locale) })}
           </p>
         )}
       </section>
@@ -230,7 +240,7 @@ export function Home({
         style={{ margin: '4px 0 24px' }}
         onClick={() => onOpen({ name: 'new-envelope' })}
       >
-        + Nuevo sobre
+        {t('home.newEnvelope')}
       </button>
       {state.settings.seenHomeTour === false && (
         <HomeTour
@@ -241,29 +251,20 @@ export function Home({
   )
 }
 
-const TOUR = [
-  {
-    title: 'En tu cuenta ahora',
-    body: 'Ese total es lo que debería verse en el banco: ahorro + lo no gastado + alquiler u otras cuotas que aún no hayas marcado pagadas.',
-  },
-  {
-    title: 'Hoy puedes gastar',
-    body: 'Cuenta Libre y los techos que marques para el diario. Los techos semanales van en su propio grupo.',
-  },
-  {
-    title: '+ Gasto',
-    body: 'Cuánto, en qué sobre, anotar. La app te dice si cabe en ESE sobre. Las cuotas: “Marcar pagado” cuando salgan.',
-  },
-]
-
 function HomeTour({ onSkip }: { onSkip: () => void }) {
+  const t = useT()
   const [i, setI] = useState(0)
-  const page = TOUR[i]
+  const pages = [
+    { title: t('tour.account'), body: t('tour.accountBody') },
+    { title: t('tour.today'), body: t('tour.todayBody') },
+    { title: t('tour.add'), body: t('tour.addBody') },
+  ]
+  const page = pages[i]
   return (
     <div className="tour">
       <div className="tour-card stack">
         <p className="tiny">
-          {i + 1} / {TOUR.length}
+          {i + 1} / {pages.length}
         </p>
         <h3 className="serif" style={{ fontSize: 24, margin: 0 }}>
           {page.title}
@@ -273,14 +274,14 @@ function HomeTour({ onSkip }: { onSkip: () => void }) {
           type="button"
           className="btn full sage"
           onClick={() => {
-            if (i < TOUR.length - 1) setI(i + 1)
+            if (i < pages.length - 1) setI(i + 1)
             else onSkip()
           }}
         >
-          {i < TOUR.length - 1 ? 'Siguiente' : 'Empezar'}
+          {i < pages.length - 1 ? t('common.next') : t('common.start')}
         </button>
         <button type="button" className="btn ghost full" onClick={onSkip}>
-          Saltar
+          {t('common.skipTour')}
         </button>
       </div>
     </div>
@@ -300,6 +301,8 @@ function EnvelopeCard({
   onPay: () => void
   onSpend: () => void
 }) {
+  const t = useT()
+  const locale = useLocale()
   const { env, remaining, total, pct, light, paid } = view
   const week = view.week
   const weekPct =
@@ -312,43 +315,48 @@ function EnvelopeCard({
         <div className="name">{env.name}</div>
         <div className="meta">
           {group === 'daily'
-            ? 'En el diario'
+            ? t('home.inDaily')
             : env.kind === 'savings'
-              ? `Usado ${euros(view.used)} este mes`
+              ? t('home.savingsUsed', { amount: euros(view.used, locale) })
               : env.kind === 'fund'
-                ? `Fondo · gastado ${euros(view.spent)} este ciclo`
+                ? t('home.fundSpent', { amount: euros(view.spent, locale) })
                 : week
-                  ? `Esta semana ${euros(week.spent)} / ~${euros(week.target)} · mes ${euros(view.spent)} / ${euros(total)}`
-                  : KIND_LABEL[env.kind]}
-          {env.kind !== 'fund' && !week && total > 0 ? ` · ${pct}% usado` : ''}
-          {env.opening > 0 ? ` · traes ${euros(env.opening)}` : ''}
+                  ? t('home.weekLine', {
+                      spent: euros(week.spent, locale),
+                      target: euros(week.target, locale),
+                      monthSpent: euros(view.spent, locale),
+                      total: euros(total, locale),
+                    })
+                  : kindLabel(env.kind, locale)}
+          {env.kind !== 'fund' && !week && total > 0 ? t('home.usedPct', { pct }) : ''}
+          {env.opening > 0 ? t('home.brought', { amount: euros(env.opening, locale) }) : ''}
         </div>
       </div>
       <div className="right">
-        <div className="remain">{euros(remaining)}</div>
-        <span className={`pill ${light}`}>{pillLabel(view)}</span>
+        <div className="remain">{euros(remaining, locale)}</div>
+        <span className={`pill ${light}`}>{pillLabel(view, t)}</span>
       </div>
       <div className={`bar ${light}`}>
         <span style={{ width: `${barPct}%` }} />
       </div>
       {week && group === 'cap' && (
         <p className="muted" style={{ fontSize: 13, gridColumn: '1 / -1', margin: 0 }}>
-          {week.label}
-          {week.daysInCycle < 7 ? ` · ${week.daysInCycle} días de este ciclo` : ''}.
-          Consejo para que dure, no un techo.
-          {week.pace === 'fast' ? ' Esta semana vas un poco rápido.' : ''}
-          {week.pace === 'over' ? ' Esta semana por encima del consejo.' : ''}
+          {t('home.weekAdvice', {
+            label: week.label,
+            clip: week.daysInCycle < 7 ? t('home.weekClip', { n: week.daysInCycle }) : '',
+            pace: week.pace === 'fast' ? t('home.paceFast') : week.pace === 'over' ? t('home.paceOver') : '',
+          })}
         </p>
       )}
       {view.alert && (
         <div className={`env-warn pill ${light}`} style={{ justifySelf: 'start' }}>
-          {alertLine(view.alert, pct)}
+          {alertLine(view.alert, pct, t)}
         </div>
       )}
       {env.kind === 'fixed' && !paid && remaining > 0 && (
         <div className="row" style={{ gridColumn: '1 / -1' }}>
           <span className="muted tiny" style={{ textTransform: 'none', letterSpacing: 0 }}>
-            Reservado, aún no marcado
+            {t('home.reserved')}
           </span>
           <span
             className="paid-btn"
@@ -357,7 +365,7 @@ function EnvelopeCard({
               onPay()
             }}
           >
-            Marcar pagado
+            {t('home.markPaid')}
           </span>
         </div>
       )}
@@ -370,7 +378,7 @@ function EnvelopeCard({
               onSpend()
             }}
           >
-            Anotar
+            {t('home.log')}
           </span>
         </div>
       )}

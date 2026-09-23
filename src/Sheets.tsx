@@ -7,7 +7,7 @@ import {
   todayISO,
   yesterdayISO,
 } from './dates'
-import { EMOJI_PICK, KIND_LABEL } from './template'
+import { EMOJI_PICK } from './template'
 import {
   activeCycle,
   coverPlan,
@@ -21,6 +21,8 @@ import {
   type EnvelopeView,
 } from './logic'
 import { euros, parseEuros } from './money'
+import { kindLabel } from './template'
+import { useLocale, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
 import {
   addEnvelope,
@@ -44,6 +46,8 @@ export function AddSheet({
   onClose: (saved?: boolean, envelopeId?: string) => void
 }) {
   const state = useAppState()
+  const t = useT()
+  const locale = useLocale()
   const views = viewsFor(state)
   const [amount, setAmount] = useState('')
   const [envelopeId, setEnvelopeId] = useState(presetId ?? '')
@@ -59,7 +63,7 @@ export function AddSheet({
   const maxDay = todayISO()
   const cents = parseEuros(amount) ?? 0
   const view = views.find((v) => v.env.id === envelopeId)
-  const verdict = verdictFor(view, cents)
+  const verdict = verdictFor(view, cents, locale)
   const isSavings = view?.env.kind === 'savings'
   const reasonOk = (isSavings ? note : reason).trim().length >= 4
   const week = dailyWeekBudget(state)
@@ -124,7 +128,7 @@ export function AddSheet({
 
   if (done) {
     return (
-      <Sheet title="Anotado" onClose={() => onClose(true, envelopeId)}>
+      <Sheet title={t('logic.logged')} onClose={() => onClose(true, envelopeId)}>
         <div className={`verdict ${done.status}`}>
           <p>
             <b>{done.title}</b>
@@ -132,16 +136,16 @@ export function AddSheet({
           <p style={{ marginTop: 8, fontWeight: 500 }}>{done.body}</p>
         </div>
         <button type="button" className="btn full sage" onClick={() => onClose(true, envelopeId)}>
-          Listo
+          {t('common.start')}
         </button>
       </Sheet>
     )
   }
 
   return (
-    <Sheet title={isSavings ? 'Usar ahorro' : '¿Me cabe?'} onClose={() => onClose()}>
+    <Sheet title={isSavings ? t('env.useSav') : t('sheet.add')} onClose={() => onClose()}>
       <label className="field">
-        Importe
+        {t('sheet.amount')}
         <input
           inputMode="decimal"
           value={amount}
@@ -159,14 +163,14 @@ export function AddSheet({
           </button>
         ))}
       </div>
-      <p className="tiny">¿Cuándo lo gastaste?</p>
+      <p className="tiny">{t('sheet.when')}</p>
       <div className="chips">
         <button
           type="button"
           className={`chip ${spendDay === todayISO() ? 'on' : ''}`}
           onClick={() => setSpendDay(todayISO())}
         >
-          Hoy
+          {t('sheet.today')}
         </button>
         {yesterdayISO() >= minDay && (
           <button
@@ -174,12 +178,12 @@ export function AddSheet({
             className={`chip ${spendDay === yesterdayISO() ? 'on' : ''}`}
             onClick={() => setSpendDay(yesterdayISO())}
           >
-            Ayer
+            {t('sheet.yesterday')}
           </button>
         )}
       </div>
       <label className="field">
-        Otra fecha
+        {t('sheet.date')}
         <input
           type="date"
           min={minDay}
@@ -193,7 +197,7 @@ export function AddSheet({
           Cuenta para el {formatDay(spendDay)} (y su semana), no como gasto de hoy.
         </p>
       )}
-      <p className="tiny">Sobre</p>
+      <p className="tiny">{t('sheet.envelope')}</p>
       <div className="chips">
         {views
           .slice()
@@ -213,7 +217,7 @@ export function AddSheet({
           ))}
       </div>
       <label className="field">
-        {isSavings ? 'Motivo (obligatorio)' : 'Nota (opcional)'}
+        {isSavings ? t('sheet.reasonSav') : t('sheet.note')}
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -245,7 +249,7 @@ export function AddSheet({
               Denegar
             </button>
             <button type="button" className="btn sage" onClick={acceptCover}>
-              Anotar igual
+              {t('sheet.save')}
             </button>
           </div>
         </div>
@@ -338,6 +342,7 @@ export function AddSheet({
 }
 
 export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void }) {
+  const t = useT()
   const state = useAppState()
   const tx = state.txs.find((t) => t.id === txId)
   const cycle = activeCycle(state)
@@ -349,7 +354,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
 
   if (!tx || tx.type !== 'expense') {
     return (
-      <Sheet title="Editar" onClose={onClose}>
+      <Sheet title={t('sheet.edit')} onClose={onClose}>
         <p>Ese movimiento no se puede editar.</p>
         <button type="button" className="btn full" onClick={onClose}>
           Cerrar
@@ -368,19 +373,19 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
   }
 
   return (
-    <Sheet title="Editar gasto" onClose={onClose}>
+    <Sheet title={t('sheet.edit')} onClose={onClose}>
       <label className="field">
         Importe
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
-      <p className="tiny">¿Cuándo lo gastaste?</p>
+      <p className="tiny">{t('sheet.when')}</p>
       <div className="chips">
         <button
           type="button"
           className={`chip ${day === todayISO() ? 'on' : ''}`}
           onClick={() => setSpendDay(todayISO())}
         >
-          Hoy
+          {t('sheet.today')}
         </button>
         {yesterdayISO() >= minDay && (
           <button
@@ -388,7 +393,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
             className={`chip ${day === yesterdayISO() ? 'on' : ''}`}
             onClick={() => setSpendDay(yesterdayISO())}
           >
-            Ayer
+            {t('sheet.yesterday')}
           </button>
         )}
       </div>
@@ -418,6 +423,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
 }
 
 export function MoveSheet({ onClose }: { onClose: () => void }) {
+  const t = useT()
   const state = useAppState()
   const views = viewsFor(state)
   const [from, setFrom] = useState(views.find((v) => v.env.kind === 'buffer')?.env.id ?? '')
@@ -442,7 +448,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Sheet title="Mover dinero" onClose={onClose}>
+    <Sheet title={t('sheet.move')} onClose={onClose}>
       <p className="muted">
         Para un fondo, un extra o para reforzar el ahorro. El dinero no
         desaparece: cambia de sobre.
@@ -483,6 +489,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
 }
 
 export function IncomeSheet({ onClose }: { onClose: () => void }) {
+  const t = useT()
   const state = useAppState()
   const views = viewsFor(state)
   const [amount, setAmount] = useState('')
@@ -498,13 +505,13 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Sheet title="Dinero extra" onClose={onClose}>
+    <Sheet title={t('sheet.income')} onClose={onClose}>
       <p className="muted">Un extra, un Bizum, una venta. Elige a qué sobre entra.</p>
       <label className="field">
         Importe
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
-      <SelectEnv label="Sobre" value={envelopeId} views={views} onChange={setEnvelopeId} />
+      <SelectEnv label={t('sheet.envelope')} value={envelopeId} views={views} onChange={setEnvelopeId} />
       <button className="btn full sage" disabled={!envelopeId || cents <= 0} onClick={save}>
         Añadir ingreso
       </button>
@@ -513,6 +520,7 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
 }
 
 export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
+  const t = useT()
   const state = useAppState()
   const [name, setName] = useState('')
   const [kind, setKind] = useState<EnvelopeKind>('cap')
@@ -528,7 +536,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
     setError('')
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('Pon un nombre.')
+      setError(t('env.needName'))
       return
     }
     if (amount.trim() && parseEuros(amount) === null) {
@@ -554,7 +562,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Sheet title="Nuevo sobre" onClose={onClose}>
+    <Sheet title={t('sheet.new')} onClose={onClose}>
       <p className="muted">
         Cuota, techo o fondo. Libre se crea solo. Si el techo se suma al diario,
         aparece en Día a día.
@@ -585,9 +593,9 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
             if (next !== 'cap') setSplit(false)
           }}
         >
-          <option value="cap">Techo (límite del ciclo)</option>
-          <option value="fixed">Cuota (marcar pagado)</option>
-          <option value="fund">Fondo (sale del ahorro)</option>
+          <option value="cap">{t('setup.typeCap')}</option>
+          <option value="fixed">{t('setup.typeBill')}</option>
+          <option value="fund">{t('setup.typeGoal')}</option>
         </select>
       </label>
       {kind === 'cap' && (
@@ -631,7 +639,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
       </label>
       {error ? <p className="deficit">{error}</p> : null}
       <button type="button" className="btn full sage" onClick={save}>
-        Crear sobre
+        {t('sheet.create')}
       </button>
     </Sheet>
   )
@@ -648,6 +656,8 @@ function SelectEnv({
   views: EnvelopeView[]
   onChange: (id: string) => void
 }) {
+  const locale = useLocale()
+  const t = useT()
   const ordered = useMemo(
     () => views.slice().sort((a, b) => kindOrder(a.env.kind) - kindOrder(b.env.kind)),
     [views],
@@ -656,10 +666,10 @@ function SelectEnv({
     <label className="field">
       {label}
       <select value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Elegir…</option>
+        <option value="">{t('sheet.pick')}</option>
         {ordered.map((v) => (
           <option key={v.env.id} value={v.env.id}>
-            {v.env.emoji} {v.env.name} · {euros(v.remaining)} · {KIND_LABEL[v.env.kind]}
+            {v.env.emoji} {v.env.name} · {euros(v.remaining, locale)} · {kindLabel(v.env.kind, locale)}
           </option>
         ))}
       </select>

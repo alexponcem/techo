@@ -3,9 +3,12 @@ import { suggestedNextPay, todayISO } from './dates'
 import { activeCycle, viewsFor } from './logic'
 import { euros, parseEuros } from './money'
 import { startNextCycle, useAppState } from './store'
+import { useLocale, useT } from './useT'
 
 export function CycleScreen({ onBack }: { onBack: () => void }) {
   const state = useAppState()
+  const t = useT()
+  const locale = useLocale()
   const cycle = activeCycle(state)
   const views = viewsFor(state)
   const [income, setIncome] = useState(cycle ? String(cycle.income / 100) : '')
@@ -51,15 +54,13 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
   return (
     <div className="stack">
       <button className="back" onClick={onBack}>
-        ← Inicio
+        {t('cycle.home')}
       </button>
       <h2 className="serif" style={{ fontSize: 32 }}>
-        Cerrar ciclo
+        {t('cycle.title')}
       </h2>
       <p className="muted">
-        Si no llegas al techo de un sobre, ese dinero no se pierde: al cerrar el
-        ciclo pasa al ahorro o al fondo que elijas. Los fondos que ya tenían
-        apartado se quedan como están.
+        {t('cycle.lead')}
       </p>
       <div className="math">
         {views.map((v) => (
@@ -67,23 +68,23 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
             <span>
               {v.env.emoji} {v.env.name}
             </span>
-            <span>{euros(v.remaining)}</span>
+            <span>{euros(v.remaining, locale)}</span>
           </div>
         ))}
       </div>
       <div className="hint">
-        Ahorro ahora: {euros(savingsNow)}.
-        Residual de techos/cuotas/libre: {euros(leftover)}.
+        {t('cycle.savNow', { amount: euros(savingsNow, locale) })}
+        {t('cycle.left', { amount: euros(leftover, locale) })}
         {funds.some((f) => f.remaining > 0)
           ? ` Fondos se quedan como están: ${funds
               .filter((f) => f.remaining > 0)
-              .map((f) => `${f.env.name} ${euros(f.remaining)}`)
+              .map((f) => `${f.env.name} ${euros(f.remaining, locale)}`)
               .join(', ')}.`
           : ''}
         <br />
         <b>
-          Traes {euros(carried)}
-          {cents > 0 ? ` + sueldo ${euros(cents)} = ${euros(pot)}` : ''}.
+          {t('cycle.bring', { carried: euros(carried, locale) })}
+          {cents > 0 ? t('cycle.plusPay', { pay: euros(cents, locale), pot: euros(pot, locale) }) : ''}.
         </b>{' '}
         De ese total se asigna el mes nuevo. El ahorro no se reinicia.
       </div>
@@ -117,7 +118,7 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
         />
       </label>
       <button className="btn full sage" disabled={cents <= 0} onClick={close}>
-        Cerrar y abrir el siguiente
+        {t('cycle.close')}
       </button>
     </div>
   )

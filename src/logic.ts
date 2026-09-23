@@ -9,7 +9,13 @@ import {
   todayISO,
   weekStartOn,
 } from './dates'
-import type { AppState, Cycle, Envelope, EnvelopeKind, Light, Rhythm, Tx } from './types'
+import { t } from './i18n'
+import { euros } from './money'
+import type { AppState, Cycle, Envelope, EnvelopeKind, Light, Locale, Rhythm, Tx } from './types'
+
+function loc(state: AppState): Locale {
+  return state.settings.locale ?? 'es'
+}
 
 export function rhythmOf(env: Envelope): Rhythm {
   if (env.id === 'comida' || env.id === 'futbol') return 'weekly'
@@ -165,18 +171,31 @@ export function saveReview(
   const cycle = activeCycle(state)
   const env = state.envelopes.find((e) => e.id === envelopeId)
   if (!cycle || !env) {
-    return { status: 'ok', title: 'Anotado', body: 'El gasto quedó registrado.' }
+    const locale = loc(state)
+    return { status: 'ok', title: t(locale, 'logic.logged'), body: t(locale, 'logic.loggedOk') }
   }
+  const locale = loc(state)
   const txs = cycleTxs(state, cycle.id)
-  const when = formatDay(day)
+  const when = formatDay(day, locale)
   if (rhythmOf(env) === 'weekly') {
-    const w = weekSlice(env, txs, cycle, day, remainingOf(env, txs), weekStartOfEnv(env, state))
-    if (!w) return { status: 'ok', title: 'Anotado', body: `Quedó en ${env.name} el ${when}.` }
+    const w = weekSlice(env, txs, cycle, day, remainingOf(env, txs), weekStartOfEnv(env, state), locale)
+    if (!w) {
+      return {
+        status: 'ok',
+        title: t(locale, 'logic.logged'),
+        body: t(locale, 'logic.loggedIn', { name: env.name, when }),
+      }
+    }
     const ok = w.spent <= w.target
     return {
       status: ok ? (w.spent >= w.target * 0.85 ? 'tight' : 'ok') : 'over',
-      title: ok ? `Anotado el ${when}` : `Esa semana vas por encima del consejo`,
-      body: `Semana ${w.label}: ${fmt(w.spent)} de ~${fmt(w.target)} (consejo para que dure el mes) en ${env.name}. El techo de verdad es el del mes.`,
+      title: ok ? t(locale, 'logic.loggedDay', { when }) : t(locale, 'logic.weekOverTitle'),
+      body: t(locale, 'logic.weekBody', {
+        label: w.label,
+        spent: fmt(w.spent, locale),
+        target: fmt(w.target, locale),
+        name: env.name,
+      }),
     }
   }
   const p = paceFor(state, day)
@@ -184,10 +203,14 @@ export function saveReview(
   const over = p.fairDaily > 0 && thatDay > p.fairDaily
   return {
     status: over ? 'tight' : 'ok',
-    title: `Anotado el ${when}`,
+    title: t(locale, 'logic.loggedDay', { when }),
     body: over
-      ? `Ese día el techo era ~${fmt(p.fairDaily)} y gastaste ${fmt(thatDay)}. El exceso se resta de los días que quedan de ESTA semana, no de todo el mes.`
-      : `Ese día en ${env.name}: ${fmt(thatDay)}. Techo del día ~${fmt(p.fairDaily)}. Lo que no uses hoy suma a los días que quedan de esta semana (finde); al cerrar la semana no infla la siguiente.`,
+      ? t(locale, 'logic.dayOver', { cap: fmt(p.fairDaily, locale), spent: fmt(thatDay, locale) })
+      : t(locale, 'logic.dayOk', {
+          name: env.name,
+          spent: fmt(thatDay, locale),
+          cap: fmt(p.fairDaily, locale),
+        }),
   }
 }
 
@@ -221,6 +244,7 @@ export function weekSlice(
   today = todayISO(),
   _remaining = 0,
   weekStartsOn = 5,
+  locale: Locale = 'es',
 ): WeekSlice | undefined {
   if (rhythmOf(env) !== 'weekly') return undefined
   const w = weekWindow(cycle, today, weekStartsOn)
@@ -237,7 +261,7 @@ export function weekSlice(
     spent,
     target,
     remaining: target - spent,
-    label: `${formatDay(w.start)} → ${formatDay(w.end)}`,
+    label: `${formatDay(w.start, locale)} → ${formatDay(w.end, locale)}`,
     daysInCycle: w.daysInWeek,
     pace,
   }
@@ -280,6 +304,7 @@ export function envelopeView(
   today = todayISO(),
   remainingOverride?: number,
   weekStartsOn = 5,
+  locale: Locale = 'es',
 ): EnvelopeView {
   const n = netFor(env.id, txs)
   const total = env.opening + env.planned
@@ -300,7 +325,7 @@ export function envelopeView(
           : 0
         : Math.round((spent / total) * 100)
   const paid = env.kind === 'fixed' && remaining <= 0 && total > 0
-  const week = weekSlice(env, txs, cycle, today, remaining, weekStartsOn)
+  const week = weekSlice(env, txs, cycle, today, remaining, weekStartsOn, locale)
   const status = usageStatus(ensureRhythm(env), spent, total, remaining, week)
   return {
     env: ensureRhythm(env),
@@ -320,8 +345,9 @@ export function viewsFor(state: AppState, today = todayISO()): EnvelopeView[] {
   const cycle = activeCycle(state)
   if (!cycle) return []
   const txs = cycleTxs(state, cycle.id)
+  const locale = loc(state)
   return state.envelopes.map((env) =>
-    envelopeView(env, txs, cycle, today, undefined, weekStartOfEnv(env, state)),
+    envelopeView(env, txs, cycle, today, undefined, weekStartOfEnv(env, state), locale),
   )
 }
 
@@ -639,6 +665,7 @@ function envMeta(state: AppState, id: string): Envelope | undefined {
 }
 
 export function reportFor(state: AppState, cycle: Cycle): CycleReport {
+  const locale = loc(state)
   const txs = cycleTxs(state, cycle.id)
   const spent = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const live = !cycle.closedAt
@@ -697,7 +724,7 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   }
   const savingsParts = [...partsMap.entries()]
     .map(([id, amount]) => {
-      if (id === 'otros') return { id, name: 'Otros', emoji: '🌱', amount }
+      if (id === 'otros') return { id, name: t(locale, 'logic.other'), emoji: '🌱', amount }
       const meta = envMeta(state, id)
       return {
         id,
@@ -733,11 +760,11 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   }))).filter((r) => r.amount > 0)
   const contributions = [
     ...(savingsGoal > 0
-      ? [{ id: 'ahorro-meta', name: 'Ahorro apartado', emoji: '🌱', amount: savingsGoal }]
+      ? [{ id: 'ahorro-meta', name: t(locale, 'logic.savSet'), emoji: '🌱', amount: savingsGoal }]
       : []),
     ...leftoverParts.map((r) => ({
       id: r.id,
-      name: `Sobra de ${r.name}`,
+      name: t(locale, 'logic.leftoverOf', { name: r.name }),
       emoji: r.emoji,
       amount: r.amount,
     })),
@@ -751,30 +778,28 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
     .reduce((s, t) => s + t.amount, 0)
 
   let verdict: MonthVerdict = 'ok'
-  let title = 'Mes correcto'
-  let detail = 'Vas cerca de la meta de ahorro.'
+  let title = t(locale, 'logic.monthOk')
+  let detail = t(locale, 'logic.monthOkDetail', { pct: goalPct })
   if (pileDown || goalPct < 40) {
     verdict = 'hard'
-    title = 'Mes difícil'
-    detail = pileDown
-      ? 'El colchón bajó: salió más del ahorro de lo que este ciclo aportó.'
-      : 'Ahorraste menos de la mitad de tu meta. El mes se comió el plan.'
+    title = t(locale, 'logic.monthHard')
+    detail = pileDown ? t(locale, 'logic.monthHardDown') : t(locale, 'logic.monthHardLow')
   } else if (goalPct >= 100 && savingsUsed === 0) {
     verdict = 'good'
-    title = 'Mes bueno'
-    detail = 'Llegaste a la meta y no tocaste el ahorro extra. Eso es control.'
+    title = t(locale, 'logic.monthGood')
+    detail = t(locale, 'logic.monthGoodClean')
   } else if (goalPct >= 100) {
     verdict = 'good'
-    title = 'Mes bueno'
-    detail = 'La meta se cumple, aunque parte del ahorro se usó en un fondo o un imprevisto.'
+    title = t(locale, 'logic.monthGood')
+    detail = t(locale, 'logic.monthGoodUsed')
   } else if (goalPct >= 70) {
     verdict = 'ok'
-    title = 'Mes correcto'
-    detail = `Vas al ${goalPct}% de tu meta de ahorro. Casi.`
+    title = t(locale, 'logic.monthOk')
+    detail = t(locale, 'logic.monthOkDetail', { pct: goalPct })
   } else {
     verdict = 'tight'
-    title = 'Mes justo'
-    detail = 'Ahorraste, pero por debajo de lo que te habías propuesto.'
+    title = t(locale, 'logic.monthTight')
+    detail = t(locale, 'logic.monthTightDetail')
   }
 
   return {
@@ -806,7 +831,7 @@ export function assigned(envelopes: Envelope[]): number {
   return envelopes.reduce((s, e) => s + e.planned, 0)
 }
 
-export function withBalancedBuffer(envelopes: Envelope[], income: number): Envelope[] {
+export function withBalancedBuffer(envelopes: Envelope[], income: number, locale: Locale = 'es'): Envelope[] {
   const charged = envelopes.filter((e) => e.kind !== 'buffer' && takesFromPay(e)).reduce((s, e) => s + e.planned, 0)
   const rest = income - charged
   const buffer = envelopes.find((e) => e.kind === 'buffer')
@@ -815,7 +840,7 @@ export function withBalancedBuffer(envelopes: Envelope[], income: number): Envel
       ...envelopes,
       {
         id: 'libre',
-        name: 'Libre',
+        name: t(locale, 'names.free'),
         kind: 'buffer',
         planned: rest,
         emoji: '💧',
@@ -836,13 +861,15 @@ export function kindOrder(kind: EnvelopeKind): number {
 
 export type HomeGroupId = 'daily' | 'cap' | 'fixed' | 'fund' | 'savings'
 
-export const HOME_GROUPS: { id: HomeGroupId; title: string; hint: string }[] = [
-  { id: 'daily', title: 'Día a día', hint: 'Libre y techos marcados para partir entre los días' },
-  { id: 'cap', title: 'Techos', hint: 'Límite del ciclo. Ej.: super, un hobby, un curso…' },
-  { id: 'fixed', title: 'Cuotas', hint: 'Reservadas al cobrar. Márcalas pagadas' },
-  { id: 'fund', title: 'Fondos', hint: 'Salen del ahorro' },
-  { id: 'savings', title: 'Ahorro', hint: 'Se acumula y se protege' },
-]
+export function homeGroups(locale: Locale): { id: HomeGroupId; title: string; hint: string }[] {
+  return [
+    { id: 'daily', title: t(locale, 'group.daily'), hint: t(locale, 'group.dailyHint') },
+    { id: 'cap', title: t(locale, 'group.cap'), hint: t(locale, 'group.capHint') },
+    { id: 'fixed', title: t(locale, 'group.fixed'), hint: t(locale, 'group.fixedHint') },
+    { id: 'fund', title: t(locale, 'group.fund'), hint: t(locale, 'group.fundHint') },
+    { id: 'savings', title: t(locale, 'group.savings'), hint: t(locale, 'group.savingsHint') },
+  ]
+}
 
 export function homeGroupOf(env: Envelope): HomeGroupId {
   if (inDailySplit(env)) return 'daily'
@@ -858,12 +885,12 @@ export interface Verdict {
   message: string
 }
 
-export function verdictFor(view: EnvelopeView | undefined, amount: number): Verdict {
+export function verdictFor(view: EnvelopeView | undefined, amount: number, locale: Locale = 'es'): Verdict {
   if (!view) {
-    return { status: 'empty', remainingAfter: 0, message: 'Elige un sobre.' }
+    return { status: 'empty', remainingAfter: 0, message: t(locale, 'logic.pickEnv') }
   }
   if (amount <= 0) {
-    return { status: 'empty', remainingAfter: view.remaining, message: 'Pon un importe.' }
+    return { status: 'empty', remainingAfter: view.remaining, message: t(locale, 'logic.needAmt') }
   }
   const remainingAfter = view.remaining - amount
   if (rhythmOf(view.env) === 'weekly' && view.week) {
@@ -872,20 +899,28 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number): Verd
       return {
         status: 'over',
         remainingAfter,
-        message: `No cabe en el techo del mes de ${view.env.name}. Te pasas por ${fmt(-remainingAfter)}.`,
+        message: t(locale, 'logic.weekMonthOver', { name: view.env.name, over: fmt(-remainingAfter, locale) }),
       }
     }
     if (weekAfter > view.week.target) {
       return {
         status: 'tight',
         remainingAfter,
-        message: `Cabe en el mes (${fmt(remainingAfter)}). Consejo de esta semana ~${fmt(view.week.target)}; con esto llevarías ${fmt(weekAfter)}.`,
+        message: t(locale, 'logic.weekTight', {
+          left: fmt(remainingAfter, locale),
+          target: fmt(view.week.target, locale),
+          after: fmt(weekAfter, locale),
+        }),
       }
     }
     return {
       status: 'ok',
       remainingAfter,
-      message: `Consejo esta semana ~${fmt(view.week.target)} (llevas ${fmt(weekAfter)}). En el mes quedarían ${fmt(remainingAfter)}.`,
+      message: t(locale, 'logic.weekOk', {
+        target: fmt(view.week.target, locale),
+        after: fmt(weekAfter, locale),
+        left: fmt(remainingAfter, locale),
+      }),
     }
   }
   if (view.env.kind === 'savings') {
@@ -893,20 +928,20 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number): Verd
       return {
         status: 'over',
         remainingAfter,
-        message: `Esto come el ahorro y lo deja en ${fmt(remainingAfter)}.`,
+        message: t(locale, 'logic.savOver', { left: fmt(remainingAfter, locale) }),
       }
     }
     return {
       status: 'tight',
       remainingAfter,
-      message: `Sale del ahorro protegido. Quedarían ${fmt(remainingAfter)}.`,
+      message: t(locale, 'logic.savTight', { left: fmt(remainingAfter, locale) }),
     }
   }
   if (remainingAfter < 0) {
     return {
       status: 'over',
       remainingAfter,
-      message: `No cabe en ${view.env.name}. Te pasas por ${fmt(-remainingAfter)}.`,
+      message: t(locale, 'logic.noFit', { name: view.env.name, over: fmt(-remainingAfter, locale) }),
     }
   }
   if (view.env.kind === 'fund') {
@@ -914,34 +949,31 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number): Verd
       return {
         status: 'ok',
         remainingAfter,
-        message: `Sale de lo apartado en ${view.env.name}. Quedarían ${fmt(remainingAfter)} en el fondo.`,
+        message: t(locale, 'logic.goalOk', { name: view.env.name, left: fmt(remainingAfter, locale) }),
       }
     }
     return {
       status: 'tight',
       remainingAfter,
-      message: `En ${view.env.name} no hay apartado. Este gasto sale del ahorro.`,
+      message: t(locale, 'logic.goalEmpty', { name: view.env.name }),
     }
   }
   if (remainingAfter <= view.total * 0.2 || view.pct >= 80) {
     return {
       status: 'tight',
       remainingAfter,
-      message: `Cabe, pero ${view.env.name} queda justo: ${fmt(remainingAfter)}.`,
+      message: t(locale, 'logic.tightFit', { name: view.env.name, left: fmt(remainingAfter, locale) }),
     }
   }
   return {
     status: 'ok',
     remainingAfter,
-    message: `Cabe. En ${view.env.name} quedarían ${fmt(remainingAfter)}.`,
+    message: t(locale, 'logic.fits', { name: view.env.name, left: fmt(remainingAfter, locale) }),
   }
 }
 
-function fmt(cents: number): string {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(cents / 100)
+function fmt(cents: number, locale: Locale = 'es'): string {
+  return euros(cents, locale)
 }
 
 export function carryKinds(kind: EnvelopeKind): boolean {

@@ -1,12 +1,14 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CycleScreen } from './Cycle'
 import { EnvelopeScreen } from './Envelope'
 import { Home } from './Home'
+import { LanguageScreen } from './LanguageScreen'
 import { SettingsScreen } from './Settings'
 import { Setup } from './Setup'
 import { AddSheet, EditSheet, IncomeSheet, MoveSheet, NewEnvelopeSheet } from './Sheets'
 import { StatsScreen } from './Stats'
 import { useAppState } from './store'
+import { useLocale, useT } from './useT'
 import type { Screen, Sheet } from './types'
 
 function restoreScroll(y: number, envelopeId?: string) {
@@ -29,6 +31,8 @@ function restoreScroll(y: number, envelopeId?: string) {
 
 export default function App() {
   const state = useAppState()
+  const t = useT()
+  const locale = useLocale()
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
   const [sheet, setSheet] = useState<Sheet>(null)
   const scrollY = useRef(0)
@@ -57,6 +61,18 @@ export default function App() {
     const envId = envelopeId ?? (sheet?.name === 'add' ? sheet.envelopeId : undefined)
     setSheet(null)
     restoreScroll(y, saved && screen.name === 'home' ? envId : undefined)
+  }
+
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
+
+  if (!state.settings.locale) {
+    return (
+      <div className="app">
+        <LanguageScreen />
+      </div>
+    )
   }
 
   if (!state.onboarded) {
@@ -100,13 +116,13 @@ export default function App() {
           className={screen.name === 'home' || screen.name === 'envelope' ? 'on' : ''}
           onClick={backHome}
         >
-          Inicio
+          {t('nav.home')}
         </button>
         <button
           type="button"
           className="tab-add"
           onClick={() => openSheet({ name: 'add' })}
-          aria-label="Añadir gasto"
+          aria-label={t('nav.add')}
         >
           +
         </button>
@@ -115,7 +131,7 @@ export default function App() {
           className={screen.name === 'stats' ? 'on' : ''}
           onClick={() => setScreen({ name: 'stats' })}
         >
-          Estadísticas
+          {t('nav.stats')}
         </button>
       </nav>
 

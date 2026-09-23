@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { activeCycle, cycleTxs, envelopeView, rhythmOf, weekStartOfEnv } from './logic'
-import { WeekStartSelect } from './WeekStartSelect'
 import { euros, parseEuros } from './money'
-import { KIND_HINT, KIND_LABEL } from './template'
+import { useLocale, useT } from './useT'
+import { WeekStartSelect } from './WeekStartSelect'
+import { kindHint, kindLabel } from './template'
 import {
   markPaid,
   removeExpense,
@@ -27,6 +28,8 @@ export function EnvelopeScreen({
   onEdit: (txId: string) => void
 }) {
   const state = useAppState()
+  const tr = useT()
+  const locale = useLocale()
   const cycle = activeCycle(state)
   const env = state.envelopes.find((e) => e.id === id)
   const [draft, setDraft] = useState('')
@@ -40,70 +43,75 @@ export function EnvelopeScreen({
     return (
       <div>
         <button className="back" onClick={onBack}>
-          ← Inicio
+          {tr('cycle.home')}
         </button>
-        <p>No está este sobre.</p>
+        <p>{tr('env.missing')}</p>
       </div>
     )
   }
   const allTxs = cycleTxs(state, cycle.id)
   const txs = allTxs.filter((t) => t.envelopeId === id || t.toEnvelopeId === id)
-  const view = envelopeView(env, allTxs, cycle, undefined, undefined, weekStartOfEnv(env, state))
+  const view = envelopeView(env, allTxs, cycle, undefined, undefined, weekStartOfEnv(env, state), locale)
 
   function saveTecho() {
     if (!env) return
     const cents = parseEuros(draft)
     if (cents === null || cents < 0) {
-      setMsg('Pon un importe válido.')
+      setMsg(tr('env.needAmount'))
       return
     }
     updatePlanned(env.id, cents)
     setEditing(false)
-    setMsg('Techo actualizado. Libre se reajusta solo.')
+    setMsg(tr('env.capOk'))
   }
 
   return (
     <div className="stack">
       <button className="back" onClick={onBack}>
-        ← Inicio
+        {tr('cycle.home')}
       </button>
       <div className="hero">
         <div className="label">
-          {env.emoji} {KIND_LABEL[env.kind]}
+          {env.emoji} {kindLabel(env.kind, locale)}
         </div>
-        <div className="amount">{euros(view.remaining)}</div>
+        <div className="amount">{euros(view.remaining, locale)}</div>
         <div className="sub">
           {env.name}
           {env.kind === 'savings'
-            ? ` · usado ${euros(view.used)} este mes (${view.pct}%)`
-            : ` · quedan de ${euros(view.total)}`}
+            ? tr('env.savingsUsed', { amount: euros(view.used, locale), pct: view.pct })
+            : tr('env.leftOf', { total: euros(view.total, locale) })}
         </div>
       </div>
       {view.week && (
         <div className="hint">
-          Consejo esta semana ({view.week.label}, {view.week.daysInCycle}{' '}
-          {view.week.daysInCycle === 1 ? 'día' : 'días'} de este ciclo): ~{euros(view.week.target)}.
-          Llevas {euros(view.week.spent)}. El techo duro es el del mes ({euros(view.total)}).
+          {tr('env.weekHint', {
+            label: view.week.label,
+            days: view.week.daysInCycle,
+            dayWord: view.week.daysInCycle === 1 ? tr('common.day') : tr('common.days'),
+            target: euros(view.week.target, locale),
+            spent: euros(view.week.spent, locale),
+            total: euros(view.total, locale),
+          })}
         </div>
       )}
       <p className="muted">
         {env.kind === 'fixed'
-          ? 'Cuota: márcala pagada cuando salga de la cuenta. Hasta entonces sigue en el saldo del banco.'
+          ? tr('env.hintBill')
           : rhythmOf(env) === 'weekly'
-            ? 'Techo semanal: el límite duro es el del mes. La cifra de la semana es un consejo para que te dure. Tú eliges el día en que empieza esa semana.'
+            ? tr('env.hintWeekly')
             : env.kind === 'fund'
-              ? 'Fondo: si está vacío, el gasto sale del ahorro. Puedes apartar antes con Mover.'
+              ? tr('env.hintGoal')
               : env.kind === 'savings'
-                ? 'Ahorro protegido. Se acumula. Fondos y imprevistos grandes salen de aquí.'
-                : KIND_HINT[env.kind]}
+                ? tr('env.hintSav')
+                : kindHint(env.kind, locale)}
       </p>
       <div className="actions">
         <button className="btn sage" onClick={onAdd}>
-          {env.kind === 'savings' ? 'Usar ahorro' : '+ Gasto'}
+          {env.kind === 'savings' ? tr('env.useSav') : tr('home.spend')}
         </button>
         {env.kind === 'fixed' && view.remaining > 0 && (
           <button className="btn secondary" onClick={() => markPaid(env.id, view.remaining)}>
-            Marcar pagado
+            {tr('home.markPaid')}
           </button>
         )}
       </div>
@@ -112,7 +120,7 @@ export function EnvelopeScreen({
           {editingName ? (
             <>
               <label className="field">
-                Nombre
+                {tr('setup.name')}
                 <input
                   value={nameDraft}
                   onChange={(e) => setNameDraft(e.target.value)}
@@ -124,18 +132,18 @@ export function EnvelopeScreen({
                 onClick={() => {
                   const next = nameDraft.trim()
                   if (!next) {
-                    setMsg('Pon un nombre.')
+                    setMsg(tr('env.needName'))
                     return
                   }
                   renameEnvelope(env.id, next)
                   setEditingName(false)
-                  setMsg('Nombre actualizado.')
+                  setMsg(tr('env.nameOk'))
                 }}
               >
-                Guardar nombre
+                {tr('env.saveName')}
               </button>
               <button type="button" className="btn ghost full" onClick={() => setEditingName(false)}>
-                Cancelar
+                {tr('common.cancel')}
               </button>
             </>
           ) : (
@@ -148,12 +156,12 @@ export function EnvelopeScreen({
                 setMsg('')
               }}
             >
-              Cambiar nombre
+              {tr('env.changeName')}
             </button>
           )}
           <div className="row">
-            <strong>Techo de este ciclo</strong>
-            <span>{euros(env.planned)}</span>
+            <strong>{tr('env.cycleCap')}</strong>
+            <span>{euros(env.planned, locale)}</span>
           </div>
           {editing ? (
             <>
@@ -164,10 +172,10 @@ export function EnvelopeScreen({
                 placeholder="Nuevo techo"
               />
               <button type="button" className="btn full" onClick={saveTecho}>
-                Guardar techo
+                {tr('common.save')}
               </button>
               <button type="button" className="btn ghost full" onClick={() => setEditing(false)}>
-                Cancelar
+                {tr('common.cancel')}
               </button>
             </>
           ) : (
@@ -180,7 +188,7 @@ export function EnvelopeScreen({
                 setMsg('')
               }}
             >
-              Editar techo
+              {tr('env.editCap')}
             </button>
           )}
           {msg ? <p className="muted">{msg}</p> : null}
@@ -199,10 +207,9 @@ export function EnvelopeScreen({
                 style={{ marginTop: 4 }}
               />
               <span>
-                <span style={{ fontWeight: 500 }}>Sumar al diario del mes</span>
+                <span style={{ fontWeight: 500 }}>{tr('env.addDaily')}</span>
                 <span className="muted" style={{ display: 'block', fontSize: 13 }}>
-                  Se junta con Libre y se parte entre los días. El sobre pasa a Día a día
-                  en Inicio.
+                  {tr('env.addDailyHint')}
                 </span>
               </span>
             </label>
@@ -210,20 +217,20 @@ export function EnvelopeScreen({
         </div>
       )}
       <div className="section-title">
-        <span>Movimientos</span>
+        <span>{tr('env.txs')}</span>
         <span className="muted">{txs.length}</span>
       </div>
       <div className="card">
-        {txs.length === 0 && <p className="muted">Aún no hay movimientos en este ciclo.</p>}
+        {txs.length === 0 && <p className="muted">{tr('env.noTx')}</p>}
         {txs
           .slice()
           .reverse()
           .map((t) => (
             <div className="tx" key={t.id}>
               <div>
-                <div>{labelTx(t.type, t.envelopeId === id)}</div>
+                <div>{labelTx(t.type, t.envelopeId === id, tr)}</div>
                 <div className="muted">
-                  {new Date(t.at).toLocaleString('es-ES', {
+                  {new Date(t.at).toLocaleString(locale === 'en' ? 'en-US' : 'es-ES', {
                     day: 'numeric',
                     month: 'short',
                     hour: '2-digit',
@@ -233,15 +240,15 @@ export function EnvelopeScreen({
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div>{sign(t, id)}{euros(t.amount)}</div>
+                <div>{sign(t, id)}{euros(t.amount, locale)}</div>
                 {t.type === 'expense' && (
                   <button type="button" className="back" onClick={() => onEdit(t.id)}>
-                    editar
+                    {tr('env.edit')}
                   </button>
                 )}
                 {' '}
                 <button type="button" className="back" onClick={() => setPending(t)}>
-                  borrar
+                  {tr('env.delete')}
                 </button>
               </div>
             </div>
@@ -252,21 +259,19 @@ export function EnvelopeScreen({
           <div className="sheet stack" onClick={(e) => e.stopPropagation()}>
             <div className="handle" />
             <h2 className="serif" style={{ fontSize: 26 }}>
-              ¿Borrar este movimiento?
+              {tr('env.deleteTitle')}
             </h2>
             <p>
               {sign(pending, id)}
-              {euros(pending.amount)}
+              {euros(pending.amount, locale)}
               {pending.note ? ` · ${pending.note}` : ''}
             </p>
             <p className="muted">
-              Si era un gasto cubierto con ahorro o libre, también se deshace ese
-              traspaso. Esto no se puede deshacer después (salvo “deshacer último”
-              en ajustes, si era el último).
+              {tr('env.deleteBody')}
             </p>
             <div className="actions">
               <button type="button" className="btn ghost" onClick={() => setPending(null)}>
-                Cancelar
+                {tr('common.cancel')}
               </button>
               <button
                 type="button"
@@ -277,7 +282,7 @@ export function EnvelopeScreen({
                   setPending(null)
                 }}
               >
-                Sí, borrar
+                {tr('common.yesDelete')}
               </button>
             </div>
           </div>
@@ -287,10 +292,14 @@ export function EnvelopeScreen({
   )
 }
 
-function labelTx(type: string, outgoing: boolean): string {
-  if (type === 'expense') return 'Gasto'
-  if (type === 'income') return 'Ingreso'
-  return outgoing ? 'Salida a otro sobre' : 'Entrada de otro sobre'
+function labelTx(
+  type: string,
+  outgoing: boolean,
+  tr: (k: 'env.txExpense' | 'env.txIncome' | 'env.txOut' | 'env.txIn') => string,
+): string {
+  if (type === 'expense') return tr('env.txExpense')
+  if (type === 'income') return tr('env.txIncome')
+  return outgoing ? tr('env.txOut') : tr('env.txIn')
 }
 
 function sign(t: { type: string; envelopeId: string; toEnvelopeId?: string }, id: string): string {

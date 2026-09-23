@@ -45,6 +45,8 @@ export interface Tx {
   at: string
 }
 
+export type Locale = 'es' | 'en'
+
 export interface Settings {
   payMode: PayMode
   fixedDay: number
@@ -53,6 +55,8 @@ export interface Settings {
   /** Semana del gasto diario (Libre y techos marcados). Por defecto 1 = lunes. */
   dailyWeekStartsOn: number
   seenHomeTour?: boolean
+  /** Idioma de la interfaz. Los nombres de sobres que crea la persona no se traducen. */
+  locale?: Locale
 }
 
 export interface AppState {

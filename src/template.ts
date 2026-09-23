@@ -1,4 +1,5 @@
-import type { Envelope } from './types'
+import { t, type MsgKey } from './i18n'
+import type { Envelope, Locale } from './types'
 
 export const ALEX_INCOME = 139_100
 export const ALEX_SAVINGS = 60_000
@@ -21,16 +22,16 @@ export function alexPlan(): Envelope[] {
   ]
 }
 
-export function blankPlan(): Envelope[] {
+export function blankPlan(locale: Locale = 'es'): Envelope[] {
   return [
-    { id: 'ahorro', name: 'Ahorro', kind: 'savings', planned: 0, emoji: '🌱', opening: 0, rhythm: 'none' },
-    { id: 'arriendo', name: 'Alquiler / arriendo', kind: 'fixed', planned: 0, emoji: '🏠', opening: 0, rhythm: 'none' },
-    { id: 'movil', name: 'Móvil / internet', kind: 'fixed', planned: 0, emoji: '📱', opening: 0, rhythm: 'none' },
-    { id: 'comida', name: 'Comida / super', kind: 'cap', planned: 0, emoji: '🍽️', opening: 0, rhythm: 'weekly' },
-    { id: 'ocio', name: 'Ocio', kind: 'cap', planned: 0, emoji: '🎬', opening: 0, rhythm: 'daily', splitDaily: false },
-    { id: 'viajes', name: 'Viajes', kind: 'fund', planned: 0, emoji: '✈️', opening: 0, rhythm: 'none' },
-    { id: 'medicina', name: 'Medicina', kind: 'fund', planned: 0, emoji: '💊', opening: 0, rhythm: 'none' },
-    { id: 'libre', name: 'Libre', kind: 'buffer', planned: 0, emoji: '💧', opening: 0, rhythm: 'daily', splitDaily: true },
+    { id: 'ahorro', name: t(locale, 'names.savings'), kind: 'savings', planned: 0, emoji: '🌱', opening: 0, rhythm: 'none' },
+    { id: 'arriendo', name: t(locale, 'names.rent'), kind: 'fixed', planned: 0, emoji: '🏠', opening: 0, rhythm: 'none' },
+    { id: 'movil', name: t(locale, 'names.phone'), kind: 'fixed', planned: 0, emoji: '📱', opening: 0, rhythm: 'none' },
+    { id: 'comida', name: t(locale, 'names.food'), kind: 'cap', planned: 0, emoji: '🍽️', opening: 0, rhythm: 'weekly' },
+    { id: 'ocio', name: t(locale, 'names.leisure'), kind: 'cap', planned: 0, emoji: '🎬', opening: 0, rhythm: 'daily', splitDaily: false },
+    { id: 'viajes', name: t(locale, 'names.travel'), kind: 'fund', planned: 0, emoji: '✈️', opening: 0, rhythm: 'none' },
+    { id: 'medicina', name: t(locale, 'names.medicine'), kind: 'fund', planned: 0, emoji: '💊', opening: 0, rhythm: 'none' },
+    { id: 'libre', name: t(locale, 'names.free'), kind: 'buffer', planned: 0, emoji: '💧', opening: 0, rhythm: 'daily', splitDaily: true },
   ]
 }
 
@@ -52,18 +53,19 @@ export const EMOJI_PICK = [
   '💧',
 ]
 
+export function kindLabel(kind: Envelope['kind'], locale: Locale = 'es'): string {
+  return t(locale, `kind.${kind}` as MsgKey)
+}
+
+export function kindHint(kind: Envelope['kind'], locale: Locale = 'es'): string {
+  return t(locale, `kindHint.${kind}` as MsgKey)
+}
+
+/** @deprecated use kindLabel */
 export const KIND_LABEL: Record<Envelope['kind'], string> = {
   savings: 'Ahorro protegido',
   fixed: 'Cuota',
   cap: 'Techo',
   fund: 'Fondo (sale del ahorro)',
   buffer: 'Libre',
-}
-
-export const KIND_HINT: Record<Envelope['kind'], string> = {
-  savings: 'Se reserva primero y se acumula. No es “lo que sobre”.',
-  fixed: 'Importe conocido. Márcalo pagado cuando salga de la cuenta.',
-  cap: 'Límite del ciclo. Márcalo “sumar al diario” si quieres que se parta con Libre entre los días. Si es semanal, eliges el día en que empieza esa semana.',
-  fund: 'Sin techo mensual. No resta del sueldo: si está vacío, el gasto sale del ahorro.',
-  buffer: 'Lo que queda del sueldo. Se reparte solo por los días del ciclo.',
 }

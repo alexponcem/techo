@@ -2,12 +2,14 @@ import { formatRange } from './dates'
 import { reportFor, type CycleReport } from './logic'
 import { euros } from './money'
 import { useAppState } from './store'
+import { useT } from './useT'
 
 const COLORS = ['#2c5a43', '#4a7a5e', '#6b8aa8', '#c65a12', '#8d6110', '#b4452c', '#7a6b8a']
 
 type Slice = { id: string; name: string; emoji: string; amount: number }
 
 export function StatsScreen() {
+  const t = useT()
   const state = useAppState()
   const current = [...state.cycles].reverse().find((c) => !c.closedAt)
   const closed = state.cycles.filter((c) => c.closedAt).slice().reverse()
@@ -19,7 +21,7 @@ export function StatsScreen() {
         <div className="brand">Techo</div>
       </header>
       <h2 className="serif" style={{ fontSize: 28, marginTop: -8 }}>
-        Estadísticas
+        {t('stats.title')}
       </h2>
 
       {live && <LiveReport report={live} />}
@@ -27,7 +29,7 @@ export function StatsScreen() {
       {closed.length > 0 && (
         <>
           <div className="section-title">
-            <span>Meses anteriores</span>
+            <span>{t('stats.prev')}</span>
           </div>
           {closed.map((c) => (
             <PastRow key={c.id} report={reportFor(state, c)} />

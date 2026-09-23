@@ -12,8 +12,14 @@ import {
   withBalancedBuffer,
   withFrozenDailyPace,
 } from './logic'
+import { t } from './i18n'
 import { alexPlan } from './template'
-import type { AppState, Envelope, Settings, Tx } from './types'
+import type { AppState, Envelope, Locale, Settings, Tx } from './types'
+
+function localeOf(s: AppState | Settings): Locale {
+  if ('settings' in s) return s.settings.locale ?? 'es'
+  return s.locale ?? 'es'
+}
 
 const SEGURO: Envelope = {
   id: 'seguro',
@@ -52,7 +58,7 @@ function withMissingEnvelopes(list: Envelope[], income: number): Envelope[] {
     next = insertAfter(next, 'ropa', { ...MEDICINA })
     added = true
   }
-  return added ? withBalancedBuffer(next, income) : next
+  return added ? withBalancedBuffer(next, income, 'es') : next
 }
 
 const KEY = 'techo.v1'
@@ -83,6 +89,7 @@ function load(): AppState {
         weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
         dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
         seenHomeTour: parsed.settings?.seenHomeTour ?? true,
+        locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
       },
       envelopes: withMissingEnvelopes(parsed.envelopes, income),
       template: withMissingEnvelopes(parsed.template, income),
@@ -131,7 +138,8 @@ export function startFirstCycle(input: {
   savingsOpening?: number
 }) {
   const saved = input.savingsOpening ?? 0
-  const template = withBalancedBuffer(input.template, input.income).map((e) => ({
+  const locale = input.settings.locale ?? 'es'
+  const template = withBalancedBuffer(input.template, input.income, locale).map((e) => ({
     ...ensureRhythm(e),
     opening: e.kind === 'savings' ? saved : 0,
   }))
@@ -199,7 +207,7 @@ export function coverAndSpend(input: {
       envelopeId: input.fromLibre.id,
       toEnvelopeId: input.envelopeId,
       amount: input.fromLibre.amount,
-      note: 'Extra cubierto con Libre',
+      note: t(localeOf(state), 'store.coveredFree'),
     })
   }
   if (input.fromSavings && input.fromSavings.amount > 0) {
@@ -303,7 +311,7 @@ export function markPaid(envelopeId: string, remaining: number) {
     type: 'expense',
     envelopeId,
     amount: remaining,
-    note: 'Pagado',
+    note: t(localeOf(state), 'store.paid'),
   })
 }
 
@@ -313,6 +321,7 @@ export function updatePlanned(id: string, planned: number) {
   const envelopes = withBalancedBuffer(
     state.envelopes.map((e) => (e.id === id ? { ...e, planned } : e)),
     cycle.income,
+    localeOf(state),
   )
   emit({
     ...state,
@@ -351,22 +360,23 @@ export function renameEnvelope(id: string, name: string) {
 
 export function addEnvelope(env: Envelope): { ok: true } | { ok: false; error: string } {
   const cycle = activeCycle(state)
-  if (!cycle) return { ok: false, error: 'No hay un ciclo abierto.' }
+  const locale = localeOf(state)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
   const name = env.name.trim()
-  if (!name) return { ok: false, error: 'Pon un nombre.' }
+  if (!name) return { ok: false, error: t(locale, 'store.needName') }
   if (env.kind === 'savings' || env.kind === 'buffer') {
-    return { ok: false, error: 'Ahorro y Libre ya están en el plan.' }
+    return { ok: false, error: t(locale, 'store.unique') }
   }
   const row = ensureRhythm({ ...env, name, id: env.id || uid() })
-  const envelopes = withBalancedBuffer([...state.envelopes, row], cycle.income)
+  const envelopes = withBalancedBuffer([...state.envelopes, row], cycle.income, locale)
   const buffer = envelopes.find((e) => e.kind === 'buffer')
   if ((buffer?.planned ?? 0) < 0) {
-    return { ok: false, error: 'Ese importe no cabe: Libre quedaría en negativo. Baja el importe.' }
+    return { ok: false, error: t(locale, 'store.negFree') }
   }
   emit({
     ...state,
     envelopes,
-    template: withBalancedBuffer([...state.template, { ...row, opening: 0 }], cycle.income),
+    template: withBalancedBuffer([...state.template, { ...row, opening: 0 }], cycle.income, locale),
   })
   return { ok: true }
 }
@@ -419,6 +429,7 @@ export function startNextCycle(
   const template = withBalancedBuffer(
     state.template.map((e) => ({ ...e, opening: 0 })),
     income,
+    localeOf(state),
   )
   const envelopes = template.map((e) => ({
     ...ensureRhythm(e),
@@ -468,11 +479,12 @@ export function exportJson(): string {
 export function importJson(raw: string): { ok: true } | { ok: false; error: string } {
   try {
     const parsed = JSON.parse(raw) as AppState
+    const ui = localeOf(state)
     if (!parsed || parsed.version !== 1) {
-      return { ok: false, error: 'Ese archivo no es una copia de Techo.' }
+      return { ok: false, error: t(ui, 'store.badFile') }
     }
     if (!Array.isArray(parsed.envelopes) || !Array.isArray(parsed.cycles) || !Array.isArray(parsed.txs)) {
-      return { ok: false, error: 'La copia está incompleta o dañada.' }
+      return { ok: false, error: t(ui, 'store.incomplete') }
     }
     const cycle = [...parsed.cycles].reverse().find((c) => !c.closedAt)
     const income = cycle?.income ?? parsed.cycles[0]?.income ?? 139_100
@@ -486,6 +498,7 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
           weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
           dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
           seenHomeTour: parsed.settings?.seenHomeTour ?? true,
+          locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
         },
         template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
         envelopes: withMissingEnvelopes(parsed.envelopes, income),
@@ -493,7 +506,7 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
     )
     return { ok: true }
   } catch {
-    return { ok: false, error: 'No pude leer el archivo. ¿Es el techo-backup.json?' }
+    return { ok: false, error: t(localeOf(state), 'store.readFail') }
   }
 }
 
