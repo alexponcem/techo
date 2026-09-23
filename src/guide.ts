@@ -10,130 +10,113 @@ export type GuidePage = {
 
 export const TUTORIAL: GuidePage[] = [
   {
-    screen: '¿Qué es Techo?',
-    title: 'Tu dinero bajo control, centavo a centavo.',
-    lead: 'Techo divide tus ingresos en Sobres para que nunca te preguntes a dónde se fue tu dinero.',
+    screen: 'Tus sobres',
+    title: 'Tres tipos. Libre se crea solo.',
+    lead: 'Antes de pagar, miras la cajita. Techo te dice si el gasto cabe.',
     items: [
       {
-        k: 'Tus Sobres ilimitados',
-        v: 'Crea todas las cajitas que necesites (alquiler, comida, ahorro, viajes, etc.). Cada dólar que entra a tu cuenta va a un sobre.',
+        k: 'Cuota',
+        v: 'Fijos y ahorro. Se reservan al cobrar. El ahorro no es “lo que sobre a fin de mes”: si esperas a que sobre, no sobra.',
       },
       {
-        k: 'Control en tiempo real',
-        v: 'Antes de pagar algo, miras tu sobre. Techo te dice si el gasto cabe o si te va a poner en aprietos.',
+        k: 'Techo',
+        v: 'Gastos con límite. Ej.: super, ocio, un hobby. Se van comiendo a medida que gastas.',
+      },
+      {
+        k: 'Fondo',
+        v: 'Una meta con nombre. Sale del ahorro, no del diario. Ej.: un viaje o un curso.',
+      },
+      {
+        k: 'Libre',
+        v: 'No lo creas tú. Aparece solo con lo que queda del sueldo. Ese es el dinero del día a día.',
       },
     ],
   },
   {
-    screen: 'Los 3 tipos de Sobres que usarás',
-    title: 'Todo tu dinero vive en alguno de estos 3 sobres:',
+    screen: 'El día que cobras',
+    title: 'Reservas primero. El resto se parte.',
     lead: '',
     items: [
       {
-        k: 'Sobres de Cuota (fijos)',
-        v: 'Pagos obligatorios que ocurren en el mes. Incluye tus gastos fijos (alquiler, gym) y tu sobre de Ahorro. Se reservan al cobrar, al igual que el ahorro ya que este no es “lo que sobre a fin de mes”, porque si esperas a que sobre, nunca lo hará jaja.',
+        k: 'Lo que se aparta',
+        v: 'Cuotas, ahorro y techos salen del sueldo al instante. Ej.: entran 1.000, reservas 700, Libre = 300.',
       },
       {
-        k: 'Sobres de Techo (límites)',
-        v: 'Tus gastos variables (ej. super, ocio, café). Tienen un límite que se va consumiendo a medida que gastas.',
+        k: 'El diario',
+        v: 'Libre se divide entre los días hasta el próximo sueldo. 300 ÷ 30 ≈ 10 al día. Si empiezas el 15, se parte entre los días que quedan.',
       },
       {
-        k: 'Sobres de Fondo (metas)',
-        v: 'No tienen un límite, pero salen exclusivamente de tu sobre de Ahorro para compras o planes específicos (un viaje, ropa, emergencias).',
+        k: 'Sumar al diario',
+        v: 'Un techo puede marcarse y juntarse con Libre. Entonces pasa a Día a día. Si no lo marcas, se queda en Techos.',
       },
     ],
   },
   {
-    screen: 'Cómo se reparte tu sueldo',
-    title: 'De tus sobres fijos a tu presupuesto diario.',
+    screen: 'Inicio',
+    title: 'Día a día, techos y un toque.',
     lead: '',
     items: [
       {
-        k: 'Paso 1 — Protege tus sobres de Cuota',
-        v: 'El día que cobras, se reservan tus gastos fijos y tu sobre de Ahorro. Ejemplo: de 1.000 $ cobrados, separas 600 $ en Cuotas + 100 $ en Ahorro = te quedan 300 $.',
+        k: 'Día a día',
+        v: 'Libre y los techos marcados. Semana lunes a domingo. Si te pasas, se recalcula el resto de ESTA semana. Lo que no gastes no se va a la siguiente.',
       },
       {
-        k: 'Paso 2 — Define tu Techo diario',
-        v: 'Lo que queda es Libre: se divide entre los días hasta el próximo sueldo. Ejemplo: 300 $ ÷ 30 días = ~10 $/día. Si un techo (ej. ocio o café) se marca “sumar al diario”, se junta con Libre antes de partir.',
+        k: 'Techos',
+        v: 'El límite es el del mes. Si es semanal (ej. el super), tú eliges el día en que empieza esa semana: si eliges sábado, termina el viernes.',
       },
       {
-        k: 'Paso 3 — Si gastas de más',
-        v: 'Se recalcula solo el resto de la semana para compensar rápido, sin arruinar todo el mes.',
-      },
-      {
-        k: 'Paso 3 — Si gastas de menos',
-        v: 'El dinero no gastado en la semana se acumula para tu fin de semana. Lo que te sobre al final del ciclo pasará a tus Ahorros.',
+        k: '+ Gasto',
+        v: 'Importe, sobre, listo. Si cabe, adelante. Si no, te avisa y puedes sacar del ahorro.',
       },
     ],
+    tip: 'Si el gasto fue ayer, pon esa fecha. Así no le pegas al presupuesto de hoy.',
   },
   {
-    screen: 'Registra tus Sobres de Techo en 5 segundos',
-    title: 'El control de tu día a día.',
-    lead: '',
-    items: [
-      { k: '1', v: 'Toca en + Gasto.' },
-      { k: '2', v: 'Ingresa el monto y elige su sobre de Techo (ej. super u ocio).' },
-      {
-        k: '3 — ¿Cabe en el sobre?',
-        v: 'Si pides un café de 3 € y te quedan 10 €, Techo te dará luz verde.',
-      },
-      {
-        k: 'Si no cabe',
-        v: 'Techo te avisará que te pasas del límite y te preguntará si deseas tomar el faltante de tus Ahorros. La decisión final siempre es tuya; la app te lo muestra para que tú analices si vale la pena.',
-      },
-    ],
-    tip: 'Si olvidaste anotar un gasto ayer, pon la fecha real para que no afecte el presupuesto de hoy.',
-  },
-  {
-    screen: 'Tus Sobres de Cuota y tu Banco',
-    title: 'Tu app alineada con tu cuenta bancaria.',
-    lead: 'Tus sobres de Cuota (alquiler, suscripciones, etc.) separan el dinero desde un principio en la app hasta que el banco realiza el cobro: es intocable y no está incluido en tus gastos libres.',
+    screen: 'Cuotas y banco',
+    title: 'Lo de aquí es lo de tu cuenta.',
+    lead: 'Las cuotas están reservadas, pero siguen en el saldo hasta que el banco las cobre.',
     items: [
       {
         k: 'Marcar pagado',
-        v: 'Cuando veas el cobro en tu banco, toca “Marcar pagado” en ese sobre y solito se te actualiza todo.',
+        v: 'Cuando veas el cobro, tócalo. Baja en Techo y en el banco a la vez.',
       },
       {
-        k: 'El objetivo',
-        v: 'Mientras no los marques, ese dinero sigue sumando en la app igual que en el banco (porque aún no se cobra). Al marcarlos, ambos saldos bajan a la vez. Si anotaste todo bien, el total en Techo y tu cuenta bancaria coincidirán al centavo.',
+        k: 'En tu cuenta ahora',
+        v: 'Si anotaste todo, ese total coincide con el banco al céntimo.',
       },
     ],
   },
   {
-    screen: 'De tu Ahorro a tus sobres de Fondo',
-    title: 'Premia tu control y pon a trabajar tu dinero.',
+    screen: 'Fondos y el cierre',
+    title: 'Lo que no te gastas, se te queda.',
     lead: '',
     items: [
       {
-        k: 'Tus Sobres de Fondo',
-        v: 'Para planes grandes (fiestas, viajes, ropa), usa tus sobres de Fondo, que se alimentan de tu Ahorro. Así no afectas tu presupuesto diario. Cada mes puedes destinar una parte del ahorro a viajes, ropa, etc., o, cuando lo necesites, pasar dinero directo del ahorro y saber en qué se fue.',
+        k: 'Fondos',
+        v: 'Salen del ahorro, no del diario. Puedes apartar un poco cada ciclo o mover cuando lo necesites.',
       },
       {
-        k: 'Cierre de mes (tu premio)',
-        v: 'Todo lo que te haya sobrado en tus sobres de Techo durante el mes se consolida para llenar tus Fondos o hacer crecer tu Ahorro. ¡Genial, no?',
+        k: 'Cerrar el ciclo',
+        v: 'Lo que sobró en techos y Libre puede ir al ahorro o a un fondo. Ese es el premio por aguantar el mes.',
       },
     ],
   },
   {
-    screen: 'Antes de que te lances…',
-    title: 'Tu información es 100% tuya y privada.',
-    lead: 'Techo aún no está terminada, así que funciona directamente en tu navegador, no en un servidor o la nube.',
+    screen: 'Tus datos',
+    title: 'Nadie más los ve. Ni Alex.',
+    lead: 'Techo aún no está terminada: vive en tu navegador, no en la nube.',
     items: [
       {
-        k: 'Privacidad total',
-        v: 'Alex (ni nadie más) puede ver tus gastos, tus sobres o lo que ingresas. Nadie te espía ni te juzga; anota tus gustos con total libertad ;).',
+        k: 'En tu móvil',
+        v: 'Nada de incógnito ni borrar el historial: ahí se pierde todo.',
       },
       {
-        k: 'Guarda tus datos en tu móvil',
-        v: 'Al no usar la nube, tus datos se guardan únicamente en tu dispositivo. Evita el modo incógnito o borrar el historial del navegador para no perder tu información.',
+        k: 'Copia de seguridad',
+        v: 'Ajustes → Exportar copia. Guárdala en el teléfono o en Drive.',
       },
       {
-        k: 'El plan: copias de seguridad',
-        v: 'De vez en cuando ve a Ajustes → Exportar copia y guárdala en tu teléfono o Drive. Si cambias de móvil o algo falla, podrás restaurarlo en un clic y evitar dramas.',
-      },
-      {
-        k: '¡Gracias por probar Techo!',
-        v: 'Tus ideas, quejas y comentarios van a construir la versión definitiva. Sin testers como tú, esto se quedaría en la cabeza de Alex. Si te atascas en algo, escríbele a él: te ayudará encantado.',
+        k: 'Si te atascas',
+        v: 'Escríbele a Alex. Tus quejas y ideas construyen la app.',
       },
     ],
   },
@@ -152,7 +135,7 @@ export const KIND_EXPLAIN: Record<string, { label: string; hint: string }> = {
   },
   cap: {
     label: 'Techo',
-    hint: 'Límite del ciclo. Semanal = consejo para que dure (ej. super o un hobby). Si marcas “sumar al diario”, se parte con Libre entre los días.',
+    hint: 'Límite del ciclo. Semanal = consejo para que dure; eliges el día en que empieza esa semana. Si marcas “sumar al diario”, se junta con Libre y pasa a Día a día.',
   },
   fund: {
     label: 'Fondo',
