@@ -17,6 +17,10 @@ export interface Envelope {
   /** Si se marcó a mitad de ciclo: desde este día, y con este importe, entra al diario. */
   splitJoinedOn?: string
   splitJoinedAmount?: number
+  /** Parte ya gastada de un sobre que luego se quitó del diario. No se devuelve. */
+  splitSettledOn?: string
+  splitSettledThrough?: string
+  splitSettledAmount?: number
   /** Día de inicio de la semana de este techo semanal. 0 = domingo … 6 = sábado. */
   weekStartsOn?: number
 }
