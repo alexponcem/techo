@@ -142,9 +142,10 @@ const msg = {
     en: 'starting cap {original}',
   },
   'home.weekBreak': {
-    es: 'Semana {from}–{to}. Lo que no gastes esta semana no se suma a la siguiente; al cierre puede ir a ahorro.',
-    en: '{from}–{to} week. What you don’t spend this week does not roll into the next; at close it can go to savings.',
+    es: 'Semana {from}–{to}. El ritmo es una guía. Si el sobre todavía tiene dinero, puedes usarlo. Al cierre, lo que sobre puede ir al ahorro.',
+    en: '{from}–{to} week. The pace is a guide. If the envelope still has money, you can use it. At close, what’s left can go to savings.',
   },
+  'home.ownPace': { es: 'Ritmo de hoy ~{hoy}', en: 'Today’s pace ~{hoy}' },
   'home.cameIn': { es: 'Entraron {amount}', en: '{amount} came in' },
   'home.inAccount': { es: 'En tu cuenta ahora', en: 'In your account now' },
   'home.inAccountHint': {

@@ -3,7 +3,7 @@ import {
   cycleTxs,
   homeGroupOf,
   homeGroups,
-  inDailySplit,
+  guideForEnvelope,
   paceFor,
   spentOnDay,
   viewsFor,
@@ -64,13 +64,14 @@ export function Home({
   if (!cycle) return null
 
   const pace = paceFor(state)
-  const splitViews = views.filter((v) => inDailySplit(v.env))
+  const libreEnv = views.find((v) => v.env.kind === 'buffer')?.env
+  const libreGuide = libreEnv ? guideForEnvelope(state, libreEnv.id) : null
+  const libreId = views.find((v) => v.env.kind === 'buffer')?.env.id
   const todayLogged = spentOnDay(
     cycleTxs(state, cycle.id),
-    splitViews.map((v) => v.env.id),
+    libreId ? [libreId] : [],
     todayISO(),
   )
-  const splitNames = splitViews.map((v) => v.env.name).join(' + ') || t('names.free')
   const hot = views.filter(
     (v) => v.alert === 'near' || v.alert === 'almost' || v.alert === 'limit' || v.alert === 'over',
   )
@@ -137,35 +138,35 @@ export function Home({
 
       <section className="hero">
         <div className="label">{t('home.today')}</div>
-        <div className="amount">{euros(pace.daily, locale)}</div>
+        <div className="amount">{euros(libreGuide?.hoy ?? 0, locale)}</div>
         <div className="sub">
-          {pace.daily <= 0 && pace.weekly > 0
-            ? t('home.todayClosed', { daily: euros(pace.referenceDaily, locale) })
+          {(libreGuide?.hoy ?? 0) <= 0 && (libreGuide?.weekLeft ?? 0) > 0
+            ? t('home.todayClosed', { daily: euros(libreGuide?.referenceDaily ?? 0, locale) })
             : todayLogged > 0
               ? t('home.todayLogged', { amount: euros(todayLogged, locale) })
-              : t('home.todayHint', { names: splitNames })}
+              : t('home.todayHint', { names: libreEnv?.name ?? t('names.free') })}
         </div>
         <div className="hero-pills">
           <div className="hero-pill">
             <div className="k">{t('home.thisWeek')}</div>
-            <div className="v">{euros(pace.weekly, locale)}</div>
+            <div className="v">{euros(libreGuide?.weekLeft ?? 0, locale)}</div>
             <div className="s">
               {t('home.weekMeta', {
-                daily: euros(pace.referenceDaily, locale),
-                cap: euros(pace.weekAssigned, locale),
-                days: pace.days,
-                dayWord: pace.days === 1 ? t('common.day') : t('common.days'),
+                daily: euros(libreGuide?.referenceDaily ?? 0, locale),
+                cap: euros(libreGuide?.weekAssigned ?? 0, locale),
+                days: libreGuide?.daysLeft ?? pace.days,
+                dayWord: (libreGuide?.daysLeft ?? pace.days) === 1 ? t('common.day') : t('common.days'),
               })}
             </div>
           </div>
           <div className="hero-pill">
             <div className="k">{t('home.month')}</div>
-            <div className="v">{euros(pace.remaining, locale)}</div>
+            <div className="v">{euros(libreGuide?.remaining ?? 0, locale)}</div>
             <div className="s">
               {t('home.monthMeta', {
-                original: euros(pace.originalMonth, locale),
+                original: euros(libreGuide?.originalMonth ?? 0, locale),
               })}
-              {splitNames ? ` · ${splitNames}` : ''}
+              {libreEnv ? ` · ${libreEnv.name}` : ''}
             </div>
           </div>
         </div>
@@ -308,6 +309,8 @@ function EnvelopeCard({
 }) {
   const t = useT()
   const locale = useLocale()
+  const app = useAppState()
+  const ownPace = group === 'daily' ? guideForEnvelope(app, view.env.id) : null
   const { env, remaining, total, pct, light, paid } = view
   const week = view.week
   const weekPct =
@@ -320,7 +323,7 @@ function EnvelopeCard({
         <div className="name">{env.name}</div>
         <div className="meta">
           {group === 'daily'
-            ? t('home.inDaily')
+            ? t('home.ownPace', { hoy: euros(ownPace?.hoy ?? 0, locale) })
             : env.kind === 'savings'
               ? t('home.savingsUsed', { amount: euros(view.used, locale) })
               : env.kind === 'fund'

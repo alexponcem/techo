@@ -11,7 +11,7 @@ import { EMOJI_PICK } from './template'
 import {
   activeCycle,
   coverPlan,
-  dailyWeekBudget,
+  guideForEnvelope,
   inDailySplit,
   kindOrder,
   saveReview,
@@ -66,11 +66,11 @@ export function AddSheet({
   const verdict = verdictFor(view, cents, locale)
   const isSavings = view?.env.kind === 'savings'
   const reasonOk = (isSavings ? note : reason).trim().length >= 4
-  const week = dailyWeekBudget(state)
+  const guide = envelopeId ? guideForEnvelope(state, envelopeId) : null
   const isDaily = Boolean(view && inDailySplit(view.env))
-  const plan = envelopeId ? coverPlan(views, envelopeId, cents, week) : null
-  const dayOver =
-    isDaily && week && cents > week.hoy && !(plan && plan.weekExhausted)
+  const plan = envelopeId ? coverPlan(views, envelopeId, cents, null) : null
+  const paceOver =
+    isDaily && guide && cents > guide.hoy && cents <= Math.max(0, view?.remaining ?? 0) && !plan
 
   const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
 
@@ -86,7 +86,7 @@ export function AddSheet({
       finish()
       return
     }
-    if (plan || dayOver) {
+    if (plan || paceOver) {
       setConfirm(true)
       return
     }
@@ -233,16 +233,12 @@ export function AddSheet({
         </div>
       )}
       <div className={`verdict ${verdict.status}`}>{verdict.message}</div>
-      {confirm && !plan && dayOver && week && (
+      {confirm && !plan && paceOver && guide && (
         <div className="hint">
           <p>
-            Te pasas del techo de hoy ({euros(week.hoy)}). Si anotas, este día se cierra y el resto
-            de <b>esta semana</b> bajará a ~{euros(
-              week.daysAfter > 0
-                ? Math.floor(Math.max(0, week.weekLeft - cents) / week.daysAfter)
-                : 0,
-            )}
-            /día. La semana que viene no se toca.
+            Pasas el ritmo de hoy ({euros(guide.hoy, locale)}). El sobre todavía tiene{' '}
+            {euros(Math.max(0, view?.remaining ?? 0), locale)}, así que se anota ahí. Lo que quede
+            se reparte en los días que faltan.
           </p>
           <div className="actions" style={{ marginBottom: 0 }}>
             <button type="button" className="btn ghost" onClick={() => setConfirm(false)}>
@@ -332,7 +328,7 @@ export function AddSheet({
               ? 'Continuar (la semana no da)'
               : plan?.goalFromSavings
                 ? 'Continuar (sale del ahorro)'
-                : plan || dayOver
+                : plan || paceOver
                   ? 'Continuar (hay extra)'
                   : 'Anotar gasto'}
         </button>

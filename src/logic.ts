@@ -568,8 +568,7 @@ export function coverPlan(
   if (!view || amount <= 0) return null
   if (view.env.kind === 'savings') return null
   const overflow = amount - Math.max(0, view.remaining)
-  const weekExtra =
-    week && inDailySplit(view.env) ? Math.max(0, amount - week.weekLeft) : 0
+  const weekExtra = 0
   if (overflow <= 0 && weekExtra <= 0) return null
 
   const libre = views.find((v) => v.env.kind === 'buffer')
@@ -641,6 +640,76 @@ export interface Pace {
   weekSpent: number
   libre: number
   caps: { name: string; remaining: number }[]
+}
+
+export interface EnvelopeGuide {
+  fairDaily: number
+  guideDaily: number
+  hoy: number
+  weekLeft: number
+  weekAssigned: number
+  remaining: number
+  daysLeft: number
+  originalMonth: number
+  referenceDaily: number
+  overPace: boolean
+}
+
+/** Ritmo de un solo sobre. Es una guía: el límite es lo que queda en el sobre. */
+export function guideForEnvelope(
+  state: AppState,
+  envelopeId: string,
+  today = todayISO(),
+): EnvelopeGuide | null {
+  const cycle = activeCycle(state)
+  const env = state.envelopes.find((e) => e.id === envelopeId)
+  if (!cycle || !env) return null
+  const origin = cycle.paceStartedAt ?? paceStartedAt(cycle.startedAt, today)
+  const last = lastSpendDay(cycle)
+  const paceDays = Math.max(1, daysBetween(origin, cycle.expectedEndAt))
+  const daysLeft = Math.max(1, today >= cycle.expectedEndAt ? 1 : daysBetween(today, cycle.expectedEndAt))
+  const txs = cycleTxs(state, cycle.id)
+  const cashNow = envelopeCash(env, txs)
+  const remaining = Math.max(0, cashNow)
+  let fair = 0
+  let originalMonth = 0
+  if (env.splitJoinedOn && env.splitJoinedAmount != null) {
+    const total = Math.max(1, daysInclusive(env.splitJoinedOn, last))
+    fair = Math.round(env.splitJoinedAmount / total)
+    originalMonth = env.splitJoinedAmount
+  } else {
+    fair = Math.round(Math.max(0, env.planned) / paceDays)
+    originalMonth = Math.max(0, env.planned)
+  }
+  const spentToday = spentOnDay(txs, [env.id], today)
+  const cashBeforeToday = remaining + Math.max(0, spentToday)
+  const behind = cashBeforeToday < fair * daysLeft
+  const guideDaily = behind ? Math.round(cashBeforeToday / daysLeft) : fair
+  const hoy = Math.max(0, guideDaily - spentToday)
+  const daysAfter = Math.max(0, daysLeft - 1)
+  const futureDaily =
+    daysAfter > 0 ? (remaining < fair * daysAfter ? Math.round(remaining / daysAfter) : fair) : 0
+  const referenceDaily = spentToday > guideDaily ? futureDaily : guideDaily
+  const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
+  const w = dailyPaceWindow(cycle, today, weekStart)
+  const weekDaysLeft = w.todayIn ? Math.max(1, daysInclusive(today, w.sliceEnd)) : Math.max(0, w.daysAfter)
+  const weekAssigned = fair * Math.max(0, w.daysInWeek)
+  const weekLeft =
+    spentToday > guideDaily
+      ? futureDaily * w.daysAfter
+      : Math.max(0, guideDaily * weekDaysLeft - spentToday)
+  return {
+    fairDaily: fair,
+    guideDaily,
+    hoy,
+    weekLeft,
+    weekAssigned,
+    remaining,
+    daysLeft: weekDaysLeft,
+    originalMonth,
+    referenceDaily,
+    overPace: spentToday > guideDaily,
+  }
 }
 
 export function paceFor(state: AppState, today = todayISO()): Pace {
