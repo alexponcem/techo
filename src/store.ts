@@ -343,7 +343,13 @@ export function setSplitDaily(id: string, splitDaily: boolean) {
   const late = Boolean(cycle && cycle.fairDaily != null && origin && today >= origin)
   const patch = (e: Envelope): Envelope => {
     if (e.id !== id) return e
-    if (!splitDaily || !late || !cycle) {
+    if (!splitDaily) {
+      const next = { ...e, splitDaily: false }
+      delete next.splitJoinedOn
+      delete next.splitJoinedAmount
+      return next
+    }
+    if (!late || !cycle) {
       const next = { ...e, splitDaily: true }
       delete next.splitJoinedOn
       delete next.splitJoinedAmount
