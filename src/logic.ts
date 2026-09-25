@@ -221,9 +221,6 @@ export function envelopeCash(env: Envelope, txs: Tx[]): number {
 
 function countsTowardDaily(env: Envelope, day: string, origin: string): boolean {
   if (env.kind === 'buffer') return true
-  if (env.splitSettledOn && env.splitSettledThrough && day >= env.splitSettledOn && day <= env.splitSettledThrough) {
-    return true
-  }
   if (env.splitDaily !== true) return false
   if (env.splitJoinedOn) return day >= env.splitJoinedOn
   return day >= origin
@@ -237,11 +234,7 @@ function spentDailyBetween(
   origin: string,
 ): number {
   if (!from || !to || from > to) return 0
-  const byId = new Map(
-    envelopes
-      .filter((e) => inDailySplit(e) || e.splitSettledAmount != null)
-      .map((e) => [e.id, e]),
-  )
+  const byId = new Map(envelopes.filter((e) => inDailySplit(e)).map((e) => [e.id, e]))
   let n = 0
   for (const t of txs) {
     if (t.type !== 'expense') continue
@@ -275,27 +268,6 @@ function lateDailyShare(envelopes: Envelope[], from: string, to: string, lastDay
   return sum
 }
 
-function settledShare(envelopes: Envelope[], from: string, to: string): number {
-  if (!from || !to || from > to) return 0
-  let sum = 0
-  for (const env of envelopes) {
-    if (env.splitSettledAmount == null || !env.splitSettledOn || !env.splitSettledThrough) continue
-    const start = env.splitSettledOn
-    const end = env.splitSettledThrough
-    const total = daysInclusive(start, end)
-    if (total <= 0) continue
-    const a = from > start ? from : start
-    const b = to < end ? to : end
-    if (a > b) continue
-    sum += Math.round((env.splitSettledAmount * daysInclusive(a, b)) / total)
-  }
-  return sum
-}
-
-function settledTotal(envelopes: Envelope[]): number {
-  return envelopes.reduce((s, env) => s + (env.splitSettledAmount ?? 0), 0)
-}
-
 function lateDailyTotal(envelopes: Envelope[]): number {
   return envelopes.reduce(
     (s, env) =>
@@ -304,47 +276,6 @@ function lateDailyTotal(envelopes: Envelope[]): number {
         : s,
     0,
   )
-}
-
-/** Al quitar un sobre del diario, se queda solo la parte que el gasto de esos días ya usó. */
-export function closeLateSplit(state: AppState, env: Envelope, today: string): Envelope {
-  const next: Envelope = { ...env, splitDaily: false }
-  delete next.splitJoinedOn
-  delete next.splitJoinedAmount
-  const cycle = activeCycle(state)
-  if (!cycle || !env.splitJoinedOn || env.splitJoinedAmount == null) return next
-  const origin = cycle.paceStartedAt ?? cycle.startedAt
-  const last = lastSpendDay(cycle)
-  const start = env.splitJoinedOn
-  const end = today < last ? today : last
-  const total = daysInclusive(start, last)
-  if (total <= 0 || start > end) return next
-  const txs = cycleTxs(state, cycle.id)
-  const fair = cycle.fairDaily ?? 0
-  let consumed = 0
-  for (const day of eachDay(start, end)) {
-    const extra = Math.round((env.splitJoinedAmount * 1) / total)
-    const others = lateDailyShare(
-      state.envelopes.filter((e) => e.id !== env.id),
-      day,
-      day,
-      last,
-    )
-    const spent = spentDailyBetween(txs, state.envelopes, day, day, origin)
-    const over = Math.max(0, spent - fair - others)
-    consumed += Math.min(extra, over)
-  }
-  consumed = Math.min(consumed, env.splitJoinedAmount)
-  if (consumed <= 0) {
-    delete next.splitSettledOn
-    delete next.splitSettledThrough
-    delete next.splitSettledAmount
-    return next
-  }
-  next.splitSettledOn = start
-  next.splitSettledThrough = end
-  next.splitSettledAmount = consumed
-  return next
 }
 
 export function spentOnDay(txs: Tx[], envelopeIds: string[], day: string): number {
@@ -571,19 +502,16 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
     cycle.fairDaily != null ? cycle.fairDaily : Math.round(splitPlanned(state.envelopes) / paceDays)
   const last = lastSpendDay(cycle)
   const envelopes = state.envelopes
-  const originalMonth = fairDaily * paceDays + lateDailyTotal(envelopes) + settledTotal(envelopes)
+  const originalMonth = fairDaily * paceDays + lateDailyTotal(envelopes)
   const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
   const w = dailyPaceWindow(cycle, today, weekStart)
   const txs = cycleTxs(state, cycle.id)
   const spentToday = spentDailyBetween(txs, envelopes, today, today, origin)
   const spentBefore = spentDailyBetween(txs, envelopes, w.sliceStart, addDays(today, -1), origin)
   const spentWeek = spentBefore + spentToday
-  const settledInWeek = settledShare(envelopes, w.sliceStart, w.sliceEnd)
   const weekAssigned =
-    fairDaily * Math.max(0, w.daysInWeek) +
-    lateDailyShare(envelopes, w.sliceStart, w.sliceEnd, last) +
-    settledInWeek
-  const available = remaining + spentWeek + settledInWeek
+    fairDaily * Math.max(0, w.daysInWeek) + lateDailyShare(envelopes, w.sliceStart, w.sliceEnd, last)
+  const available = remaining + spentWeek
   const weekPool = Math.min(weekAssigned, Math.max(0, available))
   const leftForRest = Math.max(0, weekPool - spentBefore)
   const daysLeft = w.todayIn

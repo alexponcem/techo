@@ -5,7 +5,6 @@ import {
   assigned,
   carryKinds,
   ensureRhythm,
-  closeLateSplit,
   envelopeCash,
   openDailyPace,
   reportFor,
@@ -344,8 +343,7 @@ export function setSplitDaily(id: string, splitDaily: boolean) {
   const late = Boolean(cycle && cycle.fairDaily != null && origin && today >= origin)
   const patch = (e: Envelope): Envelope => {
     if (e.id !== id) return e
-    if (!splitDaily) return closeLateSplit(state, e, today)
-    if (!late || !cycle) {
+    if (!splitDaily || !late || !cycle) {
       const next = { ...e, splitDaily: true }
       delete next.splitJoinedOn
       delete next.splitJoinedAmount
