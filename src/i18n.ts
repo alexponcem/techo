@@ -138,8 +138,8 @@ const msg = {
   },
   'home.month': { es: 'Al mes', en: 'This cycle' },
   'home.monthMeta': {
-    es: 'techo inicial {original} · {daily}/día',
-    en: 'starting cap {original} · {daily}/day',
+    es: 'techo inicial {original}',
+    en: 'starting cap {original}',
   },
   'home.weekBreak': {
     es: 'Semana {from}–{to}. Lo que no gastes esta semana no se suma a la siguiente; al cierre puede ir a ahorro.',

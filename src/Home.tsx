@@ -164,7 +164,6 @@ export function Home({
             <div className="s">
               {t('home.monthMeta', {
                 original: euros(pace.originalMonth, locale),
-                daily: euros(pace.fairDaily, locale),
               })}
               {splitNames ? ` · ${splitNames}` : ''}
             </div>

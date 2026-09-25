@@ -286,6 +286,31 @@ export function weekWindow(cycle: Cycle, today: string, weekStartsOn: number) {
   return { start, end, sliceStart, sliceEnd, daysInWeek, daysBefore, daysAfter, todayIn }
 }
 
+/** Semana del diario: no cuenta días anteriores a cuando se abrió el ritmo. */
+function dailyPaceWindow(cycle: Cycle, today: string, weekStartsOn: number) {
+  const w = weekWindow(cycle, today, weekStartsOn)
+  const origin = cycle.paceStartedAt && cycle.paceStartedAt > w.sliceStart ? cycle.paceStartedAt : w.sliceStart
+  if (origin === w.sliceStart) return w
+  const sliceEnd = w.sliceEnd
+  if (origin > sliceEnd) {
+    return { ...w, sliceStart: origin, daysInWeek: 0, daysBefore: 0, daysAfter: 0, todayIn: false }
+  }
+  let daysBefore = 0
+  let daysAfter = 0
+  for (const d of eachDay(origin, sliceEnd)) {
+    if (d < today) daysBefore += 1
+    else if (d > today) daysAfter += 1
+  }
+  return {
+    ...w,
+    sliceStart: origin,
+    daysInWeek: daysInclusive(origin, sliceEnd),
+    daysBefore,
+    daysAfter,
+    todayIn: today >= origin && today <= sliceEnd,
+  }
+}
+
 export function spentInRange(txs: Tx[], envelopeIds: string[], from: string, to: string): number {
   if (!from || !to || from > to) return 0
   let n = 0
@@ -414,7 +439,7 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
     cycle.fairDaily != null ? cycle.fairDaily : Math.round(splitPlanned(state.envelopes) / paceDays)
   const originalMonth = fairDaily * paceDays
   const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
-  const w = weekWindow(cycle, today, weekStart)
+  const w = dailyPaceWindow(cycle, today, weekStart)
   const txs = cycleTxs(state, cycle.id)
   const spentToday = spentOnDay(txs, dailyIds, today)
   const spentBefore = spentInRange(txs, dailyIds, w.sliceStart, addDays(today, -1))
