@@ -14,6 +14,9 @@ export interface Envelope {
   rhythm: Rhythm
   /** Si true, este techo se suma a Libre y se reparte en el “hoy”. Libre siempre cuenta. */
   splitDaily?: boolean
+  /** Si se marcó a mitad de ciclo: desde este día, y con este importe, entra al diario. */
+  splitJoinedOn?: string
+  splitJoinedAmount?: number
   /** Día de inicio de la semana de este techo semanal. 0 = domingo … 6 = sábado. */
   weekStartsOn?: number
 }

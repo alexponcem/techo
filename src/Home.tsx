@@ -140,7 +140,7 @@ export function Home({
         <div className="amount">{euros(pace.daily, locale)}</div>
         <div className="sub">
           {pace.daily <= 0 && pace.weekly > 0
-            ? t('home.todayClosed')
+            ? t('home.todayClosed', { daily: euros(pace.referenceDaily, locale) })
             : todayLogged > 0
               ? t('home.todayLogged', { amount: euros(todayLogged, locale) })
               : t('home.todayHint', { names: splitNames })}
@@ -151,7 +151,7 @@ export function Home({
             <div className="v">{euros(pace.weekly, locale)}</div>
             <div className="s">
               {t('home.weekMeta', {
-                daily: euros(pace.fairDaily, locale),
+                daily: euros(pace.referenceDaily, locale),
                 cap: euros(pace.weekAssigned, locale),
                 days: pace.days,
                 dayWord: pace.days === 1 ? t('common.day') : t('common.days'),

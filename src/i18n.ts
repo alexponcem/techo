@@ -123,8 +123,8 @@ const msg = {
   'home.move': { es: 'Mover', en: 'Move' },
   'home.today': { es: 'Hoy puedes gastar', en: 'You can spend today' },
   'home.todayClosed': {
-    es: 'hoy cerrado · el resto de la semana se recalcula',
-    en: 'today is closed · the rest of the week recalculates',
+    es: 'hoy cerrado · el resto de la semana queda a {daily}/día',
+    en: 'today is closed · the rest of the week is {daily}/day',
   },
   'home.todayLogged': { es: 'hoy ya {amount}', en: 'already {amount} today' },
   'home.todayHint': {

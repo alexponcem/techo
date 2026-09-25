@@ -5,6 +5,7 @@ import {
   assigned,
   carryKinds,
   ensureRhythm,
+  envelopeCash,
   openDailyPace,
   reportFor,
   takesFromPay,
@@ -334,10 +335,32 @@ export function updatePlanned(id: string, planned: number) {
 }
 
 export function setSplitDaily(id: string, splitDaily: boolean) {
+  const cycle = activeCycle(state)
+  const env = state.envelopes.find((e) => e.id === id)
+  if (!env || env.kind === 'buffer') return
+  const today = todayISO()
+  const origin = cycle?.paceStartedAt ?? cycle?.startedAt
+  const late = Boolean(cycle && cycle.fairDaily != null && origin && today >= origin)
+  const patch = (e: Envelope): Envelope => {
+    if (e.id !== id) return e
+    if (!splitDaily || !late || !cycle) {
+      const next = { ...e, splitDaily }
+      delete next.splitJoinedOn
+      delete next.splitJoinedAmount
+      return next
+    }
+    const txs = state.txs.filter((t) => t.cycleId === cycle.id)
+    return {
+      ...e,
+      splitDaily: true,
+      splitJoinedOn: today,
+      splitJoinedAmount: Math.max(0, envelopeCash(e, txs)),
+    }
+  }
   emit({
     ...state,
-    envelopes: state.envelopes.map((e) => (e.id === id ? { ...e, splitDaily } : e)),
-    template: state.template.map((e) => (e.id === id ? { ...e, splitDaily } : e)),
+    envelopes: state.envelopes.map(patch),
+    template: state.template.map(patch),
   })
 }
 
@@ -367,7 +390,11 @@ export function addEnvelope(env: Envelope): { ok: true } | { ok: false; error: s
   if (env.kind === 'savings' || env.kind === 'buffer') {
     return { ok: false, error: t(locale, 'store.unique') }
   }
-  const row = ensureRhythm({ ...env, name, id: env.id || uid() })
+  let row = ensureRhythm({ ...env, name, id: env.id || uid() })
+  const origin = cycle.paceStartedAt ?? cycle.startedAt
+  if (row.splitDaily && row.kind === 'cap' && cycle.fairDaily != null && todayISO() >= origin) {
+    row = { ...row, splitJoinedOn: todayISO(), splitJoinedAmount: Math.max(0, row.planned) }
+  }
   const envelopes = withBalancedBuffer([...state.envelopes, row], cycle.income, locale)
   const buffer = envelopes.find((e) => e.kind === 'buffer')
   if ((buffer?.planned ?? 0) < 0) {

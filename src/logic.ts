@@ -214,6 +214,70 @@ export function saveReview(
   }
 }
 
+export function envelopeCash(env: Envelope, txs: Tx[]): number {
+  const n = netFor(env.id, txs)
+  return env.opening + env.planned + n.in - n.out - n.spent
+}
+
+function countsTowardDaily(env: Envelope, day: string, origin: string): boolean {
+  if (env.kind === 'buffer') return true
+  if (env.splitDaily !== true) return false
+  if (env.splitJoinedOn) return day >= env.splitJoinedOn
+  return day >= origin
+}
+
+function spentDailyBetween(
+  txs: Tx[],
+  envelopes: Envelope[],
+  from: string,
+  to: string,
+  origin: string,
+): number {
+  if (!from || !to || from > to) return 0
+  const byId = new Map(envelopes.filter((e) => inDailySplit(e)).map((e) => [e.id, e]))
+  let n = 0
+  for (const t of txs) {
+    if (t.type !== 'expense') continue
+    const env = byId.get(t.envelopeId)
+    if (!env) continue
+    const day = localDayFromStamp(t.at)
+    if (day < from || day > to) continue
+    if (!countsTowardDaily(env, day, origin)) continue
+    n += t.amount
+  }
+  return n
+}
+
+/** Importe de sobres unidos a mitad de ciclo que cae entre from y to. */
+function lateDailyShare(envelopes: Envelope[], from: string, to: string, lastDay: string): number {
+  if (!from || !to || from > to) return 0
+  let sum = 0
+  for (const env of envelopes) {
+    if (env.kind === 'buffer' || env.splitDaily !== true) continue
+    if (!env.splitJoinedOn || env.splitJoinedAmount == null) continue
+    const start = env.splitJoinedOn
+    const end = lastDay
+    if (start > end) continue
+    const total = daysInclusive(start, end)
+    if (total <= 0) continue
+    const a = from > start ? from : start
+    const b = to < end ? to : end
+    if (a > b) continue
+    sum += Math.round((env.splitJoinedAmount * daysInclusive(a, b)) / total)
+  }
+  return sum
+}
+
+function lateDailyTotal(envelopes: Envelope[]): number {
+  return envelopes.reduce(
+    (s, env) =>
+      env.kind !== 'buffer' && env.splitDaily === true && env.splitJoinedAmount != null
+        ? s + env.splitJoinedAmount
+        : s,
+    0,
+  )
+}
+
 export function spentOnDay(txs: Tx[], envelopeIds: string[], day: string): number {
   let n = 0
   for (const t of txs) {
@@ -417,6 +481,7 @@ export interface DailyWeekBudget {
   hoy: number
   weekLeft: number
   fairDaily: number
+  referenceDaily: number
   originalMonth: number
   futureDaily: number
   daysAfter: number
@@ -431,20 +496,21 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
   if (!cycle) return null
   const views = viewsFor(state, today)
   const remaining = spendableRemaining(views)
-  const splitViews = views.filter((v) => inDailySplit(v.env))
-  const dailyIds = splitViews.map((v) => v.env.id)
   const origin = cycle.paceStartedAt ?? paceStartedAt(cycle.startedAt, today)
   const paceDays = Math.max(1, daysBetween(origin, cycle.expectedEndAt))
   const fairDaily =
     cycle.fairDaily != null ? cycle.fairDaily : Math.round(splitPlanned(state.envelopes) / paceDays)
-  const originalMonth = fairDaily * paceDays
+  const last = lastSpendDay(cycle)
+  const envelopes = state.envelopes
+  const originalMonth = fairDaily * paceDays + lateDailyTotal(envelopes)
   const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
   const w = dailyPaceWindow(cycle, today, weekStart)
   const txs = cycleTxs(state, cycle.id)
-  const spentToday = spentOnDay(txs, dailyIds, today)
-  const spentBefore = spentInRange(txs, dailyIds, w.sliceStart, addDays(today, -1))
+  const spentToday = spentDailyBetween(txs, envelopes, today, today, origin)
+  const spentBefore = spentDailyBetween(txs, envelopes, w.sliceStart, addDays(today, -1), origin)
   const spentWeek = spentBefore + spentToday
-  const weekAssigned = fairDaily * Math.max(0, w.daysInWeek)
+  const weekAssigned =
+    fairDaily * Math.max(0, w.daysInWeek) + lateDailyShare(envelopes, w.sliceStart, w.sliceEnd, last)
   const available = remaining + spentWeek
   const weekPool = Math.min(weekAssigned, Math.max(0, available))
   const leftForRest = Math.max(0, weekPool - spentBefore)
@@ -458,15 +524,17 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
   let futureDaily = 0
   if (closedToday) {
     hoy = 0
-    futureDaily = w.daysAfter > 0 ? Math.floor(weekLeft / w.daysAfter) : 0
+    futureDaily = w.daysAfter > 0 ? Math.round(weekLeft / w.daysAfter) : 0
   } else {
     hoy = Math.max(0, todayCap - spentToday)
-    futureDaily = w.daysAfter > 0 ? Math.floor(Math.max(0, leftForRest - todayCap) / w.daysAfter) : 0
+    futureDaily = w.daysAfter > 0 ? Math.round(Math.max(0, leftForRest - todayCap) / w.daysAfter) : 0
   }
+  const referenceDaily = closedToday ? futureDaily : todayCap
   return {
     hoy,
     weekLeft,
     fairDaily,
+    referenceDaily,
     originalMonth,
     futureDaily: Math.max(0, futureDaily),
     daysAfter: w.daysAfter,
@@ -565,6 +633,7 @@ export interface Pace {
   days: number
   weekDays: number
   fairDaily: number
+  referenceDaily: number
   originalMonth: number
   futureDaily: number
   weekPool: number
@@ -589,6 +658,7 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
     days: 1,
     weekDays: 1,
     fairDaily: 0,
+    referenceDaily: 0,
     originalMonth: 0,
     futureDaily: 0,
     weekPool: 0,
@@ -608,6 +678,7 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
     days: daysFromToday,
     weekDays: daysFromToday,
     fairDaily: w.fairDaily,
+    referenceDaily: w.referenceDaily,
     originalMonth: w.originalMonth,
     futureDaily: w.futureDaily,
     weekPool: w.weekPool,
