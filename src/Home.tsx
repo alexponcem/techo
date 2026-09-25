@@ -161,7 +161,13 @@ export function Home({
           <div className="hero-pill">
             <div className="k">{t('home.month')}</div>
             <div className="v">{euros(pace.remaining, locale)}</div>
-            <div className="s">{splitNames}</div>
+            <div className="s">
+              {t('home.monthMeta', {
+                original: euros(pace.originalMonth, locale),
+                daily: euros(pace.fairDaily, locale),
+              })}
+              {splitNames ? ` · ${splitNames}` : ''}
+            </div>
           </div>
         </div>
         <div className="hero-break">

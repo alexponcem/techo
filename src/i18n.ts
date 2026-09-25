@@ -133,10 +133,14 @@ const msg = {
   },
   'home.thisWeek': { es: 'Esta semana', en: 'This week' },
   'home.weekMeta': {
-    es: '~{daily}/día · techo {cap} · {days} {dayWord}',
-    en: '~{daily}/day · cap {cap} · {days} {dayWord}',
+    es: 'techo inicial {cap} · {daily}/día · quedan {days} {dayWord}',
+    en: 'starting cap {cap} · {daily}/day · {days} {dayWord} left',
   },
   'home.month': { es: 'Al mes', en: 'This cycle' },
+  'home.monthMeta': {
+    es: 'techo inicial {original} · {daily}/día',
+    en: 'starting cap {original} · {daily}/day',
+  },
   'home.weekBreak': {
     es: 'Semana {from}–{to}. Lo que no gastes esta semana no se suma a la siguiente; al cierre puede ir a ahorro.',
     en: '{from}–{to} week. What you don’t spend this week does not roll into the next; at close it can go to savings.',

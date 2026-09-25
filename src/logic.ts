@@ -392,14 +392,13 @@ export interface DailyWeekBudget {
   hoy: number
   weekLeft: number
   fairDaily: number
+  originalMonth: number
   futureDaily: number
   daysAfter: number
   closedToday: boolean
   weekPool: number
   weekAssigned: number
   weekSpent: number
-  nextWeekDays: number
-  nextWeekNeed: number
 }
 
 export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekBudget | null {
@@ -413,30 +412,23 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
   const paceDays = Math.max(1, daysBetween(origin, cycle.expectedEndAt))
   const fairDaily =
     cycle.fairDaily != null ? cycle.fairDaily : Math.round(splitPlanned(state.envelopes) / paceDays)
+  const originalMonth = fairDaily * paceDays
   const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
   const w = weekWindow(cycle, today, weekStart)
   const txs = cycleTxs(state, cycle.id)
   const spentToday = spentOnDay(txs, dailyIds, today)
-  const spentWeek = spentInRange(txs, dailyIds, w.sliceStart, w.sliceEnd)
-  const weekDaysLeft = w.todayIn
+  const spentBefore = spentInRange(txs, dailyIds, w.sliceStart, addDays(today, -1))
+  const spentWeek = spentBefore + spentToday
+  const weekAssigned = fairDaily * Math.max(0, w.daysInWeek)
+  const available = remaining + spentWeek
+  const weekPool = Math.min(weekAssigned, Math.max(0, available))
+  const leftForRest = Math.max(0, weekPool - spentBefore)
+  const daysLeft = w.todayIn
     ? Math.max(1, daysInclusive(today, w.sliceEnd))
     : Math.max(1, w.daysAfter || 1)
-  const nextStart = addDays(w.end, 1)
-  const last = lastSpendDay(cycle)
-  const nextW = weekWindow(cycle, nextStart, weekStart)
-  const nextWeekDays = nextStart <= last ? nextW.daysInWeek : 0
-  const assigned = fairDaily * weekDaysLeft
-  const nextWeekNeed = fairDaily * nextWeekDays
-  const available = remaining + spentToday
-  let weekPool = assigned
-  if (available < assigned + nextWeekNeed) {
-    const nextReserve = Math.min(nextWeekNeed, available)
-    weekPool = Math.max(0, available - nextReserve)
-  }
-  weekPool = Math.min(weekPool, available)
-  const todayCap = weekDaysLeft > 0 ? Math.round(weekPool / weekDaysLeft) : 0
+  const todayCap = daysLeft > 0 ? Math.round(leftForRest / daysLeft) : 0
   const closedToday = spentToday > todayCap
-  const weekLeft = Math.max(0, weekPool - spentToday)
+  const weekLeft = Math.max(0, weekPool - spentWeek)
   let hoy = 0
   let futureDaily = 0
   if (closedToday) {
@@ -444,20 +436,19 @@ export function dailyWeekBudget(state: AppState, today = todayISO()): DailyWeekB
     futureDaily = w.daysAfter > 0 ? Math.floor(weekLeft / w.daysAfter) : 0
   } else {
     hoy = Math.max(0, todayCap - spentToday)
-    futureDaily = w.daysAfter > 0 ? Math.floor((weekPool - todayCap) / w.daysAfter) : 0
+    futureDaily = w.daysAfter > 0 ? Math.floor(Math.max(0, leftForRest - todayCap) / w.daysAfter) : 0
   }
   return {
     hoy,
     weekLeft,
     fairDaily,
+    originalMonth,
     futureDaily: Math.max(0, futureDaily),
     daysAfter: w.daysAfter,
     closedToday,
     weekPool,
-    weekAssigned: assigned,
+    weekAssigned,
     weekSpent: spentWeek,
-    nextWeekDays,
-    nextWeekNeed,
   }
 }
 
@@ -549,6 +540,7 @@ export interface Pace {
   days: number
   weekDays: number
   fairDaily: number
+  originalMonth: number
   futureDaily: number
   weekPool: number
   weekAssigned: number
@@ -572,6 +564,7 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
     days: 1,
     weekDays: 1,
     fairDaily: 0,
+    originalMonth: 0,
     futureDaily: 0,
     weekPool: 0,
     weekAssigned: 0,
@@ -590,6 +583,7 @@ export function paceFor(state: AppState, today = todayISO()): Pace {
     days: daysFromToday,
     weekDays: daysFromToday,
     fairDaily: w.fairDaily,
+    originalMonth: w.originalMonth,
     futureDaily: w.futureDaily,
     weekPool: w.weekPool,
     weekAssigned: w.weekAssigned,
