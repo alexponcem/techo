@@ -147,10 +147,26 @@ const msg = {
   },
   'home.ownPace': { es: 'Ritmo de hoy ~{hoy}', en: 'Today’s pace ~{hoy}' },
   'home.cameIn': { es: 'Entraron {amount}', en: '{amount} came in' },
-  'home.inAccount': { es: 'En tu cuenta ahora', en: 'In your account now' },
+  'home.inAccount': { es: 'Tu dinero ahora', en: 'Your money now' },
   'home.inAccountHint': {
-    es: 'Debería coincidir con el banco si anotaste todo (un solo bolsillo).',
-    en: 'Should match your bank if you logged everything (one pocket).',
+    es: 'Banco {bank} · Efectivo {cash}',
+    en: 'Bank {bank} · Cash {cash}',
+  },
+  'home.afterPockets': {
+    es: 'Tras las cuotas: banco {bank} · efectivo {cash}',
+    en: 'After bills: bank {bank} · cash {cash}',
+  },
+  'setup.cash': { es: '¿Cuánto de eso es efectivo?', en: 'How much of that is cash?' },
+  'setup.cashHint': {
+    es: 'El resto queda como banco. Puede ser 0. Luego, en cada gasto, eliges tarjeta o efectivo.',
+    en: 'The rest stays as bank. It can be 0. On each spend you choose card or cash.',
+  },
+  'sheet.payWith': { es: '¿Tarjeta o efectivo?', en: 'Card or cash?' },
+  'sheet.card': { es: 'Tarjeta', en: 'Card' },
+  'sheet.cash': { es: 'Efectivo', en: 'Cash' },
+  'sheet.cashShort': {
+    es: 'Efectivo después de este gasto: {amount}',
+    en: 'Cash after this spend: {amount}',
   },
   'home.whenBillsLeave': { es: 'Cuando salgan las cuotas pendientes', en: 'When pending bills leave' },
   'home.billsLeft': {
@@ -207,8 +223,8 @@ const msg = {
 
   'tour.account': { es: 'En tu cuenta ahora', en: 'In your account now' },
   'tour.accountBody': {
-    es: 'Ese total es lo que debería verse en el banco: ahorro + lo no gastado + alquiler u otras cuotas que aún no hayas marcado pagadas.',
-    en: 'That total is what your bank should show: savings + unspent + rent or other bills you haven’t marked paid yet.',
+    es: 'El total es todo tu dinero. Debajo, banco y efectivo por separado. Las cuotas que aún no marcas siguen dentro del banco.',
+    en: 'The total is all your money. Under it, bank and cash are split. Bills you haven’t marked paid are still in the bank.',
   },
   'tour.today': { es: 'Hoy puedes gastar', en: 'You can spend today' },
   'tour.todayBody': {

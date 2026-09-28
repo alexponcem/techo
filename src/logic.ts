@@ -785,6 +785,29 @@ export function accountSnapshot(views: EnvelopeView[]): {
   }
 }
 
+/** Banco = total − efectivo. El efectivo baja con gastos en cash y sube si entra dinero en cash. */
+export function pocketSplit(
+  state: AppState,
+  total: number,
+  afterFixed: number,
+): { cash: number; bank: number; afterCash: number; afterBank: number } {
+  const cycle = activeCycle(state)
+  let cash = cycle?.openingCash ?? 0
+  if (cycle) {
+    for (const tx of state.txs) {
+      if (tx.cycleId !== cycle.id || tx.pocket !== 'cash') continue
+      if (tx.type === 'expense') cash -= tx.amount
+      if (tx.type === 'income') cash += tx.amount
+    }
+  }
+  return {
+    cash,
+    bank: total - cash,
+    afterCash: cash,
+    afterBank: afterFixed - cash,
+  }
+}
+
 export type MonthVerdict = 'good' | 'ok' | 'tight' | 'hard'
 
 export interface SpendRow {

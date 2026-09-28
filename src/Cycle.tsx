@@ -12,6 +12,7 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
   const cycle = activeCycle(state)
   const views = viewsFor(state)
   const [income, setIncome] = useState(cycle ? String(cycle.income / 100) : '')
+  const [cashText, setCashText] = useState('0')
   const [startedAt, setStartedAt] = useState(todayISO())
   const [expectedEndAt, setExpectedEndAt] = useState(() =>
     suggestedNextPay(todayISO(), state.settings.payMode, state.settings.fixedDay),
@@ -47,7 +48,7 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
 
   function close() {
     if (cents <= 0) return
-    startNextCycle(cents, startedAt, expectedEndAt, leftoverTo)
+    startNextCycle(cents, startedAt, expectedEndAt, leftoverTo, parseEuros(cashText) ?? 0)
     onBack()
   }
 
@@ -105,6 +106,13 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
         Sueldo que acaba de entrar
         <input inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} />
       </label>
+      <label className="field">
+        {t('setup.cash')}
+        <input inputMode="decimal" value={cashText} onChange={(e) => setCashText(e.target.value)} placeholder="0" />
+      </label>
+      <p className="muted" style={{ fontSize: 13 }}>
+        {t('setup.cashHint')}
+      </p>
       <label className="field">
         Fecha en que llegó
         <input type="date" value={startedAt} onChange={(e) => onStartChange(e.target.value)} />

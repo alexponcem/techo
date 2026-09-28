@@ -37,6 +37,8 @@ export interface Cycle {
   paceStartedAt?: string
   /** Techo diario original, congelado al abrir: (Libre + techos marcados) / días que quedaban. */
   fairDaily?: number
+  /** Efectivo que había al abrir el ciclo. El resto del dinero está en el banco. */
+  openingCash?: number
 }
 
 export interface Tx {
@@ -48,6 +50,8 @@ export interface Tx {
   amount: number
   note: string
   at: string
+  /** card = banco. cash = efectivo. Si falta, es tarjeta (movimientos antiguos). */
+  pocket?: 'card' | 'cash'
 }
 
 export type Locale = 'es' | 'en'

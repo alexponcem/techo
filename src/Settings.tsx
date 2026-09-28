@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import { clampWeekStart } from './dates'
+import { parseEuros } from './money'
 import { weekdayName } from './i18n'
 import { HowItWorks } from './Setup'
-import { exportJson, importJson, resetAll, undoLast, updateSettings, useAppState } from './store'
+import { exportJson, importJson, resetAll, setOpeningCash, undoLast, updateSettings, useAppState } from './store'
 import { useLocale, useMoney, useT } from './useT'
 import type { Locale } from './types'
 
@@ -69,6 +70,19 @@ export function SettingsScreen({
           <p>
             <b>{t('settings.thisCycle')}</b> {money(cycle.income)}
           </p>
+        )}
+        {cycle && (
+          <label className="field">
+            {t('setup.cash')}
+            <input
+              inputMode="decimal"
+              defaultValue={String((cycle.openingCash ?? 0) / 100)}
+              onBlur={(e) => {
+                const cents = parseEuros(e.target.value)
+                if (cents != null && cents >= 0) setOpeningCash(cents)
+              }}
+            />
+          </label>
         )}
         <p className="muted">
           {t('settings.safari')}

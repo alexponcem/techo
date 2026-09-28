@@ -138,6 +138,7 @@ export function startFirstCycle(input: {
   settings: Settings
   template: Envelope[]
   savingsOpening?: number
+  openingCash?: number
 }) {
   const saved = input.savingsOpening ?? 0
   const locale = input.settings.locale ?? 'es'
@@ -161,6 +162,7 @@ export function startFirstCycle(input: {
         income: input.income,
         fairDaily: pace.fairDaily,
         paceStartedAt: pace.paceStartedAt,
+        openingCash: input.openingCash ?? 0,
       },
     ],
     txs: [],
@@ -179,13 +181,20 @@ function pushTx(tx: Omit<Tx, 'id' | 'cycleId' | 'at'> & { at?: string }) {
     toEnvelopeId: tx.toEnvelopeId,
     amount: tx.amount,
     note: tx.note,
+    pocket: tx.pocket,
   }
   emit({ ...state, txs: [...state.txs, next] })
 }
 
-export function addExpense(envelopeId: string, amount: number, note: string, at?: string) {
+export function addExpense(
+  envelopeId: string,
+  amount: number,
+  note: string,
+  at?: string,
+  pocket?: 'card' | 'cash',
+) {
   if (amount <= 0) return
-  pushTx({ type: 'expense', envelopeId, amount, note, at })
+  pushTx({ type: 'expense', envelopeId, amount, note, at, pocket: pocket ?? 'card' })
 }
 
 export function coverAndSpend(input: {
@@ -195,6 +204,7 @@ export function coverAndSpend(input: {
   at?: string
   fromLibre?: { id: string; amount: number }
   fromSavings?: { id: string; amount: number; reason: string }
+  pocket?: 'card' | 'cash'
 }) {
   const cycle = activeCycle(state)
   if (!cycle || input.amount <= 0) return
@@ -232,13 +242,19 @@ export function coverAndSpend(input: {
     envelopeId: input.envelopeId,
     amount: input.amount,
     note: input.note,
+    pocket: input.pocket ?? 'card',
   })
   emit({ ...state, txs: [...state.txs, ...extra] })
 }
 
-export function addIncome(envelopeId: string, amount: number, note: string) {
+export function addIncome(
+  envelopeId: string,
+  amount: number,
+  note: string,
+  pocket?: 'card' | 'cash',
+) {
   if (amount <= 0) return
-  pushTx({ type: 'income', envelopeId, amount, note })
+  pushTx({ type: 'income', envelopeId, amount, note, pocket: pocket ?? 'card' })
 }
 
 export function moveMoney(fromId: string, toId: string, amount: number, note: string) {
@@ -284,7 +300,7 @@ export function removeExpense(id: string) {
 
 export function updateExpense(
   id: string,
-  patch: { amount: number; note: string; at: string },
+  patch: { amount: number; note: string; at: string; pocket?: 'card' | 'cash' },
 ) {
   const tx = state.txs.find((t) => t.id === id)
   if (!tx || tx.type !== 'expense' || patch.amount <= 0) return
@@ -293,7 +309,9 @@ export function updateExpense(
   const fromOwn = Math.max(0, tx.amount - cover)
   const newCover = Math.max(0, patch.amount - fromOwn)
   let txs = state.txs.map((t) =>
-    t.id === id ? { ...t, amount: patch.amount, note: patch.note, at: patch.at } : t,
+    t.id === id
+      ? { ...t, amount: patch.amount, note: patch.note, at: patch.at, pocket: patch.pocket ?? t.pocket }
+      : t,
   )
   if (siblings.length === 1) {
     const sid = siblings[0].id
@@ -444,6 +462,7 @@ export function startNextCycle(
   startedAt: string,
   expectedEndAt?: string,
   leftoverToId?: string,
+  openingCash = 0,
 ) {
   const current = activeCycle(state)
   if (!current) return
@@ -521,8 +540,18 @@ export function startNextCycle(
         income,
         fairDaily: pace.fairDaily,
         paceStartedAt: pace.paceStartedAt,
+        openingCash,
       },
     ],
+  })
+}
+
+export function setOpeningCash(cents: number) {
+  const cycle = activeCycle(state)
+  if (!cycle || cents < 0) return
+  emit({
+    ...state,
+    cycles: state.cycles.map((c) => (c.id === cycle.id ? { ...c, openingCash: cents } : c)),
   })
 }
 

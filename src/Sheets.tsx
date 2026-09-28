@@ -56,6 +56,7 @@ export function AddSheet({
   const [reason, setReason] = useState('')
   const [confirm, setConfirm] = useState(false)
   const [spendDay, setSpendDay] = useState(todayISO())
+  const [pocket, setPocket] = useState<'card' | 'cash'>('card')
   const [done, setDone] = useState<{ status: 'ok' | 'tight' | 'over'; title: string; body: string } | null>(
     null,
   )
@@ -83,7 +84,7 @@ export function AddSheet({
     if (!envelopeId || cents <= 0) return
     if (isSavings) {
       if (!reasonOk) return
-      addExpense(envelopeId, cents, `AHORRO: ${note.trim()}`, at)
+      addExpense(envelopeId, cents, `AHORRO: ${note.trim()}`, at, pocket)
       finish()
       return
     }
@@ -91,14 +92,14 @@ export function AddSheet({
       setConfirm(true)
       return
     }
-    addExpense(envelopeId, cents, note, at)
+    addExpense(envelopeId, cents, note, at, pocket)
     finish()
   }
 
   function acceptCover() {
     if (!envelopeId) return
     if (!plan) {
-      addExpense(envelopeId, cents, note, at)
+      addExpense(envelopeId, cents, note, at, pocket)
       finish()
       return
     }
@@ -123,6 +124,7 @@ export function AddSheet({
                 : reason.trim(),
             }
           : undefined,
+      pocket,
     })
     finish()
   }
@@ -198,6 +200,23 @@ export function AddSheet({
           Cuenta para el {formatDay(spendDay)} (y su semana), no como gasto de hoy.
         </p>
       )}
+      <p className="tiny">{t('sheet.payWith')}</p>
+      <div className="chips">
+        <button
+          type="button"
+          className={`chip ${pocket === 'card' ? 'on' : ''}`}
+          onClick={() => setPocket('card')}
+        >
+          {t('sheet.card')}
+        </button>
+        <button
+          type="button"
+          className={`chip ${pocket === 'cash' ? 'on' : ''}`}
+          onClick={() => setPocket('cash')}
+        >
+          {t('sheet.cash')}
+        </button>
+      </div>
       <p className="tiny">{t('sheet.envelope')}</p>
       <div className="chips">
         {views
@@ -348,6 +367,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
   const [amount, setAmount] = useState(tx ? String(tx.amount / 100) : '')
   const [note, setNote] = useState(tx?.note ?? '')
   const [spendDay, setSpendDay] = useState(tx ? localDayFromStamp(tx.at) : todayISO())
+  const [pocket, setPocket] = useState<'card' | 'cash'>(tx?.pocket === 'cash' ? 'cash' : 'card')
 
   if (!tx || tx.type !== 'expense') {
     return (
@@ -365,7 +385,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
 
   function save() {
     if (cents <= 0) return
-    updateExpense(txId, { amount: cents, note, at: stampAtNoon(day) })
+    updateExpense(txId, { amount: cents, note, at: stampAtNoon(day), pocket })
     onClose()
   }
 
@@ -375,6 +395,15 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
         Importe
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
+      <p className="tiny">{t('sheet.payWith')}</p>
+      <div className="chips">
+        <button type="button" className={`chip ${pocket === 'card' ? 'on' : ''}`} onClick={() => setPocket('card')}>
+          {t('sheet.card')}
+        </button>
+        <button type="button" className={`chip ${pocket === 'cash' ? 'on' : ''}`} onClick={() => setPocket('cash')}>
+          {t('sheet.cash')}
+        </button>
+      </div>
       <p className="tiny">{t('sheet.when')}</p>
       <div className="chips">
         <button
@@ -495,10 +524,11 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
     views.find((v) => v.env.kind === 'savings')?.env.id ?? '',
   )
   const cents = parseEuros(amount) ?? 0
+  const [pocket, setPocket] = useState<'card' | 'cash'>('card')
 
   function save() {
     if (!envelopeId || cents <= 0) return
-    addIncome(envelopeId, cents, 'Ingreso extra')
+    addIncome(envelopeId, cents, 'Ingreso extra', pocket)
     onClose()
   }
 
@@ -509,6 +539,15 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
         Importe
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
+      <p className="tiny">{t('sheet.payWith')}</p>
+      <div className="chips">
+        <button type="button" className={`chip ${pocket === 'card' ? 'on' : ''}`} onClick={() => setPocket('card')}>
+          {t('sheet.card')}
+        </button>
+        <button type="button" className={`chip ${pocket === 'cash' ? 'on' : ''}`} onClick={() => setPocket('cash')}>
+          {t('sheet.cash')}
+        </button>
+      </div>
       <SelectEnv label={t('sheet.envelope')} value={envelopeId} views={views} onChange={setEnvelopeId} />
       <button className="btn full sage" disabled={!envelopeId || cents <= 0} onClick={save}>
         Añadir ingreso

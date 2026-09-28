@@ -30,11 +30,13 @@ export function Setup() {
   )
   const [envelopes, setEnvelopes] = useState<Envelope[]>(() => blankPlan(locale))
   const [savedText, setSavedText] = useState('0')
+  const [cashText, setCashText] = useState('0')
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const income = parseEuros(incomeText) ?? 0
   const savingsOpening = parseEuros(savedText) ?? 0
+  const openingCash = parseEuros(cashText) ?? 0
   const balanced = useMemo(() => withBalancedBuffer(envelopes, income, locale), [envelopes, income, locale])
   const plannedOthers = assigned(balanced.filter((e) => takesFromPay(e)))
   const deficit = plannedOthers - income
@@ -92,6 +94,7 @@ export function Setup() {
         },
         template: balanced,
         savingsOpening,
+        openingCash,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : t('setup.openFail'))
@@ -228,6 +231,18 @@ export function Setup() {
         </label>
         <p className="muted" style={{ fontSize: 13 }}>
           {t('setup.savedHint')}
+        </p>
+        <label className="field">
+          {t('setup.cash')}
+          <input
+            inputMode="decimal"
+            value={cashText}
+            onChange={(e) => setCashText(e.target.value)}
+            placeholder="0"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: 13 }}>
+          {t('setup.cashHint')}
         </p>
         <label className="field">
           {t('setup.payday')}

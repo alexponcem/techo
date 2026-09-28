@@ -1,5 +1,6 @@
 import {
   accountSnapshot,
+  pocketSplit,
   cycleTxs,
   homeGroupOf,
   homeGroups,
@@ -84,6 +85,7 @@ export function Home({
     .map((c) => `${c.name} ${money(c.remaining)}`)
     .join(' · ')
   const snap = accountSnapshot(views)
+  const pockets = pocketSplit(state, snap.inAccount, snap.afterFixed)
   const unpaidNames = snap.unpaid.map((v) => v.env.name).join(', ')
   const groups = homeGroups(locale).map((g) => ({
     ...g,
@@ -192,7 +194,7 @@ export function Home({
         <div className="tiny">{t('home.inAccount')}</div>
         <div className="saldo-amount">{money(snap.inAccount)}</div>
         <p className="muted" style={{ fontSize: 13 }}>
-          {t('home.inAccountHint')}
+          {t('home.inAccountHint', { bank: money(pockets.bank), cash: money(pockets.cash) })}
         </p>
         {snap.unpaidTotal > 0 ? (
           <div className="saldo-next">
@@ -200,6 +202,9 @@ export function Home({
               <span>{t('home.whenBillsLeave')}</span>
               <b>{money(snap.afterFixed)}</b>
             </div>
+            <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+              {t('home.afterPockets', { bank: money(pockets.afterBank), cash: money(pockets.afterCash) })}
+            </p>
             <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
               {t('home.billsLeft', { names: unpaidNames })}
             </p>
