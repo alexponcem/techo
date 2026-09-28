@@ -226,38 +226,17 @@ export function Home({
               {g.hint}
             </p>
             <div className="stack">
-              {g.items.map((v) => {
-                const kids = views.filter((c) => c.env.parentId === v.env.id)
-                const kidCash = kids.reduce((s, c) => s + Math.max(0, c.remaining), 0)
-                return (
-                  <div key={v.env.id} className="stack" style={{ gap: 8 }}>
-                    <EnvelopeCard
-                      view={v}
-                      group={g.id}
-                      onOpen={() => onEnvelope(v.env.id)}
-                      onPay={() => markPaid(v.env.id, v.remaining)}
-                      onSpend={() => onOpen({ name: 'add', envelopeId: v.env.id })}
-                    />
-                    {kids.length > 0 && (
-                      <div className="stack" style={{ gap: 8, marginLeft: 18 }}>
-                        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-                          {t('fund.group', { amount: money(kidCash) })}
-                        </p>
-                        {kids.map((c) => (
-                          <EnvelopeCard
-                            key={c.env.id}
-                            view={c}
-                            group={g.id}
-                            onOpen={() => onEnvelope(c.env.id)}
-                            onPay={() => markPaid(c.env.id, c.remaining)}
-                            onSpend={() => onOpen({ name: 'add', envelopeId: c.env.id })}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+              {g.items.map((v) => (
+                <EnvelopeCard
+                  key={v.env.id}
+                  view={v}
+                  group={g.id}
+                  folders={views.filter((c) => c.env.parentId === v.env.id)}
+                  onOpen={() => onEnvelope(v.env.id)}
+                  onPay={() => markPaid(v.env.id, v.remaining)}
+                  onSpend={() => onOpen({ name: 'add', envelopeId: v.env.id })}
+                />
+              ))}
             </div>
           </section>
         ),
@@ -316,15 +295,28 @@ function HomeTour({ onSkip }: { onSkip: () => void }) {
   )
 }
 
+function folderLine(
+  t: (k: MsgKey, vars?: Record<string, string | number>) => string,
+  money: (cents: number) => string,
+  remaining: number,
+  spent: number,
+): string {
+  if (remaining > 0 && spent > 0) return t('fund.both', { set: money(remaining), spent: money(spent) })
+  if (spent > 0) return t('fund.spentBit', { amount: money(spent) })
+  return t('fund.setAside', { amount: money(remaining) })
+}
+
 function EnvelopeCard({
   view,
   group,
+  folders = [],
   onOpen,
   onPay,
   onSpend,
 }: {
   view: EnvelopeView
   group: HomeGroupId
+  folders?: EnvelopeView[]
   onOpen: () => void
   onPay: () => void
   onSpend: () => void
@@ -334,7 +326,12 @@ function EnvelopeCard({
   const locale = useLocale()
   const app = useAppState()
   const ownPace = group === 'daily' ? guideForEnvelope(app, view.env.id) : null
-  const { env, remaining, total, pct, light, paid } = view
+  const { env, total, pct, light, paid } = view
+  const folderRemaining = folders.reduce((s, c) => s + c.remaining, 0)
+  const folderSpent = folders.reduce((s, c) => s + c.spent, 0)
+  const remaining = view.remaining + folderRemaining
+  const spent = view.spent + folderSpent
+  const headline = remaining > 0 ? remaining : spent
   const week = view.week
   const weekPct =
     week && week.target > 0 ? Math.min(100, Math.round((week.spent / week.target) * 100)) : 0
@@ -350,7 +347,13 @@ function EnvelopeCard({
             : env.kind === 'savings'
               ? t('home.savingsUsed', { amount: money(view.used) })
               : env.kind === 'fund'
-                ? t('home.fundSpent', { amount: money(view.spent) })
+                ? folders.length > 0
+                  ? remaining > 0 && spent > 0
+                    ? t('fund.both', { set: money(remaining), spent: money(spent) })
+                    : spent > 0
+                      ? t('fund.spentBit', { amount: money(spent) })
+                      : t('fund.setAside', { amount: money(remaining) })
+                  : t('home.fundSpent', { amount: money(view.spent) })
                 : week
                   ? t('home.weekLine', {
                       spent: money(week.spent),
@@ -364,12 +367,18 @@ function EnvelopeCard({
         </div>
       </div>
       <div className="right">
-        <div className="remain">{money(remaining)}</div>
+        <div className="remain">{money(env.kind === 'fund' && folders.length > 0 ? headline : remaining)}</div>
         <span className={`pill ${light}`}>{pillLabel(view, t)}</span>
       </div>
       <div className={`bar ${light}`}>
         <span style={{ width: `${barPct}%` }} />
       </div>
+      {folders.length > 0 &&
+        folders.map((c) => (
+          <span key={c.env.id} className="muted" style={{ fontSize: 12, gridColumn: '1 / -1' }}>
+            {c.env.emoji} {c.env.name} · {folderLine(t, money, c.remaining, c.spent)}
+          </span>
+        ))}
       {week && group === 'cap' && (
         <p className="muted" style={{ fontSize: 13, gridColumn: '1 / -1', margin: 0 }}>
           {t('home.weekAdvice', {

@@ -3,7 +3,7 @@ import { activeCycle, cycleTxs, envelopeView, rhythmOf, weekStartOfEnv } from '.
 import { parseEuros } from './money'
 import { useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
-import { kindHint, kindLabel } from './template'
+import { EMOJI_PICK, kindHint, kindLabel } from './template'
 import {
   addSubfund,
   markPaid,
@@ -43,6 +43,7 @@ export function EnvelopeScreen({
   const [msg, setMsg] = useState('')
   const [pending, setPending] = useState<Tx | null>(null)
   const [folderName, setFolderName] = useState('')
+  const [folderEmoji, setFolderEmoji] = useState('✈️')
 
   if (!cycle || !env) {
     return (
@@ -57,6 +58,12 @@ export function EnvelopeScreen({
   const allTxs = cycleTxs(state, cycle.id)
   const txs = allTxs.filter((t) => t.envelopeId === id || t.toEnvelopeId === id)
   const view = envelopeView(env, allTxs, cycle, undefined, undefined, weekStartOfEnv(env, state), locale)
+  const childViews = state.envelopes
+    .filter((e) => e.parentId === env.id)
+    .map((e) => envelopeView(e, allTxs, cycle, undefined, undefined, weekStartOfEnv(e, state), locale))
+  const groupRemaining = view.remaining + childViews.reduce((s, c) => s + c.remaining, 0)
+  const groupSpent = view.spent + childViews.reduce((s, c) => s + c.spent, 0)
+  const shownRemaining = env.kind === 'fund' && !env.parentId ? groupRemaining : view.remaining
 
   function saveTecho() {
     if (!env) return
@@ -79,12 +86,18 @@ export function EnvelopeScreen({
         <div className="label">
           {env.emoji} {kindLabel(env.kind, locale)}
         </div>
-        <div className="amount">{money(view.remaining)}</div>
+        <div className="amount">{money(shownRemaining)}</div>
         <div className="sub">
           {env.name}
           {env.kind === 'savings'
             ? tr('env.savingsUsed', { amount: money(view.used), pct: view.pct })
-            : tr('env.leftOf', { total: money(view.total) })}
+            : env.kind === 'fund' && childViews.length > 0
+              ? groupRemaining > 0 && groupSpent > 0
+                ? tr('fund.both', { set: money(groupRemaining), spent: money(groupSpent) })
+                : groupSpent > 0
+                  ? tr('fund.spentBit', { amount: money(groupSpent) })
+                  : tr('fund.setAside', { amount: money(groupRemaining) })
+              : tr('env.leftOf', { total: money(view.total) })}
         </div>
       </div>
       {view.week && (
@@ -203,13 +216,33 @@ export function EnvelopeScreen({
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>
                 {tr('fund.hint')}
               </p>
-              {state.envelopes
-                .filter((e) => e.parentId === env.id)
-                .map((child) => (
-                  <button key={child.id} type="button" className="btn ghost full" onClick={() => onOpen(child.id)}>
-                    {child.emoji} {child.name}
+              {childViews.map((child) => (
+                <button
+                  key={child.env.id}
+                  type="button"
+                  className="btn ghost full"
+                  onClick={() => onOpen(child.env.id)}
+                >
+                  {child.env.emoji} {child.env.name} ·{' '}
+                  {child.remaining > 0 && child.spent > 0
+                    ? tr('fund.both', { set: money(child.remaining), spent: money(child.spent) })
+                    : child.spent > 0
+                      ? tr('fund.spentBit', { amount: money(child.spent) })
+                      : tr('fund.setAside', { amount: money(child.remaining) })}
+                </button>
+              ))}
+              <div className="chips" style={{ flexWrap: 'wrap' }}>
+                {EMOJI_PICK.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    className={`chip ${folderEmoji === e ? 'on' : ''}`}
+                    onClick={() => setFolderEmoji(e)}
+                  >
+                    {e}
                   </button>
                 ))}
+              </div>
               <input
                 value={folderName}
                 onChange={(e) => setFolderName(e.target.value)}
@@ -219,7 +252,7 @@ export function EnvelopeScreen({
                 type="button"
                 className="btn full"
                 onClick={() => {
-                  const result = addSubfund(env.id, folderName)
+                  const result = addSubfund(env.id, folderName, folderEmoji)
                   if (!result.ok) {
                     setMsg(result.error)
                     return
