@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { activeCycle, cycleTxs, envelopeView, rhythmOf, weekStartOfEnv } from './logic'
-import { euros, parseEuros } from './money'
-import { useLocale, useT } from './useT'
+import { parseEuros } from './money'
+import { useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
 import { kindHint, kindLabel } from './template'
 import {
+  addSubfund,
   markPaid,
   removeExpense,
   removeTx,
@@ -21,14 +22,17 @@ export function EnvelopeScreen({
   onBack,
   onAdd,
   onEdit,
+  onOpen,
 }: {
   id: string
   onBack: () => void
   onAdd: () => void
   onEdit: (txId: string) => void
+  onOpen: (id: string) => void
 }) {
   const state = useAppState()
   const tr = useT()
+  const money = useMoney()
   const locale = useLocale()
   const cycle = activeCycle(state)
   const env = state.envelopes.find((e) => e.id === id)
@@ -38,6 +42,7 @@ export function EnvelopeScreen({
   const [editingName, setEditingName] = useState(false)
   const [msg, setMsg] = useState('')
   const [pending, setPending] = useState<Tx | null>(null)
+  const [folderName, setFolderName] = useState('')
 
   if (!cycle || !env) {
     return (
@@ -74,12 +79,12 @@ export function EnvelopeScreen({
         <div className="label">
           {env.emoji} {kindLabel(env.kind, locale)}
         </div>
-        <div className="amount">{euros(view.remaining, locale)}</div>
+        <div className="amount">{money(view.remaining)}</div>
         <div className="sub">
           {env.name}
           {env.kind === 'savings'
-            ? tr('env.savingsUsed', { amount: euros(view.used, locale), pct: view.pct })
-            : tr('env.leftOf', { total: euros(view.total, locale) })}
+            ? tr('env.savingsUsed', { amount: money(view.used), pct: view.pct })
+            : tr('env.leftOf', { total: money(view.total) })}
         </div>
       </div>
       {view.week && (
@@ -88,9 +93,9 @@ export function EnvelopeScreen({
             label: view.week.label,
             days: view.week.daysInCycle,
             dayWord: view.week.daysInCycle === 1 ? tr('common.day') : tr('common.days'),
-            target: euros(view.week.target, locale),
-            spent: euros(view.week.spent, locale),
-            total: euros(view.total, locale),
+            target: money(view.week.target),
+            spent: money(view.week.spent),
+            total: money(view.total),
           })}
         </div>
       )}
@@ -161,7 +166,7 @@ export function EnvelopeScreen({
           )}
           <div className="row">
             <strong>{tr('env.cycleCap')}</strong>
-            <span>{euros(env.planned, locale)}</span>
+            <span>{money(env.planned)}</span>
           </div>
           {editing ? (
             <>
@@ -192,6 +197,48 @@ export function EnvelopeScreen({
             </button>
           )}
           {msg ? <p className="muted">{msg}</p> : null}
+          {env.kind === 'fund' && !env.parentId && (
+            <div className="stack" style={{ gap: 8 }}>
+              <strong>{tr('fund.folders')}</strong>
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                {tr('fund.hint')}
+              </p>
+              {state.envelopes
+                .filter((e) => e.parentId === env.id)
+                .map((child) => (
+                  <button key={child.id} type="button" className="btn ghost full" onClick={() => onOpen(child.id)}>
+                    {child.emoji} {child.name}
+                  </button>
+                ))}
+              <input
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                placeholder={tr('fund.ph')}
+              />
+              <button
+                type="button"
+                className="btn full"
+                onClick={() => {
+                  const result = addSubfund(env.id, folderName)
+                  if (!result.ok) {
+                    setMsg(result.error)
+                    return
+                  }
+                  setFolderName('')
+                  setMsg('')
+                }}
+              >
+                {tr('fund.add')}
+              </button>
+            </div>
+          )}
+          {env.parentId && (
+            <p className="muted" style={{ fontSize: 13 }}>
+              {tr('fund.inParent', {
+                name: state.envelopes.find((e) => e.id === env.parentId)?.name ?? '',
+              })}
+            </p>
+          )}
           {env.kind === 'cap' && rhythmOf(env) === 'weekly' && !env.splitDaily && (
             <WeekStartSelect
               value={weekStartOfEnv(env, state)}
@@ -240,7 +287,7 @@ export function EnvelopeScreen({
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div>{sign(t, id)}{euros(t.amount, locale)}</div>
+                <div>{sign(t, id)}{money(t.amount)}</div>
                 {t.type === 'expense' && (
                   <button type="button" className="back" onClick={() => onEdit(t.id)}>
                     {tr('env.edit')}
@@ -263,7 +310,7 @@ export function EnvelopeScreen({
             </h2>
             <p>
               {sign(pending, id)}
-              {euros(pending.amount, locale)}
+              {money(pending.amount)}
               {pending.note ? ` · ${pending.note}` : ''}
             </p>
             <p className="muted">

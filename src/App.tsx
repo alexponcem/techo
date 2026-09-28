@@ -99,6 +99,7 @@ export default function App() {
           onBack={backHome}
           onAdd={() => openSheet({ name: 'add', envelopeId: screen.id })}
           onEdit={(txId) => openSheet({ name: 'edit', txId })}
+          onOpen={(childId) => setScreen({ name: 'envelope', id: childId })}
         />
       )}
       {screen.name === 'settings' && (

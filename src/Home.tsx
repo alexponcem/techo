@@ -13,10 +13,9 @@ import {
 import { useState } from 'react'
 import { clampWeekStart, formatRange, todayISO } from './dates'
 import { weekdayName, type MsgKey } from './i18n'
-import { euros } from './money'
 import { kindLabel } from './template'
 import { markPaid, updateSettings, useAppState } from './store'
-import { useLocale, useT } from './useT'
+import { useLocale, useMoney, useT } from './useT'
 import type { Sheet as SheetState } from './types'
 
 function pillLabel(view: EnvelopeView, tr: (k: MsgKey, vars?: Record<string, string | number>) => string): string {
@@ -57,6 +56,7 @@ export function Home({
 }) {
   const state = useAppState()
   const t = useT()
+  const money = useMoney()
   const locale = useLocale()
   const cycle = [...state.cycles].reverse().find((c) => !c.closedAt)
   const views = viewsFor(state)
@@ -81,13 +81,13 @@ export function Home({
   const near = hot.filter((v) => v.alert === 'near')
   const capLine = pace.caps
     .filter((c) => c.remaining > 0)
-    .map((c) => `${c.name} ${euros(c.remaining, locale)}`)
+    .map((c) => `${c.name} ${money(c.remaining)}`)
     .join(' · ')
   const snap = accountSnapshot(views)
   const unpaidNames = snap.unpaid.map((v) => v.env.name).join(', ')
   const groups = homeGroups(locale).map((g) => ({
     ...g,
-    items: views.filter((v) => homeGroupOf(v.env) === g.id),
+    items: views.filter((v) => homeGroupOf(v.env) === g.id && !v.env.parentId),
   }))
 
   return (
@@ -138,22 +138,22 @@ export function Home({
 
       <section className="hero">
         <div className="label">{t('home.today')}</div>
-        <div className="amount">{euros(libreGuide?.hoy ?? 0, locale)}</div>
+        <div className="amount">{money(libreGuide?.hoy ?? 0)}</div>
         <div className="sub">
           {(libreGuide?.hoy ?? 0) <= 0 && (libreGuide?.weekLeft ?? 0) > 0
-            ? t('home.todayClosed', { daily: euros(libreGuide?.referenceDaily ?? 0, locale) })
+            ? t('home.todayClosed', { daily: money(libreGuide?.referenceDaily ?? 0) })
             : todayLogged > 0
-              ? t('home.todayLogged', { amount: euros(todayLogged, locale) })
+              ? t('home.todayLogged', { amount: money(todayLogged) })
               : t('home.todayHint', { names: libreEnv?.name ?? t('names.free') })}
         </div>
         <div className="hero-pills">
           <div className="hero-pill">
             <div className="k">{t('home.thisWeek')}</div>
-            <div className="v">{euros(libreGuide?.weekLeft ?? 0, locale)}</div>
+            <div className="v">{money(libreGuide?.weekLeft ?? 0)}</div>
             <div className="s">
               {t('home.weekMeta', {
-                daily: euros(libreGuide?.referenceDaily ?? 0, locale),
-                cap: euros(libreGuide?.weekAssigned ?? 0, locale),
+                daily: money(libreGuide?.referenceDaily ?? 0),
+                cap: money(libreGuide?.weekAssigned ?? 0),
                 days: libreGuide?.daysLeft ?? pace.days,
                 dayWord: (libreGuide?.daysLeft ?? pace.days) === 1 ? t('common.day') : t('common.days'),
               })}
@@ -161,10 +161,10 @@ export function Home({
           </div>
           <div className="hero-pill">
             <div className="k">{t('home.month')}</div>
-            <div className="v">{euros(libreGuide?.remaining ?? 0, locale)}</div>
+            <div className="v">{money(libreGuide?.remaining ?? 0)}</div>
             <div className="s">
               {t('home.monthMeta', {
-                original: euros(libreGuide?.originalMonth ?? 0, locale),
+                original: money(libreGuide?.originalMonth ?? 0),
               })}
               {libreEnv ? ` · ${libreEnv.name}` : ''}
             </div>
@@ -184,13 +184,13 @@ export function Home({
         </div>
         <div className="hero-meta">
           <span>{formatRange(cycle.startedAt, cycle.expectedEndAt, locale)}</span>
-          <span>{t('home.cameIn', { amount: euros(cycle.income, locale) })}</span>
+          <span>{t('home.cameIn', { amount: money(cycle.income) })}</span>
         </div>
       </section>
 
       <section className="saldo">
         <div className="tiny">{t('home.inAccount')}</div>
-        <div className="saldo-amount">{euros(snap.inAccount, locale)}</div>
+        <div className="saldo-amount">{money(snap.inAccount)}</div>
         <p className="muted" style={{ fontSize: 13 }}>
           {t('home.inAccountHint')}
         </p>
@@ -198,7 +198,7 @@ export function Home({
           <div className="saldo-next">
             <div className="row">
               <span>{t('home.whenBillsLeave')}</span>
-              <b>{euros(snap.afterFixed, locale)}</b>
+              <b>{money(snap.afterFixed)}</b>
             </div>
             <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
               {t('home.billsLeft', { names: unpaidNames })}
@@ -211,7 +211,7 @@ export function Home({
         )}
         {snap.floor > 0 && snap.unpaidTotal > 0 && (
           <p className="muted" style={{ fontSize: 13 }}>
-            {t('home.floor', { amount: euros(snap.floor, locale) })}
+            {t('home.floor', { amount: money(snap.floor) })}
           </p>
         )}
       </section>
@@ -226,16 +226,38 @@ export function Home({
               {g.hint}
             </p>
             <div className="stack">
-              {g.items.map((v) => (
-                <EnvelopeCard
-                  key={v.env.id}
-                  view={v}
-                  group={g.id}
-                  onOpen={() => onEnvelope(v.env.id)}
-                  onPay={() => markPaid(v.env.id, v.remaining)}
-                  onSpend={() => onOpen({ name: 'add', envelopeId: v.env.id })}
-                />
-              ))}
+              {g.items.map((v) => {
+                const kids = views.filter((c) => c.env.parentId === v.env.id)
+                const kidCash = kids.reduce((s, c) => s + Math.max(0, c.remaining), 0)
+                return (
+                  <div key={v.env.id} className="stack" style={{ gap: 8 }}>
+                    <EnvelopeCard
+                      view={v}
+                      group={g.id}
+                      onOpen={() => onEnvelope(v.env.id)}
+                      onPay={() => markPaid(v.env.id, v.remaining)}
+                      onSpend={() => onOpen({ name: 'add', envelopeId: v.env.id })}
+                    />
+                    {kids.length > 0 && (
+                      <div className="stack" style={{ gap: 8, marginLeft: 18 }}>
+                        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                          {t('fund.group', { amount: money(kidCash) })}
+                        </p>
+                        {kids.map((c) => (
+                          <EnvelopeCard
+                            key={c.env.id}
+                            view={c}
+                            group={g.id}
+                            onOpen={() => onEnvelope(c.env.id)}
+                            onPay={() => markPaid(c.env.id, c.remaining)}
+                            onSpend={() => onOpen({ name: 'add', envelopeId: c.env.id })}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </section>
         ),
@@ -308,6 +330,7 @@ function EnvelopeCard({
   onSpend: () => void
 }) {
   const t = useT()
+  const money = useMoney()
   const locale = useLocale()
   const app = useAppState()
   const ownPace = group === 'daily' ? guideForEnvelope(app, view.env.id) : null
@@ -323,25 +346,25 @@ function EnvelopeCard({
         <div className="name">{env.name}</div>
         <div className="meta">
           {group === 'daily'
-            ? t('home.ownPace', { hoy: euros(ownPace?.hoy ?? 0, locale) })
+            ? t('home.ownPace', { hoy: money(ownPace?.hoy ?? 0) })
             : env.kind === 'savings'
-              ? t('home.savingsUsed', { amount: euros(view.used, locale) })
+              ? t('home.savingsUsed', { amount: money(view.used) })
               : env.kind === 'fund'
-                ? t('home.fundSpent', { amount: euros(view.spent, locale) })
+                ? t('home.fundSpent', { amount: money(view.spent) })
                 : week
                   ? t('home.weekLine', {
-                      spent: euros(week.spent, locale),
-                      target: euros(week.target, locale),
-                      monthSpent: euros(view.spent, locale),
-                      total: euros(total, locale),
+                      spent: money(week.spent),
+                      target: money(week.target),
+                      monthSpent: money(view.spent),
+                      total: money(total),
                     })
                   : kindLabel(env.kind, locale)}
           {env.kind !== 'fund' && !week && total > 0 ? t('home.usedPct', { pct }) : ''}
-          {env.opening > 0 ? t('home.brought', { amount: euros(env.opening, locale) }) : ''}
+          {env.opening > 0 ? t('home.brought', { amount: money(env.opening) }) : ''}
         </div>
       </div>
       <div className="right">
-        <div className="remain">{euros(remaining, locale)}</div>
+        <div className="remain">{money(remaining)}</div>
         <span className={`pill ${light}`}>{pillLabel(view, t)}</span>
       </div>
       <div className={`bar ${light}`}>

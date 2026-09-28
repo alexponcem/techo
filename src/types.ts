@@ -17,6 +17,8 @@ export interface Envelope {
   /** Si se marcó a mitad de ciclo: desde este día, y con este importe, entra al diario. */
   splitJoinedOn?: string
   splitJoinedAmount?: number
+  /** Carpeta dentro de un fondo. Ej.: un viaje dentro de Viajes. */
+  parentId?: string
   /** Día de inicio de la semana de este techo semanal. 0 = domingo … 6 = sábado. */
   weekStartsOn?: number
 }
@@ -49,6 +51,7 @@ export interface Tx {
 }
 
 export type Locale = 'es' | 'en'
+export type Currency = 'EUR' | 'USD'
 
 export interface Settings {
   payMode: PayMode
@@ -60,6 +63,8 @@ export interface Settings {
   seenHomeTour?: boolean
   /** Idioma de la interfaz. Los nombres de sobres que crea la persona no se traducen. */
   locale?: Locale
+  /** Divisa en la que se muestran los importes. */
+  currency?: Currency
 }
 
 export interface AppState {

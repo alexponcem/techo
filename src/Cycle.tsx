@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { suggestedNextPay, todayISO } from './dates'
 import { activeCycle, viewsFor } from './logic'
-import { euros, parseEuros } from './money'
+import { parseEuros } from './money'
 import { startNextCycle, useAppState } from './store'
-import { useLocale, useT } from './useT'
+import { useMoney, useT } from './useT'
 
 export function CycleScreen({ onBack }: { onBack: () => void }) {
   const state = useAppState()
   const t = useT()
-  const locale = useLocale()
+  const money = useMoney()
   const cycle = activeCycle(state)
   const views = viewsFor(state)
   const [income, setIncome] = useState(cycle ? String(cycle.income / 100) : '')
@@ -68,23 +68,23 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
             <span>
               {v.env.emoji} {v.env.name}
             </span>
-            <span>{euros(v.remaining, locale)}</span>
+            <span>{money(v.remaining)}</span>
           </div>
         ))}
       </div>
       <div className="hint">
-        {t('cycle.savNow', { amount: euros(savingsNow, locale) })}
-        {t('cycle.left', { amount: euros(leftover, locale) })}
+        {t('cycle.savNow', { amount: money(savingsNow) })}
+        {t('cycle.left', { amount: money(leftover) })}
         {funds.some((f) => f.remaining > 0)
           ? ` Fondos se quedan como están: ${funds
               .filter((f) => f.remaining > 0)
-              .map((f) => `${f.env.name} ${euros(f.remaining, locale)}`)
+              .map((f) => `${f.env.name} ${money(f.remaining)}`)
               .join(', ')}.`
           : ''}
         <br />
         <b>
-          {t('cycle.bring', { carried: euros(carried, locale) })}
-          {cents > 0 ? t('cycle.plusPay', { pay: euros(cents, locale), pot: euros(pot, locale) }) : ''}.
+          {t('cycle.bring', { carried: money(carried) })}
+          {cents > 0 ? t('cycle.plusPay', { pay: money(cents), pot: money(pot) }) : ''}.
         </b>{' '}
         De ese total se asigna el mes nuevo. El ahorro no se reinicia.
       </div>

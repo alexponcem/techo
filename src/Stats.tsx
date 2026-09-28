@@ -1,8 +1,7 @@
 import { formatRange } from './dates'
 import { reportFor, type CycleReport } from './logic'
-import { euros } from './money'
 import { useAppState } from './store'
-import { useT } from './useT'
+import { useMoney, useT } from './useT'
 
 const COLORS = ['#2c5a43', '#4a7a5e', '#6b8aa8', '#c65a12', '#8d6110', '#b4452c', '#7a6b8a']
 
@@ -41,6 +40,7 @@ export function StatsScreen() {
 }
 
 function LiveReport({ report }: { report: CycleReport }) {
+  const money = useMoney()
   const sign = report.savedNet >= 0 ? '+' : ''
   const heroClass =
     report.verdict === 'good'
@@ -73,11 +73,11 @@ function LiveReport({ report }: { report: CycleReport }) {
         <div className="label">{report.title}</div>
         <div className="amount">
           {sign}
-          {euros(report.savedNet)}
+          {money(report.savedNet)}
         </div>
         <div className="sub">
           {report.savingsGoal > 0
-            ? `ahorro neto · meta ${euros(report.savingsGoal)} · ${report.goalPct}%`
+            ? `ahorro neto · meta ${money(report.savingsGoal)} · ${report.goalPct}%`
             : 'ahorro neto de este ciclo'}
         </div>
         <p className="stats-hero-copy">{report.detail}</p>
@@ -98,8 +98,8 @@ function LiveReport({ report }: { report: CycleReport }) {
         )}
         {report.savingsUsed > 0 && (
           <p className="muted" style={{ fontSize: 13 }}>
-            De esa suma hay que restar {euros(report.savingsUsed)} que salieron del
-            colchón → neto {euros(report.savedNet)}.
+            De esa suma hay que restar {money(report.savingsUsed)} que salieron del
+            colchón → neto {money(report.savedNet)}.
           </p>
         )}
       </section>
@@ -116,8 +116,8 @@ function LiveReport({ report }: { report: CycleReport }) {
         ) : (
           <>
             <p>
-              Gastaste <b>{euros(report.variableSpent)}</b> de{' '}
-              <b>{euros(report.variableCap)}</b> en lo que sí cambia.
+              Gastaste <b>{money(report.variableSpent)}</b> de{' '}
+              <b>{money(report.variableCap)}</b> en lo que sí cambia.
             </p>
             <Pie slices={variableSlices} />
           </>
@@ -138,7 +138,7 @@ function LiveReport({ report }: { report: CycleReport }) {
         ) : (
           <>
             <p>
-              Salieron <b>{euros(report.savingsUsed)}</b> del colchón.
+              Salieron <b>{money(report.savingsUsed)}</b> del colchón.
             </p>
             <Pie slices={report.savingsParts} />
           </>
@@ -149,6 +149,7 @@ function LiveReport({ report }: { report: CycleReport }) {
 }
 
 function PastRow({ report }: { report: CycleReport }) {
+  const money = useMoney()
   return (
     <div className="card stack" style={{ gap: 8 }}>
       <div className="row">
@@ -157,11 +158,11 @@ function PastRow({ report }: { report: CycleReport }) {
       </div>
       <div className="row">
         <span className="muted">Ahorro neto</span>
-        <b>{euros(report.savedNet)}</b>
+        <b>{money(report.savedNet)}</b>
       </div>
       {report.savingsUsed > 0 && (
         <div className="muted" style={{ fontSize: 13 }}>
-          Del ahorro: {report.savingsParts.map((p) => `${p.emoji} ${euros(p.amount)}`).join(' · ')}
+          Del ahorro: {report.savingsParts.map((p) => `${p.emoji} ${money(p.amount)}`).join(' · ')}
         </div>
       )}
     </div>
@@ -176,6 +177,7 @@ function tonePill(v: CycleReport['verdict']): string {
 }
 
 function Pie({ slices }: { slices: Slice[] }) {
+  const money = useMoney()
   const total = slices.reduce((s, x) => s + x.amount, 0)
   if (total <= 0) return <p className="muted">Nada que graficar aún.</p>
   let deg = 0
@@ -204,7 +206,7 @@ function Pie({ slices }: { slices: Slice[] }) {
               {s.emoji} {s.name}
             </span>
             <b>
-              {euros(s.amount)} · {s.pct}%
+              {money(s.amount)} · {s.pct}%
             </b>
           </li>
         ))}

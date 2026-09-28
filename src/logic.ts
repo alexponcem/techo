@@ -175,6 +175,7 @@ export function saveReview(
     return { status: 'ok', title: t(locale, 'logic.logged'), body: t(locale, 'logic.loggedOk') }
   }
   const locale = loc(state)
+  const currency = state.settings.currency ?? 'EUR'
   const txs = cycleTxs(state, cycle.id)
   const when = formatDay(day, locale)
   if (rhythmOf(env) === 'weekly') {
@@ -192,8 +193,8 @@ export function saveReview(
       title: ok ? t(locale, 'logic.loggedDay', { when }) : t(locale, 'logic.weekOverTitle'),
       body: t(locale, 'logic.weekBody', {
         label: w.label,
-        spent: fmt(w.spent, locale),
-        target: fmt(w.target, locale),
+        spent: fmt(w.spent, locale, currency),
+        target: fmt(w.target, locale, currency),
         name: env.name,
       }),
     }
@@ -205,11 +206,11 @@ export function saveReview(
     status: over ? 'tight' : 'ok',
     title: t(locale, 'logic.loggedDay', { when }),
     body: over
-      ? t(locale, 'logic.dayOver', { cap: fmt(p.fairDaily, locale), spent: fmt(thatDay, locale) })
+      ? t(locale, 'logic.dayOver', { cap: fmt(p.fairDaily, locale, currency), spent: fmt(thatDay, locale, currency) })
       : t(locale, 'logic.dayOk', {
           name: env.name,
-          spent: fmt(thatDay, locale),
-          cap: fmt(p.fairDaily, locale),
+          spent: fmt(thatDay, locale, currency),
+          cap: fmt(p.fairDaily, locale, currency),
         }),
   }
 }
@@ -1044,7 +1045,12 @@ export interface Verdict {
   message: string
 }
 
-export function verdictFor(view: EnvelopeView | undefined, amount: number, locale: Locale = 'es'): Verdict {
+export function verdictFor(
+  view: EnvelopeView | undefined,
+  amount: number,
+  locale: Locale = 'es',
+  currency: import('./types').Currency = 'EUR',
+): Verdict {
   if (!view) {
     return { status: 'empty', remainingAfter: 0, message: t(locale, 'logic.pickEnv') }
   }
@@ -1058,7 +1064,7 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number, local
       return {
         status: 'over',
         remainingAfter,
-        message: t(locale, 'logic.weekMonthOver', { name: view.env.name, over: fmt(-remainingAfter, locale) }),
+        message: t(locale, 'logic.weekMonthOver', { name: view.env.name, over: fmt(-remainingAfter, locale, currency) }),
       }
     }
     if (weekAfter > view.week.target) {
@@ -1066,9 +1072,9 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number, local
         status: 'tight',
         remainingAfter,
         message: t(locale, 'logic.weekTight', {
-          left: fmt(remainingAfter, locale),
-          target: fmt(view.week.target, locale),
-          after: fmt(weekAfter, locale),
+          left: fmt(remainingAfter, locale, currency),
+          target: fmt(view.week.target, locale, currency),
+          after: fmt(weekAfter, locale, currency),
         }),
       }
     }
@@ -1076,9 +1082,9 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number, local
       status: 'ok',
       remainingAfter,
       message: t(locale, 'logic.weekOk', {
-        target: fmt(view.week.target, locale),
-        after: fmt(weekAfter, locale),
-        left: fmt(remainingAfter, locale),
+        target: fmt(view.week.target, locale, currency),
+        after: fmt(weekAfter, locale, currency),
+        left: fmt(remainingAfter, locale, currency),
       }),
     }
   }
@@ -1087,20 +1093,20 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number, local
       return {
         status: 'over',
         remainingAfter,
-        message: t(locale, 'logic.savOver', { left: fmt(remainingAfter, locale) }),
+        message: t(locale, 'logic.savOver', { left: fmt(remainingAfter, locale, currency) }),
       }
     }
     return {
       status: 'tight',
       remainingAfter,
-      message: t(locale, 'logic.savTight', { left: fmt(remainingAfter, locale) }),
+      message: t(locale, 'logic.savTight', { left: fmt(remainingAfter, locale, currency) }),
     }
   }
   if (remainingAfter < 0) {
     return {
       status: 'over',
       remainingAfter,
-      message: t(locale, 'logic.noFit', { name: view.env.name, over: fmt(-remainingAfter, locale) }),
+      message: t(locale, 'logic.noFit', { name: view.env.name, over: fmt(-remainingAfter, locale, currency) }),
     }
   }
   if (view.env.kind === 'fund') {
@@ -1108,7 +1114,7 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number, local
       return {
         status: 'ok',
         remainingAfter,
-        message: t(locale, 'logic.goalOk', { name: view.env.name, left: fmt(remainingAfter, locale) }),
+        message: t(locale, 'logic.goalOk', { name: view.env.name, left: fmt(remainingAfter, locale, currency) }),
       }
     }
     return {
@@ -1121,18 +1127,18 @@ export function verdictFor(view: EnvelopeView | undefined, amount: number, local
     return {
       status: 'tight',
       remainingAfter,
-      message: t(locale, 'logic.tightFit', { name: view.env.name, left: fmt(remainingAfter, locale) }),
+      message: t(locale, 'logic.tightFit', { name: view.env.name, left: fmt(remainingAfter, locale, currency) }),
     }
   }
   return {
     status: 'ok',
     remainingAfter,
-    message: t(locale, 'logic.fits', { name: view.env.name, left: fmt(remainingAfter, locale) }),
+    message: t(locale, 'logic.fits', { name: view.env.name, left: fmt(remainingAfter, locale, currency) }),
   }
 }
 
-function fmt(cents: number, locale: Locale = 'es'): string {
-  return euros(cents, locale)
+function fmt(cents: number, locale: Locale = 'es', currency: import('./types').Currency = 'EUR'): string {
+  return euros(cents, locale, currency)
 }
 
 export function carryKinds(kind: EnvelopeKind): boolean {

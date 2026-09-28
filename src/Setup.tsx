@@ -4,16 +4,17 @@ import { weekdayName } from './i18n'
 import { WeekStartSelect } from './WeekStartSelect'
 import { kindExplain, tutorialFor } from './guide'
 import { assigned, takesFromPay, withBalancedBuffer } from './logic'
-import { euros, parseEuros } from './money'
+import { parseEuros } from './money'
 import { importJson, startFirstCycle } from './store'
 import { kindLabel, blankPlan } from './template'
-import { useLocale, useT } from './useT'
+import { useLocale, useMoney, useT } from './useT'
 import type { Envelope, EnvelopeKind, PayMode, Rhythm } from './types'
 
 type Step = 'welcome' | 'tutorial' | 'income' | 'envelopes' | 'review'
 
 export function Setup() {
   const t = useT()
+  const money = useMoney()
   const locale = useLocale()
   const pages = tutorialFor(locale)
   const explain = kindExplain(locale)
@@ -74,7 +75,7 @@ export function Setup() {
       return
     }
     if (deficit > 0) {
-      setError(t('setup.overPlan', { amount: euros(deficit, locale) }))
+      setError(t('setup.overPlan', { amount: money(deficit) }))
       return
     }
     try {
@@ -445,7 +446,7 @@ export function Setup() {
               <strong>
                 {buffer.emoji} {buffer.name}
               </strong>
-              <span>{euros(buffer.planned, locale)}</span>
+              <span>{money(buffer.planned)}</span>
             </div>
             <p className="muted" style={{ fontSize: 13 }}>
               {t('setup.freeCard', {
@@ -480,12 +481,12 @@ export function Setup() {
       <div className="math">
         <div className="math-row">
           <span>{t('setup.incomeRow')}</span>
-          <span>{euros(income, locale)}</span>
+          <span>{money(income)}</span>
         </div>
         {savingsOpening > 0 ? (
           <div className="math-row">
             <span>{t('setup.savedRow')}</span>
-            <span>{euros(savingsOpening, locale)}</span>
+            <span>{money(savingsOpening)}</span>
           </div>
         ) : null}
         {balanced.map((e) => (
@@ -493,19 +494,19 @@ export function Setup() {
             <span>
               {e.emoji} {e.name}
             </span>
-            <span>{euros(e.planned, locale)}</span>
+            <span>{money(e.planned)}</span>
           </div>
         ))}
       </div>
       {deficit > 0 ? (
         <div className="deficit">
-          {t('setup.deficit', { amount: euros(deficit, locale) })}
+          {t('setup.deficit', { amount: money(deficit) })}
         </div>
       ) : (
         <div className="hint">
           {buffer && buffer.planned > 0
             ? t('setup.freeHint', {
-                amount: euros(buffer.planned, locale),
+                amount: money(buffer.planned),
                 extra: balanced.some((e) => e.kind === 'cap' && e.splitDaily)
                   ? t('setup.freeHintExtra')
                   : '',

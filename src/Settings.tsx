@@ -1,10 +1,9 @@
 import { useRef, useState } from 'react'
 import { clampWeekStart } from './dates'
 import { weekdayName } from './i18n'
-import { euros } from './money'
 import { HowItWorks } from './Setup'
 import { exportJson, importJson, resetAll, undoLast, updateSettings, useAppState } from './store'
-import { useLocale, useT } from './useT'
+import { useLocale, useMoney, useT } from './useT'
 import type { Locale } from './types'
 
 export function SettingsScreen({
@@ -16,6 +15,7 @@ export function SettingsScreen({
 }) {
   const state = useAppState()
   const t = useT()
+  const money = useMoney()
   const locale = useLocale()
   const cycle = [...state.cycles].reverse().find((c) => !c.closedAt)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -67,7 +67,7 @@ export function SettingsScreen({
         </p>
         {cycle && (
           <p>
-            <b>{t('settings.thisCycle')}</b> {euros(cycle.income, locale)}
+            <b>{t('settings.thisCycle')}</b> {money(cycle.income)}
           </p>
         )}
         <p className="muted">
@@ -83,6 +83,21 @@ export function SettingsScreen({
           >
             <option value="es">{t('lang.es')}</option>
             <option value="en">{t('lang.en')}</option>
+          </select>
+        </label>
+        <label className="field">
+          {t('settings.currency')}
+          <select
+            value={state.settings.currency ?? 'EUR'}
+            onChange={(e) =>
+              updateSettings({
+                ...state.settings,
+                currency: e.target.value === 'USD' ? 'USD' : 'EUR',
+              })
+            }
+          >
+            <option value="EUR">{t('currency.eur')}</option>
+            <option value="USD">{t('currency.usd')}</option>
           </select>
         </label>
         <label className="field">

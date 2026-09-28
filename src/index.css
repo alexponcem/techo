@@ -772,6 +772,10 @@ select:focus {
   cursor: pointer;
 }
 
+.choice.on {
+  outline: 2px solid var(--ink);
+}
+
 .choice b {
   display: block;
   font-size: 17px;

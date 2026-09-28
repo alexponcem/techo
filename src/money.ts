@@ -1,10 +1,10 @@
 import { intlTag } from './i18n'
-import type { Locale } from './types'
+import type { Currency, Locale } from './types'
 
-export function euros(cents: number, locale: Locale = 'es'): string {
+export function euros(cents: number, locale: Locale = 'es', currency: Currency = 'EUR'): string {
   return new Intl.NumberFormat(intlTag(locale), {
     style: 'currency',
-    currency: 'EUR',
+    currency,
   }).format(cents / 100)
 }
 
@@ -16,7 +16,7 @@ export function eurosPlain(cents: number, locale: Locale = 'es'): string {
 }
 
 export function parseEuros(raw: string): number | null {
-  const n = raw.trim().replace(/\s/g, '').replace('€', '').replace(',', '.')
+  const n = raw.trim().replace(/\s/g, '').replace('€', '').replace('$', '').replace(',', '.')
   if (!n) return null
   const v = Number(n)
   if (!Number.isFinite(v)) return null

@@ -20,9 +20,9 @@ import {
   viewsFor,
   type EnvelopeView,
 } from './logic'
-import { euros, parseEuros } from './money'
+import { parseEuros } from './money'
 import { kindLabel } from './template'
-import { useLocale, useT } from './useT'
+import { useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
 import {
   addEnvelope,
@@ -47,6 +47,7 @@ export function AddSheet({
 }) {
   const state = useAppState()
   const t = useT()
+  const money = useMoney()
   const locale = useLocale()
   const views = viewsFor(state)
   const [amount, setAmount] = useState('')
@@ -236,8 +237,8 @@ export function AddSheet({
       {confirm && !plan && paceOver && guide && (
         <div className="hint">
           <p>
-            Pasas el ritmo de hoy ({euros(guide.hoy, locale)}). El sobre todavía tiene{' '}
-            {euros(Math.max(0, view?.remaining ?? 0), locale)}, así que se anota ahí. Lo que quede
+            Pasas el ritmo de hoy ({money(guide.hoy)}). El sobre todavía tiene{' '}
+            {money(Math.max(0, view?.remaining ?? 0))}, así que se anota ahí. Lo que quede
             se reparte en los días que faltan.
           </p>
           <div className="actions" style={{ marginBottom: 0 }}>
@@ -254,31 +255,31 @@ export function AddSheet({
         <div className={plan.possible ? 'hint' : 'deficit'}>
           {plan.weekExhausted ? (
             <p>
-              Esta semana de diario ya no da más. El extra (<b>{euros(plan.fromSavings)}</b>)
+              Esta semana de diario ya no da más. El extra (<b>{money(plan.fromSavings)}</b>)
               saldría del <b>ahorro</b>, no de la semana que viene. Duele más a propósito: así se
               controla. ¿Vale la pena?
             </p>
           ) : plan.goalFromSavings ? (
             <p>
               {view?.env.name}: no hay dinero apartado en este fondo. Se descontarán{' '}
-              <b>{euros(plan.fromSavings)}</b> del ahorro. ¿De acuerdo?
+              <b>{money(plan.fromSavings)}</b> del ahorro. ¿De acuerdo?
             </p>
           ) : (
             <>
               {view ? (
                 <p>
-                  En {view.env.name} caben {euros(Math.max(0, view.remaining))}. Este gasto se pasa
-                  por {euros(plan.overflow)}.
+                  En {view.env.name} caben {money(Math.max(0, view.remaining))}. Este gasto se pasa
+                  por {money(plan.overflow)}.
                 </p>
               ) : null}
               {plan.fromLibre > 0 && (
                 <p style={{ marginTop: 8 }}>
-                  Se descontarán <b>{euros(plan.fromLibre)}</b> de Libre. ¿De acuerdo?
+                  Se descontarán <b>{money(plan.fromLibre)}</b> de Libre. ¿De acuerdo?
                 </p>
               )}
               {plan.fromSavings > 0 && (
                 <p style={{ marginTop: 8 }}>
-                  Libre no alcanza. El resto (<b>{euros(plan.fromSavings)}</b>) saldría del ahorro
+                  Libre no alcanza. El resto (<b>{money(plan.fromSavings)}</b>) saldría del ahorro
                   bloqueado. Segunda advertencia: hay que poner un motivo.
                 </p>
               )}
@@ -420,6 +421,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
 
 export function MoveSheet({ onClose }: { onClose: () => void }) {
   const t = useT()
+  const money = useMoney()
   const state = useAppState()
   const views = viewsFor(state)
   const [from, setFrom] = useState(views.find((v) => v.env.kind === 'buffer')?.env.id ?? '')
@@ -470,7 +472,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
           className="btn ghost full"
           onClick={() => setAmount((fromView.remaining / 100).toString())}
         >
-          Mover todo lo que queda ({euros(fromView.remaining)})
+          Mover todo lo que queda ({money(fromView.remaining)})
         </button>
       )}
       <button
@@ -654,6 +656,7 @@ function SelectEnv({
 }) {
   const locale = useLocale()
   const t = useT()
+  const money = useMoney()
   const ordered = useMemo(
     () => views.slice().sort((a, b) => kindOrder(a.env.kind) - kindOrder(b.env.kind)),
     [views],
@@ -665,7 +668,7 @@ function SelectEnv({
         <option value="">{t('sheet.pick')}</option>
         {ordered.map((v) => (
           <option key={v.env.id} value={v.env.id}>
-            {v.env.emoji} {v.env.name} · {euros(v.remaining, locale)} · {kindLabel(v.env.kind, locale)}
+            {v.env.emoji} {v.env.name} · {money(v.remaining)} · {kindLabel(v.env.kind, locale)}
           </option>
         ))}
       </select>

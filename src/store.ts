@@ -91,6 +91,7 @@ function load(): AppState {
         dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
         seenHomeTour: parsed.settings?.seenHomeTour ?? true,
         locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
+        currency: parsed.settings?.currency === 'USD' ? ('USD' as const) : ('EUR' as const),
       },
       envelopes: withMissingEnvelopes(parsed.envelopes, income),
       template: withMissingEnvelopes(parsed.template, income),
@@ -379,6 +380,30 @@ export function setEnvelopeWeekStart(id: string, weekStartsOn: number) {
   })
 }
 
+export function addSubfund(parentId: string, name: string, emoji = '📁'): { ok: true } | { ok: false; error: string } {
+  const locale = localeOf(state)
+  const parent = state.envelopes.find((e) => e.id === parentId && e.kind === 'fund' && !e.parentId)
+  const trimmed = name.trim()
+  if (!parent) return { ok: false, error: t(locale, 'store.noCycle') }
+  if (!trimmed) return { ok: false, error: t(locale, 'store.needName') }
+  const row = ensureRhythm({
+    id: uid(),
+    name: trimmed,
+    kind: 'fund',
+    planned: 0,
+    emoji,
+    opening: 0,
+    rhythm: 'none',
+    parentId,
+  })
+  emit({
+    ...state,
+    envelopes: [...state.envelopes, row],
+    template: [...state.template, { ...row, opening: 0 }],
+  })
+  return { ok: true }
+}
+
 export function renameEnvelope(id: string, name: string) {
   emit({
     ...state,
@@ -532,6 +557,7 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
           dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
           seenHomeTour: parsed.settings?.seenHomeTour ?? true,
           locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
+        currency: parsed.settings?.currency === 'USD' ? ('USD' as const) : ('EUR' as const),
         },
         template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
         envelopes: withMissingEnvelopes(parsed.envelopes, income),
