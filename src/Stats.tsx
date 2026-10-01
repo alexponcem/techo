@@ -40,6 +40,7 @@ export function StatsScreen() {
 }
 
 function LiveReport({ report }: { report: CycleReport }) {
+  const t = useT()
   const money = useMoney()
   const sign = report.savedNet >= 0 ? '+' : ''
   const heroClass =
@@ -59,7 +60,7 @@ function LiveReport({ report }: { report: CycleReport }) {
       ? [
           {
             id: 'sin-gastar',
-            name: 'Aún sin gastar',
+            name: t('stats.unspent'),
             emoji: '🫧',
             amount: report.variableCap - report.variableSpent,
           },
@@ -77,69 +78,45 @@ function LiveReport({ report }: { report: CycleReport }) {
         </div>
         <div className="sub">
           {report.savingsGoal > 0
-            ? `ahorro neto · meta ${money(report.savingsGoal)} · ${report.goalPct}%`
-            : 'ahorro neto de este ciclo'}
+            ? `${t('stats.netSav')} · ${money(report.savingsGoal)} · ${report.goalPct}%`
+            : t('stats.netSav')}
         </div>
         <p className="stats-hero-copy">{report.detail}</p>
       </section>
 
       <section className="card stack">
-        <div>
-          <strong>Qué forma este ahorro</strong>
-          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Lo que apartaste más lo que no gastaste en variables. Las cuotas no
-            entran: son las mismas cada mes.
-          </p>
-        </div>
+        <strong>{t('stats.savedShape')}</strong>
         {report.contributions.some((c) => c.amount > 0) ? (
           <Pie slices={report.contributions.filter((c) => c.amount > 0)} />
         ) : (
-          <p className="muted">Aún no hay ahorro que mostrar en este ciclo.</p>
+          <p className="muted">{t('stats.noSav')}</p>
         )}
         {report.savingsUsed > 0 && (
           <p className="muted" style={{ fontSize: 13 }}>
-            De esa suma hay que restar {money(report.savingsUsed)} que salieron del
-            colchón → neto {money(report.savedNet)}.
+            {t('stats.usedSav', { used: money(report.savingsUsed), net: money(report.savedNet) })}
           </p>
         )}
       </section>
 
       <section className="card stack">
-        <div>
-          <strong>Variables: en qué se fue el techo</strong>
-          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Techos y Libre de este ciclo. Si no gastaste nada, no hay gráfico.
-          </p>
-        </div>
+        <strong>{t('stats.variable')}</strong>
         {report.variableSpent <= 0 ? (
-          <p className="muted">Todavía no hay gastos variables.</p>
+          <p className="muted">{t('stats.noVar')}</p>
         ) : (
           <>
-            <p>
-              Gastaste <b>{money(report.variableSpent)}</b> de{' '}
-              <b>{money(report.variableCap)}</b> en lo que sí cambia.
-            </p>
+            <p>{t('stats.spentOf', { spent: money(report.variableSpent), cap: money(report.variableCap) })}</p>
             <Pie slices={variableSlices} />
           </>
         )}
       </section>
 
       <section className="card stack">
-        <div>
-          <strong>Si tocaste el ahorro</strong>
-          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Aquí ves cuánto salió del ahorro y a qué fondo o gasto se fue.
-          </p>
-        </div>
+        <strong>{t('stats.touched')}</strong>
         {report.savingsUsed <= 0 ? (
-          <div className="hint" style={{ margin: 0 }}>
-            Este ciclo no tocaste el ahorro. El colchón sigue quieto.
-          </div>
+          <p className="muted">{t('stats.untouched')}</p>
         ) : (
           <>
-            <p>
-              Salieron <b>{money(report.savingsUsed)}</b> del colchón.
-            </p>
+            <p>{t('stats.leftSav', { amount: money(report.savingsUsed) })}</p>
             <Pie slices={report.savingsParts} />
           </>
         )}
@@ -149,6 +126,7 @@ function LiveReport({ report }: { report: CycleReport }) {
 }
 
 function PastRow({ report }: { report: CycleReport }) {
+  const t = useT()
   const money = useMoney()
   return (
     <div className="card stack" style={{ gap: 8 }}>
@@ -157,12 +135,14 @@ function PastRow({ report }: { report: CycleReport }) {
         <span className={`pill ${tonePill(report.verdict)}`}>{report.title}</span>
       </div>
       <div className="row">
-        <span className="muted">Ahorro neto</span>
+        <span className="muted">{t('stats.netSav')}</span>
         <b>{money(report.savedNet)}</b>
       </div>
       {report.savingsUsed > 0 && (
         <div className="muted" style={{ fontSize: 13 }}>
-          Del ahorro: {report.savingsParts.map((p) => `${p.emoji} ${money(p.amount)}`).join(' · ')}
+          {t('stats.fromSav', {
+            list: report.savingsParts.map((p) => `${p.emoji} ${money(p.amount)}`).join(' · '),
+          })}
         </div>
       )}
     </div>
@@ -177,9 +157,10 @@ function tonePill(v: CycleReport['verdict']): string {
 }
 
 function Pie({ slices }: { slices: Slice[] }) {
+  const t = useT()
   const money = useMoney()
   const total = slices.reduce((s, x) => s + x.amount, 0)
-  if (total <= 0) return <p className="muted">Nada que graficar aún.</p>
+  if (total <= 0) return <p className="muted">{t('stats.noChart')}</p>
   let deg = 0
   const parts: string[] = []
   const colored = slices.map((s, i) => {

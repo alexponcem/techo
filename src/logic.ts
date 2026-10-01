@@ -179,41 +179,44 @@ export function saveReview(
   const currency = state.settings.currency ?? 'EUR'
   const txs = cycleTxs(state, cycle.id)
   const when = formatDay(day, locale)
-  if (rhythmOf(env) === 'weekly') {
-    const w = weekSlice(env, txs, cycle, day, remainingOf(env, txs), weekStartOfEnv(env, state), locale)
-    if (!w) {
+  const plain = {
+    status: 'ok' as const,
+    title: t(locale, 'logic.logged'),
+    body: t(locale, 'logic.loggedIn', { name: env.name, when }),
+  }
+  // El ritmo diario es de Libre y de los techos marcados. Un fondo, una cuota o el ahorro no lo usan.
+  if (inDailySplit(env)) {
+    const guide = guideForEnvelope(state, envelopeId, day)
+    const thatDay = spentOnDay(txs, [envelopeId], day)
+    if (guide && guide.guideDaily > 0 && thatDay > guide.guideDaily) {
       return {
-        status: 'ok',
+        status: 'tight',
         title: t(locale, 'logic.logged'),
-        body: t(locale, 'logic.loggedIn', { name: env.name, when }),
+        body: t(locale, 'logic.dayOver', {
+          name: env.name,
+          cap: fmt(guide.guideDaily, locale, currency),
+          spent: fmt(thatDay, locale, currency),
+        }),
       }
     }
-    const ok = w.spent <= w.target
-    return {
-      status: ok ? (w.spent >= w.target * 0.85 ? 'tight' : 'ok') : 'over',
-      title: ok ? t(locale, 'logic.loggedDay', { when }) : t(locale, 'logic.weekOverTitle'),
-      body: t(locale, 'logic.weekBody', {
-        label: w.label,
-        spent: fmt(w.spent, locale, currency),
-        target: fmt(w.target, locale, currency),
-        name: env.name,
-      }),
+    return plain
+  }
+  if (env.kind === 'cap' && rhythmOf(env) === 'weekly') {
+    const w = weekSlice(env, txs, cycle, day, remainingOf(env, txs), weekStartOfEnv(env, state), locale)
+    if (w && w.target > 0 && w.spent > w.target) {
+      return {
+        status: 'tight',
+        title: t(locale, 'logic.logged'),
+        body: t(locale, 'logic.weekBody', {
+          label: w.label,
+          spent: fmt(w.spent, locale, currency),
+          target: fmt(w.target, locale, currency),
+          name: env.name,
+        }),
+      }
     }
   }
-  const p = paceFor(state, day)
-  const thatDay = spentOnDay(txs, [envelopeId], day)
-  const over = p.fairDaily > 0 && thatDay > p.fairDaily
-  return {
-    status: over ? 'tight' : 'ok',
-    title: t(locale, 'logic.loggedDay', { when }),
-    body: over
-      ? t(locale, 'logic.dayOver', { cap: fmt(p.fairDaily, locale, currency), spent: fmt(thatDay, locale, currency) })
-      : t(locale, 'logic.dayOk', {
-          name: env.name,
-          spent: fmt(thatDay, locale, currency),
-          cap: fmt(p.fairDaily, locale, currency),
-        }),
-  }
+  return plain
 }
 
 export function envelopeCash(env: Envelope, txs: Tx[]): number {
@@ -463,10 +466,8 @@ function usageStatus(
   const fromPct = band(pct)
   if (fromPct.alert) return fromPct
 
-  if (week && week.target > 0 && week.pace !== 'ok') {
-    if (week.pace === 'over') return { light: 'orange', alert: 'near' }
-    return { light: 'yellow', alert: 'half' }
-  }
+  if (week && week.target > 0 && week.pace === 'over') return { light: 'orange', alert: null }
+  if (week && week.target > 0 && week.pace === 'fast') return { light: 'yellow', alert: null }
   return { light: 'green', alert: null }
 }
 
@@ -475,7 +476,6 @@ function band(pct: number): { light: Light; alert: UsageAlert } {
   if (pct >= 100) return { light: 'red', alert: 'limit' }
   if (pct >= 90) return { light: 'red', alert: 'almost' }
   if (pct >= 80) return { light: 'orange', alert: 'near' }
-  if (pct >= 50) return { light: 'yellow', alert: 'half' }
   return { light: 'green', alert: null }
 }
 
@@ -1109,6 +1109,20 @@ export function verdictFor(
     return { status: 'empty', remainingAfter: view.remaining, message: t(locale, 'logic.needAmt') }
   }
   const remainingAfter = view.remaining - amount
+  if (view.env.kind === 'fund') {
+    if (remainingAfter < 0) {
+      return {
+        status: 'tight',
+        remainingAfter,
+        message: t(locale, 'logic.goalEmpty', { name: view.env.name }),
+      }
+    }
+    return {
+      status: 'ok',
+      remainingAfter,
+      message: t(locale, 'logic.goalOk', { name: view.env.name, left: fmt(remainingAfter, locale, currency) }),
+    }
+  }
   if (rhythmOf(view.env) === 'weekly' && view.week) {
     const weekAfter = view.week.spent + amount
     if (remainingAfter < 0) {
@@ -1132,9 +1146,8 @@ export function verdictFor(
     return {
       status: 'ok',
       remainingAfter,
-      message: t(locale, 'logic.weekOk', {
-        target: fmt(view.week.target, locale, currency),
-        after: fmt(weekAfter, locale, currency),
+      message: t(locale, 'logic.fits', {
+        name: view.env.name,
         left: fmt(remainingAfter, locale, currency),
       }),
     }
@@ -1158,20 +1171,6 @@ export function verdictFor(
       status: 'over',
       remainingAfter,
       message: t(locale, 'logic.noFit', { name: view.env.name, over: fmt(-remainingAfter, locale, currency) }),
-    }
-  }
-  if (view.env.kind === 'fund') {
-    if (remainingAfter >= 0) {
-      return {
-        status: 'ok',
-        remainingAfter,
-        message: t(locale, 'logic.goalOk', { name: view.env.name, left: fmt(remainingAfter, locale, currency) }),
-      }
-    }
-    return {
-      status: 'tight',
-      remainingAfter,
-      message: t(locale, 'logic.goalEmpty', { name: view.env.name }),
     }
   }
   if (remainingAfter <= view.total * 0.2 || view.pct >= 80) {

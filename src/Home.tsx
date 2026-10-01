@@ -75,17 +75,8 @@ export function Home({
     libreId ? [libreId] : [],
     todayISO(),
   )
-  const hot = views.filter(
-    (v) => v.alert === 'near' || v.alert === 'almost' || v.alert === 'limit' || v.alert === 'over',
-  )
-  const over = hot.filter((v) => v.alert === 'over')
-  const atLimit = hot.filter((v) => v.alert === 'limit')
-  const almost = hot.filter((v) => v.alert === 'almost')
-  const near = hot.filter((v) => v.alert === 'near')
-  const capLine = pace.caps
-    .filter((c) => c.remaining > 0)
-    .map((c) => `${c.name} ${money(c.remaining)}`)
-    .join(' · ')
+  const over = views.filter((v) => v.alert === 'over')
+  const atLimit = views.filter((v) => v.alert === 'limit')
   const snap = accountSnapshot(views)
   const pockets = pocketSplit(state, snap.inAccount, snap.afterFixed)
   const unpaidNames = snap.unpaid.map((v) => v.env.name).join(', ')
@@ -136,25 +127,13 @@ export function Home({
         </div>
       )}
 
-      {hot.length > 0 && (
-        <div className={`banner ${over.length + atLimit.length + almost.length > 0 ? 'red' : 'orange'}`}>
+      {(over.length > 0 || atLimit.length > 0) && (
+        <div className="banner red">
           {over.length === 1 && <div>{t('home.overOne', { name: over[0].env.name })}</div>}
           {over.length > 1 && <div>{t('home.overMany', { names: over.map((v) => v.env.name).join(', ') })}</div>}
           {atLimit.length === 1 && <div>{t('home.atLimitOne', { name: atLimit[0].env.name })}</div>}
           {atLimit.length > 1 && (
             <div>{t('home.atLimitMany', { names: atLimit.map((v) => v.env.name).join(', ') })}</div>
-          )}
-          {almost.length === 1 && (
-            <div>{t('home.almostOne', { name: almost[0].env.name, pct: almost[0].pct })}</div>
-          )}
-          {almost.length > 1 && (
-            <div>{t('home.almostMany', { names: almost.map((v) => v.env.name).join(', ') })}</div>
-          )}
-          {near.length === 1 && (
-            <div>{t('home.nearOne', { name: near[0].env.name, pct: near[0].pct })}</div>
-          )}
-          {near.length > 1 && (
-            <div>{t('home.nearMany', { names: near.map((v) => v.env.name).join(', ') })}</div>
           )}
         </div>
       )}
@@ -198,12 +177,6 @@ export function Home({
             from: weekdayName(locale, clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)),
             to: weekdayName(locale, (clampWeekStart(state.settings.dailyWeekStartsOn ?? 1) + 6) % 7),
           })}
-          {capLine ? (
-            <>
-              <br />
-              {capLine}
-            </>
-          ) : null}
         </div>
         <div className="hero-meta">
           <span>{formatRange(cycle.startedAt, cycle.expectedEndAt, locale)}</span>
@@ -235,11 +208,7 @@ export function Home({
             {t('home.billsDone')}
           </p>
         )}
-        {snap.floor > 0 && snap.unpaidTotal > 0 && (
-          <p className="muted" style={{ fontSize: 13 }}>
-            {t('home.floor', { amount: money(snap.floor) })}
-          </p>
-        )}
+
       </section>
 
       {groups.map((g) =>
@@ -380,12 +349,12 @@ function EnvelopeCard({
                     ? t('fund.spentBit', { amount: money(spentLife) })
                     : t('fund.setAside', { amount: money(remaining) })
                 : week
-                  ? t('home.weekLine', {
+                  ? `${t('home.weekLine', {
                       spent: money(week.spent),
                       target: money(week.target),
                       monthSpent: money(view.spent),
                       total: money(total),
-                    })
+                    })}${week.pace === 'fast' ? t('home.paceFast') : week.pace === 'over' ? t('home.paceOver') : ''}`
                   : kindLabel(env.kind, locale)}
           {env.kind !== 'fund' && !week && total > 0 ? t('home.usedPct', { pct }) : ''}
           {env.opening > 0 ? t('home.brought', { amount: money(env.opening) }) : ''}
@@ -393,7 +362,15 @@ function EnvelopeCard({
       </div>
       <div className="right">
         <div className="remain">{money(remaining)}</div>
-        <span className={`pill ${light}`}>{pillLabel(view, t)}</span>
+        <span className={`pill ${env.kind === 'fund' ? (remaining > 0 ? 'green' : light) : light}`}>
+          {env.kind === 'fund'
+            ? remaining > 0
+              ? t('home.pillSet')
+              : spentLife > 0
+                ? t('home.pillFromSav')
+                : t('home.pillEmpty')
+            : pillLabel(view, t)}
+        </span>
       </div>
       <div className={`bar ${light}`}>
         <span style={{ width: `${barPct}%` }} />
@@ -404,15 +381,6 @@ function EnvelopeCard({
             {c.env.emoji} {c.env.name} · {folderLine(t, money, c.remaining, fundSpentSince(app, c.env.id))}
           </span>
         ))}
-      {week && group === 'cap' && (
-        <p className="muted" style={{ fontSize: 13, gridColumn: '1 / -1', margin: 0 }}>
-          {t('home.weekAdvice', {
-            label: week.label,
-            clip: week.daysInCycle < 7 ? t('home.weekClip', { n: week.daysInCycle }) : '',
-            pace: week.pace === 'fast' ? t('home.paceFast') : week.pace === 'over' ? t('home.paceOver') : '',
-          })}
-        </p>
-      )}
       {view.alert && (
         <div className={`env-warn pill ${light}`} style={{ justifySelf: 'start' }}>
           {alertLine(view.alert, pct, t)}

@@ -12,7 +12,7 @@ export interface Envelope {
   emoji: string
   opening: number
   rhythm: Rhythm
-  /** Si true, este techo se suma a Libre y se reparte en el “hoy”. Libre siempre cuenta. */
+  /** Si true, el dinero de este techo se parte entre los días. No se mezcla con Libre. */
   splitDaily?: boolean
   /** Si se marcó a mitad de ciclo: desde este día, y con este importe, entra al diario. */
   splitJoinedOn?: string

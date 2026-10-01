@@ -50,7 +50,7 @@ export const TUTORIAL: GuidePage[] = [
       },
       {
         k: 'Sumar al diario',
-        v: 'Un techo puede marcarse y juntarse con Libre. Entonces pasa a Día a día. Si no lo marcas, se queda en Techos.',
+        v: 'Un techo puede partir su propio dinero entre los días. Entonces pasa a Día a día y el dinero sigue en ese sobre. Si no lo marcas, se queda en Techos.',
       },
     ],
   },
@@ -61,7 +61,7 @@ export const TUTORIAL: GuidePage[] = [
     items: [
       {
         k: 'Día a día',
-        v: 'Libre y los techos marcados. Semana lunes a domingo. Si te pasas, se recalcula el resto de ESTA semana. Lo que no gastes no se va a la siguiente.',
+        v: 'Libre tiene el número grande de hoy. Cada techo marcado muestra su propio ritmo. Semana lunes a domingo. Si te pasas, se recalcula el resto de ESTA semana. Lo que no gastes no se va a la siguiente.',
       },
       {
         k: 'Techos',
@@ -164,7 +164,7 @@ const TUTORIAL_EN: GuidePage[] = [
       },
       {
         k: 'Add to daily',
-        v: 'A cap can be checked to join Free. Then it moves to Day to day. If you don’t check it, it stays under Caps.',
+        v: 'A cap can split its own money across the days. Then it moves to Day to day and the money stays in that envelope. If you don’t check it, it stays under Caps.',
       },
     ],
   },
@@ -175,7 +175,7 @@ const TUTORIAL_EN: GuidePage[] = [
     items: [
       {
         k: 'Day to day',
-        v: 'Free and the caps you marked. Week is Monday to Sunday. If you go over, the rest of THIS week recalculates. What you don’t spend does not roll into the next week.',
+        v: 'Free has the big today number. Each marked cap shows its own pace. Week is Monday to Sunday. If you go over, the rest of THIS week recalculates. What you don’t spend does not roll into the next week.',
       },
       {
         k: 'Caps',

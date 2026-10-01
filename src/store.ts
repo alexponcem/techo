@@ -331,14 +331,27 @@ export function updateExpense(
       ? { ...t, amount: patch.amount, note: patch.note, at: patch.at, pocket: patch.pocket ?? t.pocket }
       : t,
   )
-  if (siblings.length === 1) {
+  if (newCover === 0) {
+    const drop = new Set(siblings.map((t) => t.id))
+    txs = txs.filter((t) => !drop.has(t.id))
+  } else if (siblings.length === 1) {
     const sid = siblings[0].id
-    if (newCover === 0) txs = txs.filter((t) => t.id !== sid)
-    else {
-      txs = txs.map((t) =>
-        t.id === sid ? { ...t, amount: newCover, at: patch.at } : t,
-      )
-    }
+    txs = txs.map((t) => (t.id === sid ? { ...t, amount: newCover, at: patch.at } : t))
+  } else if (siblings.length > 1 && cover > 0) {
+    let assigned = 0
+    const amounts = siblings.map((s, i) => {
+      if (i === siblings.length - 1) return Math.max(0, newCover - assigned)
+      const part = Math.round((s.amount / cover) * newCover)
+      assigned += part
+      return part
+    })
+    const byId = new Map(siblings.map((s, i) => [s.id, amounts[i]]))
+    txs = txs.flatMap((t) => {
+      const amount = byId.get(t.id)
+      if (amount == null) return [t]
+      if (amount <= 0) return []
+      return [{ ...t, amount, at: patch.at }]
+    })
   }
   emit({ ...state, txs })
 }

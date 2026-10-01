@@ -13,7 +13,7 @@ import {
 import { parseEuros } from './money'
 import { useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
-import { EMOJI_PICK, kindHint, kindLabel } from './template'
+import { EMOJI_PICK, kindLabel } from './template'
 import {
   addSubfund,
   markPaid,
@@ -148,29 +148,16 @@ export function EnvelopeScreen({
               : tr('env.leftOf', { total: money(view.total) })}
         </div>
       </div>
-      {view.week && (
+      {view.week && env.kind === 'cap' && (
         <div className="hint">
           {tr('env.weekHint', {
             label: view.week.label,
-            days: view.week.daysInCycle,
-            dayWord: view.week.daysInCycle === 1 ? tr('common.day') : tr('common.days'),
             target: money(view.week.target),
             spent: money(view.week.spent),
             total: money(view.total),
           })}
         </div>
       )}
-      <p className="muted">
-        {env.kind === 'fixed'
-          ? tr('env.hintBill')
-          : rhythmOf(env) === 'weekly'
-            ? tr('env.hintWeekly')
-            : env.kind === 'fund'
-              ? tr('env.hintGoal')
-              : env.kind === 'savings'
-                ? tr('env.hintSav')
-                : kindHint(env.kind, locale)}
-      </p>
       {env.kind === 'fund' && lifeSpent > view.spent + childViews.reduce((s, c) => s + c.spent, 0) && (
         <p className="muted" style={{ margin: 0 }}>
           {tr('fund.memory')}
@@ -240,8 +227,12 @@ export function EnvelopeScreen({
               {tr('env.changeName')}
             </button>
           )}
+          {env.kind !== 'fund' && (
+            <>
           <div className="row">
-            <strong>{tr('env.cycleCap')}</strong>
+            <strong>
+              {env.kind === 'fixed' ? tr('env.billAmount') : env.kind === 'savings' ? tr('env.savGoal') : tr('env.cycleCap')}
+            </strong>
             <span>{money(env.planned)}</span>
           </div>
           {editing ? (
@@ -250,7 +241,7 @@ export function EnvelopeScreen({
                 inputMode="decimal"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Nuevo techo"
+                placeholder={tr('env.newCap')}
               />
               <button type="button" className="btn full" onClick={saveTecho}>
                 {tr('common.save')}
@@ -269,8 +260,10 @@ export function EnvelopeScreen({
                 setMsg('')
               }}
             >
-              {tr('env.editCap')}
+              {env.kind === 'cap' ? tr('env.editCap') : tr('env.editAmount')}
             </button>
+          )}
+            </>
           )}
           {msg ? <p className="muted">{msg}</p> : null}
           {env.kind === 'fund' && !env.parentId && (

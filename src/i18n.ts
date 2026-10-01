@@ -56,8 +56,8 @@ const msg = {
     en: 'A known amount. Mark it paid when it leaves your account.',
   },
   'kindHint.cap': {
-    es: 'Límite del ciclo. Márcalo “sumar al diario” si quieres que se parta con Libre entre los días. Si es semanal, eliges el día en que empieza esa semana.',
-    en: 'A cap for the cycle. Check “Add to daily” to split it with Free across the days. If it’s weekly, you pick the day that week starts.',
+    es: 'Límite del ciclo. “Sumar al diario” parte el dinero de este sobre entre los días y lo pasa a Día a día. Si es semanal, eliges el día en que empieza esa semana.',
+    en: 'A cap for the cycle. “Add to daily” splits this envelope’s own money across the days and moves it to Day to day. If it’s weekly, you pick the day that week starts.',
   },
   'kindHint.fund': {
     es: 'Sin techo mensual. No resta del sueldo: si está vacío, el gasto sale del ahorro.',
@@ -77,8 +77,8 @@ const msg = {
     en: 'A fixed cost. Mark it paid when the bank charges it. Example: rent 600, phone 20.',
   },
   'explain.cap': {
-    es: 'Límite del ciclo. Semanal = consejo para que dure; eliges el día en que empieza esa semana. Si marcas “sumar al diario”, se junta con Libre y pasa a Día a día.',
-    en: 'A cap for the cycle. Weekly = pacing so it lasts; you pick the day that week starts. If you check “Add to daily”, it joins Free and moves to Day to day.',
+    es: 'Límite del ciclo. Semanal = consejo para que dure; eliges el día en que empieza esa semana. “Sumar al diario” parte el dinero de este sobre entre los días y lo pasa a Día a día.',
+    en: 'A cap for the cycle. Weekly = pacing so it lasts; you pick the day that week starts. “Add to daily” splits this envelope’s own money across the days and moves it to Day to day.',
   },
   'explain.fund': {
     es: 'Una parte del ahorro con nombre (ej. un viaje o un curso). Si está a 0 €, sale del ahorro general.',
@@ -128,8 +128,8 @@ const msg = {
   },
   'home.todayLogged': { es: 'hoy ya {amount}', en: 'already {amount} today' },
   'home.todayHint': {
-    es: '{names} · si te pasas, se cierra el día',
-    en: '{names} · go over and the day closes',
+    es: '{names}',
+    en: '{names}',
   },
   'home.thisWeek': { es: 'Esta semana', en: 'This week' },
   'home.weekMeta': {
@@ -142,8 +142,8 @@ const msg = {
     en: 'starting cap {original}',
   },
   'home.weekBreak': {
-    es: 'Semana {from}–{to}. El ritmo es una guía. Si el sobre todavía tiene dinero, puedes usarlo. Al cierre, lo que sobre puede ir al ahorro.',
-    en: '{from}–{to} week. The pace is a guide. If the envelope still has money, you can use it. At close, what’s left can go to savings.',
+    es: 'Semana {from}–{to}',
+    en: '{from}–{to}',
   },
   'home.ownPace': { es: 'Ritmo de hoy ~{hoy}', en: 'Today’s pace ~{hoy}' },
   'home.cameIn': { es: 'Entraron {amount}', en: '{amount} came in' },
@@ -170,12 +170,12 @@ const msg = {
   },
   'home.whenBillsLeave': { es: 'Cuando salgan las cuotas pendientes', en: 'When pending bills leave' },
   'home.billsLeft': {
-    es: 'Falta: {names}. Eso que queda es ahorro + variables + fondos.',
-    en: 'Still due: {names}. What’s left is savings + variable + goals.',
+    es: 'Falta: {names}.',
+    en: 'Still due: {names}.',
   },
   'home.billsDone': {
-    es: 'Cuotas de este ciclo ya marcadas. Este es el saldo que te queda.',
-    en: 'Bills for this cycle are marked paid. This is what’s left.',
+    es: 'Cuotas de este ciclo ya marcadas.',
+    en: 'Bills for this cycle are marked paid.',
   },
   'home.floor': {
     es: 'Si agotas techos y Libre, te quedarían {amount} (ahorro + fondos).',
@@ -296,8 +296,8 @@ const msg = {
     en: 'Bill. Rent, phone. Mark it paid when it leaves the bank.',
   },
   'setup.liDaily': {
-    es: 'Techo diario. Ej.: ocio o café. Entra en “hoy puedes gastar”.',
-    en: 'Daily cap. E.g. leisure or coffee. It goes into “you can spend today”.',
+    es: 'Techo diario. Ej.: café. Su propio ritmo, en Día a día.',
+    en: 'Daily cap. E.g. coffee. Its own pace, under Day to day.',
   },
   'setup.liWeekly': {
     es: 'Techo semanal. Ej.: super o un hobby. Consejo por semana; el límite duro es el mes. Eliges el día en que empieza esa semana.',
@@ -308,8 +308,8 @@ const msg = {
     en: 'Goal. E.g. a trip or a class. No cap. If it’s at 0, it comes from savings.',
   },
   'setup.envHint': {
-    es: 'Quita lo que no uses y pon tus importes. Cuotas y techos se reservan al cobrar. Libre se crea solo con lo que queda y se reparte por los días que quedan hasta el próximo sueldo. Un techo (ej. ocio o café) puede sumarse a ese diario con el check.',
-    en: 'Remove what you don’t use and enter your amounts. Bills and caps are set aside at payday. Free is created from what’s left and split across the days until the next payday. A cap (e.g. leisure or coffee) can join that daily split with the check.',
+    es: 'Quita lo que no uses y pon tus importes. Cuotas y techos se reservan al cobrar. Libre se crea solo con lo que queda y se reparte por los días que quedan hasta el próximo sueldo. Un techo (ej. café) puede partir su propio dinero entre los días con el check.',
+    en: 'Remove what you don’t use and enter your amounts. Bills and caps are set aside at payday. Free is created from what’s left and split across the days until the next payday. A cap (e.g. coffee) can split its own money across the days with the check.',
   },
   'setup.name': { es: 'Nombre', en: 'Name' },
   'setup.remove': { es: 'quitar', en: 'remove' },
@@ -383,8 +383,8 @@ const msg = {
   'settings.pay': { es: 'Cobro:', en: 'Payday:' },
   'settings.thisCycle': { es: 'Este ciclo:', en: 'This cycle:' },
   'settings.safari': {
-    es: 'Abre Techo siempre en Safari normal, no en incógnito: ahí no se guarda nada. Quitar el icono no suele borrar datos; una ventana privada sí.',
-    en: 'Open Techo in a normal browser, not a private window: nothing is saved there. Removing the icon usually keeps your data; a private window does not.',
+    es: 'Ábrelo en el navegador normal. En una ventana privada no se guarda nada.',
+    en: 'Open it in a normal browser. A private window saves nothing.',
   },
   'settings.dailyWeek': {
     es: 'Semana del gasto diario (Libre y techos marcados)',
@@ -478,9 +478,12 @@ const msg = {
   'env.leftOf': { es: ' · quedan de {total}', en: ' · left of {total}' },
   'env.savingsUsed': { es: ' · usado {amount} este mes ({pct}%)', en: ' · used {amount} this cycle ({pct}%)' },
   'env.weekHint': {
-    es: 'Consejo esta semana ({label}, {days} {dayWord} de este ciclo): ~{target}. Llevas {spent}. El techo duro es el del mes ({total}).',
-    en: 'Pacing this week ({label}, {days} {dayWord} in this cycle): ~{target}. You’ve logged {spent}. The hard cap is the cycle ({total}).',
+    es: '{label}: {spent} de ~{target}. Límite del ciclo {total}.',
+    en: '{label}: {spent} of ~{target}. Cycle limit {total}.',
   },
+  'env.billAmount': { es: 'Cuota de este ciclo', en: 'Bill this cycle' },
+  'env.savGoal': { es: 'Meta de este ciclo', en: 'Goal this cycle' },
+  'env.editAmount': { es: 'Editar importe', en: 'Edit amount' },
   'env.hintBill': {
     es: 'Cuota: márcala pagada cuando salga de la cuenta. Hasta entonces sigue en el saldo del banco.',
     en: 'Bill: mark it paid when it leaves the account. Until then it still sits in the bank balance.',
@@ -509,8 +512,8 @@ const msg = {
   'env.newCap': { es: 'Nuevo techo', en: 'New cap' },
   'env.addDaily': { es: 'Sumar al diario del mes', en: 'Add to daily' },
   'env.addDailyHint': {
-    es: 'Se junta con Libre y se parte entre los días. El sobre pasa a Día a día en Inicio.',
-    en: 'It joins Free and splits across the days. The envelope moves to Day to day on Home.',
+    es: 'Su dinero se parte entre los días que quedan. En Inicio pasa a Día a día.',
+    en: 'Its own money splits across the days left. On Home it moves to Day to day.',
   },
   'env.txs': { es: 'Movimientos', en: 'Activity' },
   'env.noTx': { es: 'Aún no hay movimientos en este ciclo.', en: 'No activity in this cycle yet.' },
@@ -593,8 +596,8 @@ const msg = {
   'sheet.cantEdit': { es: 'Ese movimiento no se puede editar.', en: 'That movement can’t be edited.' },
   'sheet.move': { es: 'Mover dinero', en: 'Move money' },
   'sheet.moveHint': {
-    es: 'Para un fondo, un extra o para reforzar el ahorro. El dinero no desaparece: cambia de sobre.',
-    en: 'For a goal, a top-up, or to grow savings. The money doesn’t vanish: it changes envelope.',
+    es: 'El dinero cambia de sobre.',
+    en: 'The money changes envelope.',
   },
   'sheet.from': { es: 'De', en: 'From' },
   'sheet.to': { es: 'A', en: 'To' },
@@ -606,21 +609,35 @@ const msg = {
   'sheet.moveBtn': { es: 'Mover', en: 'Move' },
   'sheet.income': { es: 'Dinero extra', en: 'Extra money' },
   'sheet.incomeHint': {
-    es: 'Un extra, un Bizum, una venta. Elige a qué sobre entra.',
-    en: 'A bonus, a transfer, a sale. Choose which envelope it goes into.',
+    es: 'Elige a qué sobre entra.',
+    en: 'Choose which envelope it goes into.',
   },
   'sheet.incomeBtn': { es: 'Añadir ingreso', en: 'Add income' },
   'sheet.new': { es: 'Nuevo sobre', en: 'New envelope' },
   'sheet.newHint': {
-    es: 'Cuota, techo o fondo. Libre se crea solo. Si el techo se suma al diario, aparece en Día a día.',
-    en: 'Bill, cap or goal. Free is created for you. If the cap is added to daily, it shows under Day to day.',
+    es: 'Cuota, techo o fondo. Libre se crea solo.',
+    en: 'Bill, cap or goal. Free is created for you.',
   },
   'sheet.newPh': { es: 'Ej. Café, Netflix…', en: 'E.g. Coffee, Netflix…' },
   'sheet.create': { es: 'Crear sobre', en: 'Create envelope' },
   'sheet.addDaily': { es: 'Sumar al diario del mes', en: 'Add to daily' },
   'sheet.addDailyHint': {
-    es: 'Se junta con Libre. El sobre va a Día a día.',
-    en: 'It joins Free. The envelope goes to Day to day.',
+    es: 'Su dinero se parte entre los días que quedan. En Inicio pasa a Día a día.',
+    en: 'Its own money splits across the days left. On Home it moves to Day to day.',
+  },
+  'sheet.rhythm': { es: 'Ritmo', en: 'Pace' },
+  'sheet.weekly': { es: 'Semanal', en: 'Weekly' },
+  'sheet.wholeCycle': { es: 'Todo el ciclo', en: 'Whole cycle' },
+  'sheet.pastDay': { es: 'Cuenta el {day}.', en: 'Counts on {day}.' },
+  'sheet.continue': { es: 'Continuar', en: 'Continue' },
+  'sheet.continueSav': { es: 'Continuar, sale del ahorro', en: 'Continue, from savings' },
+  'sheet.fromSavings': {
+    es: 'Se descontarán {amount} del ahorro.',
+    en: '{amount} will come from savings.',
+  },
+  'sheet.savLock': {
+    es: 'Hace falta un motivo. Queda anotado.',
+    en: 'A reason is required. It stays on the record.',
   },
 
   'cycle.title': { es: 'Cerrar ciclo', en: 'Close cycle' },
@@ -679,6 +696,8 @@ const msg = {
   'stats.leftSav': { es: 'Salieron {amount} del colchón.', en: '{amount} left the cushion.' },
   'stats.netSav': { es: 'Ahorro neto', en: 'Net savings' },
   'stats.noChart': { es: 'Nada que graficar aún.', en: 'Nothing to chart yet.' },
+  'stats.unspent': { es: 'Aún sin gastar', en: 'Not spent yet' },
+  'stats.fromSav': { es: 'Del ahorro: {list}', en: 'From savings: {list}' },
 
   'logic.logged': { es: 'Anotado', en: 'Logged' },
   'logic.loggedOk': { es: 'El gasto quedó registrado.', en: 'The spend was saved.' },
@@ -686,16 +705,16 @@ const msg = {
   'logic.loggedDay': { es: 'Anotado el {when}', en: 'Logged {when}' },
   'logic.weekOverTitle': { es: 'Esa semana vas por encima del consejo', en: 'That week is over the pacing' },
   'logic.weekBody': {
-    es: 'Semana {label}: {spent} de ~{target} (consejo para que dure el mes) en {name}. El techo de verdad es el del mes.',
-    en: 'Week {label}: {spent} of ~{target} (pacing so the month lasts) in {name}. The real cap is the cycle.',
+    es: '{name}, semana {label}: {spent} de ~{target}.',
+    en: '{name}, week {label}: {spent} of ~{target}.',
   },
   'logic.dayOver': {
-    es: 'Ese día el techo era ~{cap} y gastaste {spent}. El exceso se resta de los días que quedan de ESTA semana, no de todo el mes.',
-    en: 'That day’s cap was ~{cap} and you spent {spent}. The extra comes off the rest of THIS week, not the whole cycle.',
+    es: '{name}: {spent} ese día, por encima de su ritmo (~{cap}). El resto de esta semana baja.',
+    en: '{name}: {spent} that day, over its pace (~{cap}). The rest of this week drops.',
   },
   'logic.dayOk': {
-    es: 'Ese día en {name}: {spent}. Techo del día ~{cap}. Lo que no uses hoy suma a los días que quedan de esta semana (finde); al cerrar la semana no infla la siguiente.',
-    en: 'That day in {name}: {spent}. Day cap ~{cap}. What you don’t use today stays for the rest of this week; closing the week does not inflate the next one.',
+    es: 'Quedó en {name}: {spent}.',
+    en: 'Logged in {name}: {spent}.',
   },
   'logic.pickEnv': { es: 'Elige un sobre.', en: 'Pick an envelope.' },
   'logic.needAmt': { es: 'Pon un importe.', en: 'Enter an amount.' },
@@ -704,8 +723,8 @@ const msg = {
     en: 'It doesn’t fit {name}’s cycle cap. You’re over by {over}.',
   },
   'logic.weekTight': {
-    es: 'Cabe en el mes ({left}). Consejo de esta semana ~{target}; con esto llevarías {after}.',
-    en: 'It fits the cycle ({left}). This week’s pacing ~{target}; this would take you to {after}.',
+    es: 'Cabe. Esta semana el consejo es ~{target} y llevarías {after}. En el ciclo quedan {left}.',
+    en: 'It fits. This week’s pace is ~{target} and you’d be at {after}. {left} left in the cycle.',
   },
   'logic.weekOk': {
     es: 'Consejo esta semana ~{target} (llevas {after}). En el mes quedarían {left}.',
@@ -725,8 +744,8 @@ const msg = {
     en: 'This comes from what’s set aside in {name}. {left} would remain in the goal.',
   },
   'logic.goalEmpty': {
-    es: 'En {name} no hay apartado. Este gasto sale del ahorro.',
-    en: 'Nothing is set aside in {name}. This spend comes from savings.',
+    es: 'En {name} no alcanza lo apartado. Lo que falte sale del ahorro.',
+    en: 'What’s set aside in {name} isn’t enough. The rest comes from savings.',
   },
   'logic.tightFit': {
     es: 'Cabe, pero {name} queda justo: {left}.',

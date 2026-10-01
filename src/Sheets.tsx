@@ -68,6 +68,7 @@ export function AddSheet({
   const maxDay = todayISO()
   const cents = parseEuros(amount) ?? 0
   const route = fundSpendTarget(state.envelopes, envelopeId, folderId)
+  const selectedEnv = state.envelopes.find((e) => e.id === envelopeId)
   const chargeId = route.id
   const view = views.find((v) => v.env.id === (chargeId || envelopeId))
   const chargeView = chargeId ? views.find((v) => v.env.id === chargeId) : undefined
@@ -96,7 +97,7 @@ export function AddSheet({
   const guide = chargeId ? guideForEnvelope(state, chargeId) : null
   const isDaily = Boolean(chargeView && inDailySplit(chargeView.env))
   const paceOver =
-    isDaily && guide && cents > guide.hoy && cents <= Math.max(0, view?.remaining ?? 0) && !plan
+    isDaily && guide && cents > guide.hoy && cents <= Math.max(0, chargeView?.remaining ?? 0) && !plan
 
   const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
 
@@ -204,7 +205,7 @@ export function AddSheet({
       <div className="chips">
         {QUICK.map((n) => (
           <button key={n} className="chip" onClick={() => setAmount(String(n))}>
-            {n} €
+            {money(n * 100)}
           </button>
         ))}
       </div>
@@ -239,7 +240,7 @@ export function AddSheet({
       </label>
       {spendDay !== todayISO() && (
         <p className="muted" style={{ fontSize: 13 }}>
-          Cuenta para el {formatDay(spendDay)} (y su semana), no como gasto de hoy.
+          {t('sheet.pastDay', { day: formatDay(spendDay, locale) })}
         </p>
       )}
       <p className="tiny">{t('sheet.payWith')}</p>
@@ -262,12 +263,13 @@ export function AddSheet({
       <p className="tiny">{t('sheet.envelope')}</p>
       <div className="chips">
         {views
+          .filter((v) => !v.env.parentId)
           .slice()
           .sort((a, b) => kindOrder(a.env.kind) - kindOrder(b.env.kind))
           .map((v) => (
             <button
               key={v.env.id}
-              className={`chip ${envelopeId === v.env.id ? 'on' : ''}`}
+              className={`chip ${envelopeId === v.env.id || selectedEnv?.parentId === v.env.id ? 'on' : ''}`}
               onClick={() => {
                 setEnvelopeId(v.env.id)
                 setFolderId('')
@@ -304,6 +306,11 @@ export function AddSheet({
           {t('sheet.folderAuto', { name: route.choices[0].name })}
         </p>
       )}
+      {selectedEnv?.parentId && (
+        <p className="muted" style={{ fontSize: 13 }}>
+          {t('sheet.folderAuto', { name: selectedEnv.name })}
+        </p>
+      )}
       <label className="field">
         {isSavings ? t('sheet.reasonSav') : t('sheet.note')}
         <input
@@ -314,23 +321,14 @@ export function AddSheet({
           }
         />
       </label>
-      {isSavings && (
-        <div className="deficit">
-          El ahorro está bloqueado a propósito. Solo se usa con un motivo concreto, no para un
-          capricho. Ese motivo queda anotado.
-        </div>
-      )}
+      {isSavings && <p className="muted">{t('sheet.savLock')}</p>}
       <div className={`verdict ${verdict.status}`}>{verdict.message}</div>
       {confirm && !plan && paceOver && guide && (
         <div className="hint">
-          <p>
-            Pasas el ritmo de hoy ({money(guide.hoy)}). El sobre todavía tiene{' '}
-            {money(Math.max(0, view?.remaining ?? 0))}, así que se anota ahí. Lo que quede
-            se reparte en los días que faltan.
-          </p>
+          <p>{t('sheet.dayOver', { amount: money(guide.referenceDaily) })}</p>
           <div className="actions" style={{ marginBottom: 0 }}>
             <button type="button" className="btn ghost" onClick={() => setConfirm(false)}>
-              Denegar
+              {t('common.cancel')}
             </button>
             <button type="button" className="btn sage" onClick={acceptCover}>
               {t('sheet.save')}
@@ -340,68 +338,42 @@ export function AddSheet({
       )}
       {confirm && plan && (
         <div className={plan.possible ? 'hint' : 'deficit'}>
-          {plan.weekExhausted ? (
-            <p>
-              Esta semana de diario ya no da más. El extra (<b>{money(plan.fromSavings)}</b>)
-              saldría del <b>ahorro</b>, no de la semana que viene. Duele más a propósito: así se
-              controla. ¿Vale la pena?
-            </p>
-          ) : plan.goalFromSavings ? (
+          {plan.goalFromSavings ? (
             <p>
               {plan.fromParent && plan.parentId ? (
                 <>
                   {t('sheet.fromFolder', {
                     amount: money(plan.fromParent),
-                    parent: views.find((v) => v.env.id === plan.parentId)?.env.name ?? '',
+                    parent: parentName,
                     name: chargeView?.env.name ?? '',
                   })}{' '}
                 </>
-              ) : (
-                <>{chargeView?.env.name}: no hay dinero apartado en este fondo. </>
-              )}
-              Se descontarán <b>{money(plan.fromSavings)}</b> del ahorro. ¿De acuerdo?
+              ) : null}
+              {t('sheet.fromSavings', { amount: money(plan.fromSavings) })}
             </p>
           ) : (
             <>
-              {view ? (
-                <p>
-                  En {view.env.name} caben {money(Math.max(0, view.remaining))}. Este gasto se pasa
-                  por {money(plan.overflow)}.
-                </p>
+              {view && plan.overflow > 0 ? (
+                <p>{t('logic.noFit', { name: view.env.name, over: money(plan.overflow) })}</p>
               ) : null}
-              {plan.fromLibre > 0 && (
-                <p style={{ marginTop: 8 }}>
-                  Se descontarán <b>{money(plan.fromLibre)}</b> de Libre. ¿De acuerdo?
-                </p>
-              )}
-              {plan.fromSavings > 0 && (
-                <p style={{ marginTop: 8 }}>
-                  Libre no alcanza. El resto (<b>{money(plan.fromSavings)}</b>) saldría del ahorro
-                  bloqueado. Segunda advertencia: hay que poner un motivo.
-                </p>
-              )}
+              {plan.fromLibre > 0 && <p>{t('sheet.fromFree', { amount: money(plan.fromLibre) })}</p>}
+              {plan.fromSavings > 0 && <p>{t('sheet.freeShort', { amount: money(plan.fromSavings) })}</p>}
             </>
           )}
-          {!plan.possible && (
-            <p style={{ marginTop: 8 }}>
-              {plan.goalFromSavings || plan.weekExhausted
-                ? 'No hay suficiente ahorro para este gasto.'
-                : 'No hay suficiente en Libre + Ahorro para cubrir el extra.'}
-            </p>
-          )}
+          {!plan.possible && <p>{t('sheet.notEnough')}</p>}
           {plan.needsSavingsReason && plan.possible && (
             <label className="field" style={{ marginTop: 10 }}>
-              Motivo para tocar el ahorro
+              {t('sheet.reasonCover')}
               <input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Ej. urgente, arreglo, imprevisto…"
+                placeholder={t('sheet.phSav')}
               />
             </label>
           )}
           <div className="actions" style={{ marginBottom: 0 }}>
             <button type="button" className="btn ghost" onClick={() => setConfirm(false)}>
-              Denegar
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -409,7 +381,7 @@ export function AddSheet({
               disabled={!plan.possible || (plan.needsSavingsReason && reason.trim().length < 4)}
               onClick={acceptCover}
             >
-              Aceptar y descontar
+              {t('sheet.agree')}
             </button>
           </div>
         </div>
@@ -421,16 +393,14 @@ export function AddSheet({
           onClick={trySave}
         >
           {isSavings
-            ? 'Usar ahorro con este motivo'
-            : plan?.weekExhausted
-              ? 'Continuar (la semana no da)'
+            ? t('env.useSav')
+            : onlyParent
+              ? t('sheet.save')
               : plan?.goalFromSavings
-                ? 'Continuar (sale del ahorro)'
-                : onlyParent
-                  ? 'Anotar gasto'
-                  : plan || paceOver
-                    ? 'Continuar (hay extra)'
-                    : 'Anotar gasto'}
+                ? t('sheet.continueSav')
+                : plan || paceOver
+                  ? t('sheet.continue')
+                  : t('sheet.save')}
         </button>
       )}
     </Sheet>
@@ -514,15 +484,11 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
         />
       </label>
       <label className="field">
-        Nota
+        {t('sheet.note')}
         <input value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
-      <p className="muted" style={{ fontSize: 13 }}>
-        Así no hace falta borrarlo y volverlo a meter. Si salió del ahorro, el
-        traspaso se ajusta al nuevo importe.
-      </p>
       <button type="button" className="btn full sage" disabled={cents <= 0} onClick={save}>
-        Guardar cambios
+        {t('sheet.saveEdit')}
       </button>
     </Sheet>
   )
@@ -560,10 +526,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <Sheet title={t('sheet.move')} onClose={onClose}>
-      <p className="muted">
-        Para un fondo, un extra o para reforzar el ahorro. El dinero no
-        desaparece: cambia de sobre.
-      </p>
+      <p className="muted">{t('sheet.moveHint')}</p>
       <SelectEnv
         label={t('sheet.from')}
         value={from}
@@ -621,15 +584,15 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
 
   function save() {
     if (!envelopeId || cents <= 0) return
-    addIncome(envelopeId, cents, 'Ingreso extra', pocket)
+    addIncome(envelopeId, cents, t('sheet.income'), pocket)
     onClose()
   }
 
   return (
     <Sheet title={t('sheet.income')} onClose={onClose}>
-      <p className="muted">Un extra, un Bizum, una venta. Elige a qué sobre entra.</p>
+      <p className="muted">{t('sheet.incomeHint')}</p>
       <label className="field">
-        Importe
+        {t('sheet.amount')}
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
       <p className="tiny">{t('sheet.payWith')}</p>
@@ -643,7 +606,7 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
       </div>
       <SelectEnv label={t('sheet.envelope')} value={envelopeId} views={views} onChange={setEnvelopeId} />
       <button className="btn full sage" disabled={!envelopeId || cents <= 0} onClick={save}>
-        Añadir ingreso
+        {t('sheet.incomeBtn')}
       </button>
     </Sheet>
   )
@@ -670,7 +633,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
       return
     }
     if (amount.trim() && parseEuros(amount) === null) {
-      setError('Pon un importe válido.')
+      setError(t('env.needAmount'))
       return
     }
     const result = addEnvelope({
@@ -693,13 +656,10 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <Sheet title={t('sheet.new')} onClose={onClose}>
-      <p className="muted">
-        Cuota, techo o fondo. Libre se crea solo. Si el techo se suma al diario,
-        aparece en Día a día.
-      </p>
+      <p className="muted">{t('sheet.newHint')}</p>
       <label className="field">
-        Nombre
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Café, Netflix…" />
+        {t('setup.name')}
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('sheet.newPh')} />
       </label>
       <div className="chips" style={{ flexWrap: 'wrap' }}>
         {EMOJI_PICK.map((e) => (
@@ -714,7 +674,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       <label className="field">
-        Tipo
+        {t('setup.type')}
         <select
           value={kind}
           onChange={(e) => {
@@ -738,18 +698,18 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
               style={{ marginTop: 4 }}
             />
             <span>
-              <span style={{ fontWeight: 500 }}>Sumar al diario del mes</span>
+              <span style={{ fontWeight: 500 }}>{t('env.addDaily')}</span>
               <span className="muted" style={{ display: 'block', fontSize: 13 }}>
-                Se junta con Libre. El sobre va a Día a día.
+                {t('env.addDailyHint')}
               </span>
             </span>
           </label>
           {!splitDaily && (
             <label className="field">
-              ¿Diario o semanal?
+              {t('sheet.rhythm')}
               <select value={rhythm === 'weekly' ? 'weekly' : 'daily'} onChange={(e) => setRhythm(e.target.value as Rhythm)}>
-                <option value="weekly">Semanal — consejo por semana (ej. super o hobby)</option>
-                <option value="daily">Límite del ciclo (sin consejo semanal)</option>
+                <option value="weekly">{t('sheet.weekly')}</option>
+                <option value="daily">{t('sheet.wholeCycle')}</option>
               </select>
             </label>
           )}
@@ -759,7 +719,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
         </>
       )}
       <label className="field">
-        {kind === 'fund' ? 'Apartar este ciclo (puede ser 0)' : 'Importe de este ciclo'}
+        {t('sheet.amount')}
         <input
           inputMode="decimal"
           value={amount}
