@@ -319,7 +319,10 @@ export function weekSlice(
   const w = weekWindow(cycle, today, weekStartsOn)
   if (w.daysInWeek <= 0) return undefined
   const cycleDays = cycleSpendDays(cycle)
-  const target = Math.round((env.planned * w.daysInWeek) / cycleDays)
+  // Una semana del ciclo, no el trozo que queda si el ciclo empieza a mitad de semana.
+  // Si no, 130 € con solo 3 días dentro de la semana salen como ~12,58.
+  const weekRate = Math.round((env.planned * 7) / cycleDays)
+  const target = Math.min(Math.max(0, env.planned), weekRate)
   const spent = spentInRange(txs, [env.id], w.sliceStart, w.sliceEnd)
   let pace: 'ok' | 'fast' | 'over' = 'ok'
   if (target > 0 && spent > target * 1.2) pace = 'over'

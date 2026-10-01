@@ -21,6 +21,7 @@ export function SettingsScreen({
   const cycle = [...state.cycles].reverse().find((c) => !c.closedAt)
   const fileRef = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
+  const [showHow, setShowHow] = useState(false)
 
   function download() {
     const blob = new Blob([exportJson()], { type: 'application/json' })
@@ -53,10 +54,6 @@ export function SettingsScreen({
       <h2 className="serif" style={{ fontSize: 32 }}>
         {t('settings.title')}
       </h2>
-      <div className="section-title">
-        <span>{t('setup.how')}</span>
-      </div>
-      <HowItWorks />
       <div className="card stack">
         <p>
           <b>{t('settings.pay')}</b>{' '}
@@ -132,9 +129,6 @@ export function SettingsScreen({
             ))}
           </select>
         </label>
-        <p className="muted" style={{ fontSize: 13 }}>
-          {t('settings.dailyWeekHint')}
-        </p>
         <label className="field">
           {t('settings.weeklyDefault')}
           <select
@@ -153,10 +147,11 @@ export function SettingsScreen({
             ))}
           </select>
         </label>
-        <p className="muted" style={{ fontSize: 13 }}>
-          {t('settings.weeklyDefaultHint')}
-        </p>
       </div>
+      <button type="button" className="btn secondary full" onClick={() => setShowHow((open) => !open)}>
+        {showHow ? t('common.close') : t('setup.how')}
+      </button>
+      {showHow ? <HowItWorks /> : null}
       <button className="btn secondary full" onClick={onIncome}>
         {t('settings.extraIncome')}
       </button>
