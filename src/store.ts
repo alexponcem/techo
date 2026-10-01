@@ -208,6 +208,7 @@ export function coverAndSpend(input: {
   note: string
   at?: string
   fromLibre?: { id: string; amount: number }
+  fromParent?: { id: string; amount: number }
   fromSavings?: { id: string; amount: number; reason: string }
   pocket?: 'card' | 'cash'
 }) {
@@ -215,6 +216,18 @@ export function coverAndSpend(input: {
   if (!cycle || input.amount <= 0) return
   const at = input.at ?? new Date().toISOString()
   const extra: Tx[] = []
+  if (input.fromParent && input.fromParent.amount > 0) {
+    extra.push({
+      id: uid(),
+      cycleId: cycle.id,
+      at,
+      type: 'transfer',
+      envelopeId: input.fromParent.id,
+      toEnvelopeId: input.envelopeId,
+      amount: input.fromParent.amount,
+      note: t(localeOf(state), 'store.toFolder'),
+    })
+  }
   if (input.fromLibre && input.fromLibre.amount > 0) {
     extra.push({
       id: uid(),

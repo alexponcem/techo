@@ -17,6 +17,7 @@ import { EMOJI_PICK, kindHint, kindLabel } from './template'
 import {
   addSubfund,
   markPaid,
+  moveMoney,
   removeEnvelope,
   removeExpense,
   removeTx,
@@ -58,6 +59,8 @@ export function EnvelopeScreen({
   const [folderEmoji, setFolderEmoji] = useState('✈️')
   const [removing, setRemoving] = useState(false)
   const [destId, setDestId] = useState('')
+  const [moveTo, setMoveTo] = useState('')
+  const [moveAmount, setMoveAmount] = useState('')
 
   if (!cycle || !env) {
     return (
@@ -99,6 +102,27 @@ export function EnvelopeScreen({
     updatePlanned(env.id, cents)
     setEditing(false)
     setMsg(tr('env.capOk'))
+  }
+
+  function passToFolder() {
+    if (!env) return
+    const target = childViews.length === 1 ? childViews[0].env.id : moveTo
+    if (!target) {
+      setMsg(tr('fund.needFolder'))
+      return
+    }
+    const cents = parseEuros(moveAmount)
+    if (cents === null || cents <= 0) {
+      setMsg(tr('env.needAmount'))
+      return
+    }
+    if (cents > view.remaining) {
+      setMsg(tr('fund.tooMuch', { amount: money(view.remaining) }))
+      return
+    }
+    moveMoney(env.id, target, cents, tr('store.toFolder'))
+    setMoveAmount('')
+    setMsg(tr('fund.moved'))
   }
 
   return (
@@ -273,6 +297,42 @@ export function EnvelopeScreen({
                       : tr('fund.setAside', { amount: money(child.remaining) })}
                 </button>
               ))}
+              {childViews.length > 0 && view.remaining > 0 && (
+                <div className="stack" style={{ gap: 8 }}>
+                  <strong>{tr('fund.moveTitle')}</strong>
+                  <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                    {childViews.length === 1
+                      ? tr('fund.moveOne', { name: childViews[0].env.name, amount: money(view.remaining) })
+                      : tr('fund.moveHint', { name: env.name, amount: money(view.remaining) })}
+                  </p>
+                  {childViews.length > 1 && (
+                    <div className="chips" style={{ flexWrap: 'wrap' }}>
+                      {childViews.map((child) => (
+                        <button
+                          key={child.env.id}
+                          type="button"
+                          className={`chip ${moveTo === child.env.id ? 'on' : ''}`}
+                          onClick={() => {
+                            setMoveTo(child.env.id)
+                            setMsg('')
+                          }}
+                        >
+                          {child.env.emoji} {child.env.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    inputMode="decimal"
+                    value={moveAmount}
+                    onChange={(e) => setMoveAmount(e.target.value)}
+                    placeholder="0,00"
+                  />
+                  <button type="button" className="btn full" onClick={passToFolder}>
+                    {tr('fund.moveBtn')}
+                  </button>
+                </div>
+              )}
               <div className="chips" style={{ flexWrap: 'wrap' }}>
                 {EMOJI_PICK.map((e) => (
                   <button

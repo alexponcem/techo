@@ -11,6 +11,7 @@ import { EMOJI_PICK } from './template'
 import {
   activeCycle,
   coverPlan,
+  fundSpendTarget,
   guideForEnvelope,
   inDailySplit,
   kindOrder,
@@ -22,7 +23,7 @@ import {
 } from './logic'
 import { parseEuros } from './money'
 import { kindLabel } from './template'
-import { useLocale, useMoney, useT } from './useT'
+import { useCurrency, useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
 import {
   addEnvelope,
@@ -49,9 +50,11 @@ export function AddSheet({
   const t = useT()
   const money = useMoney()
   const locale = useLocale()
+  const currency = useCurrency()
   const views = viewsFor(state)
   const [amount, setAmount] = useState('')
   const [envelopeId, setEnvelopeId] = useState(presetId ?? '')
+  const [folderId, setFolderId] = useState('')
   const [note, setNote] = useState('')
   const [reason, setReason] = useState('')
   const [confirm, setConfirm] = useState(false)
@@ -64,27 +67,65 @@ export function AddSheet({
   const minDay = cycle?.startedAt ?? todayISO()
   const maxDay = todayISO()
   const cents = parseEuros(amount) ?? 0
-  const view = views.find((v) => v.env.id === envelopeId)
-  const verdict = verdictFor(view, cents, locale)
+  const route = fundSpendTarget(state.envelopes, envelopeId, folderId)
+  const chargeId = route.id
+  const view = views.find((v) => v.env.id === (chargeId || envelopeId))
+  const chargeView = chargeId ? views.find((v) => v.env.id === chargeId) : undefined
+  const plan = chargeId ? coverPlan(views, chargeId, cents, null) : null
+  const onlyParent = Boolean(plan?.fromParent && plan.fromSavings <= 0 && plan.fromLibre <= 0)
+  const parentName = plan?.parentId
+    ? (views.find((v) => v.env.id === plan.parentId)?.env.name ?? '')
+    : ''
+  const verdict = route.needsChoice
+    ? {
+        status: 'empty' as const,
+        message: cents > 0 ? t('fund.needFolder') : t('logic.needAmt'),
+      }
+    : onlyParent && plan?.fromParent
+      ? {
+          status: 'ok' as const,
+          message: t('sheet.parentFits', {
+            amount: money(plan.fromParent),
+            parent: parentName,
+            name: chargeView?.env.name ?? '',
+          }),
+        }
+      : verdictFor(chargeView ?? view, cents, locale, currency)
   const isSavings = view?.env.kind === 'savings'
   const reasonOk = (isSavings ? note : reason).trim().length >= 4
-  const guide = envelopeId ? guideForEnvelope(state, envelopeId) : null
-  const isDaily = Boolean(view && inDailySplit(view.env))
-  const plan = envelopeId ? coverPlan(views, envelopeId, cents, null) : null
+  const guide = chargeId ? guideForEnvelope(state, chargeId) : null
+  const isDaily = Boolean(chargeView && inDailySplit(chargeView.env))
   const paceOver =
     isDaily && guide && cents > guide.hoy && cents <= Math.max(0, view?.remaining ?? 0) && !plan
 
   const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
 
+  function parentCover() {
+    if (!plan?.fromParent || !plan.parentId) return undefined
+    return { id: plan.parentId, amount: plan.fromParent }
+  }
+
   function finish() {
-    setDone(saveReview(getState(), envelopeId, cents, clampDay(spendDay, minDay, maxDay)))
+    setDone(saveReview(getState(), chargeId || envelopeId, cents, clampDay(spendDay, minDay, maxDay)))
   }
 
   function trySave() {
-    if (!envelopeId || cents <= 0) return
+    if (!chargeId || cents <= 0 || route.needsChoice) return
     if (isSavings) {
       if (!reasonOk) return
-      addExpense(envelopeId, cents, `AHORRO: ${note.trim()}`, at, pocket)
+      addExpense(chargeId, cents, `AHORRO: ${note.trim()}`, at, pocket)
+      finish()
+      return
+    }
+    if (onlyParent) {
+      coverAndSpend({
+        envelopeId: chargeId,
+        amount: cents,
+        note,
+        at,
+        fromParent: parentCover(),
+        pocket,
+      })
       finish()
       return
     }
@@ -92,24 +133,25 @@ export function AddSheet({
       setConfirm(true)
       return
     }
-    addExpense(envelopeId, cents, note, at, pocket)
+    addExpense(chargeId, cents, note, at, pocket)
     finish()
   }
 
   function acceptCover() {
-    if (!envelopeId) return
+    if (!chargeId) return
     if (!plan) {
-      addExpense(envelopeId, cents, note, at, pocket)
+      addExpense(chargeId, cents, note, at, pocket)
       finish()
       return
     }
     if (!plan.possible) return
     if (plan.needsSavingsReason && reason.trim().length < 4) return
     coverAndSpend({
-      envelopeId,
+      envelopeId: chargeId,
       amount: cents,
       note,
       at,
+      fromParent: parentCover(),
       fromLibre:
         plan.fromLibre > 0 && plan.libreId
           ? { id: plan.libreId, amount: plan.fromLibre }
@@ -120,7 +162,7 @@ export function AddSheet({
               id: plan.savingsId,
               amount: plan.fromSavings,
               reason: plan.goalFromSavings
-                ? note.trim() || view?.env.name || 'Fondo'
+                ? note.trim() || chargeView?.env.name || 'Fondo'
                 : reason.trim(),
             }
           : undefined,
@@ -228,6 +270,7 @@ export function AddSheet({
               className={`chip ${envelopeId === v.env.id ? 'on' : ''}`}
               onClick={() => {
                 setEnvelopeId(v.env.id)
+                setFolderId('')
                 setConfirm(false)
               }}
             >
@@ -236,6 +279,31 @@ export function AddSheet({
             </button>
           ))}
       </div>
+      {route.choices.length > 1 && (
+        <>
+          <p className="tiny">{t('sheet.pickFolder')}</p>
+          <div className="chips">
+            {route.choices.map((folder) => (
+              <button
+                key={folder.id}
+                type="button"
+                className={`chip ${folderId === folder.id ? 'on' : ''}`}
+                onClick={() => {
+                  setFolderId(folder.id)
+                  setConfirm(false)
+                }}
+              >
+                {folder.emoji} {folder.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {route.choices.length === 1 && (
+        <p className="muted" style={{ fontSize: 13 }}>
+          {t('sheet.folderAuto', { name: route.choices[0].name })}
+        </p>
+      )}
       <label className="field">
         {isSavings ? t('sheet.reasonSav') : t('sheet.note')}
         <input
@@ -280,8 +348,18 @@ export function AddSheet({
             </p>
           ) : plan.goalFromSavings ? (
             <p>
-              {view?.env.name}: no hay dinero apartado en este fondo. Se descontarán{' '}
-              <b>{money(plan.fromSavings)}</b> del ahorro. ¿De acuerdo?
+              {plan.fromParent && plan.parentId ? (
+                <>
+                  {t('sheet.fromFolder', {
+                    amount: money(plan.fromParent),
+                    parent: views.find((v) => v.env.id === plan.parentId)?.env.name ?? '',
+                    name: chargeView?.env.name ?? '',
+                  })}{' '}
+                </>
+              ) : (
+                <>{chargeView?.env.name}: no hay dinero apartado en este fondo. </>
+              )}
+              Se descontarán <b>{money(plan.fromSavings)}</b> del ahorro. ¿De acuerdo?
             </p>
           ) : (
             <>
@@ -339,7 +417,7 @@ export function AddSheet({
       {!confirm && (
         <button
           className="btn full sage"
-          disabled={!envelopeId || cents <= 0 || (isSavings && !reasonOk)}
+          disabled={!chargeId || route.needsChoice || cents <= 0 || (isSavings && !reasonOk)}
           onClick={trySave}
         >
           {isSavings
@@ -348,9 +426,11 @@ export function AddSheet({
               ? 'Continuar (la semana no da)'
               : plan?.goalFromSavings
                 ? 'Continuar (sale del ahorro)'
-                : plan || paceOver
-                  ? 'Continuar (hay extra)'
-                  : 'Anotar gasto'}
+                : onlyParent
+                  ? 'Anotar gasto'
+                  : plan || paceOver
+                    ? 'Continuar (hay extra)'
+                    : 'Anotar gasto'}
         </button>
       )}
     </Sheet>
@@ -454,7 +534,11 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
   const state = useAppState()
   const views = viewsFor(state)
   const [from, setFrom] = useState(views.find((v) => v.env.kind === 'buffer')?.env.id ?? '')
-  const [to, setTo] = useState(views.find((v) => v.env.kind === 'fund')?.env.id ?? '')
+  const [to, setTo] = useState(() => {
+    const parent = views.find((v) => v.env.kind === 'fund' && !v.env.parentId)
+    const child = parent ? views.find((v) => v.env.parentId === parent.env.id) : undefined
+    return child?.env.id ?? parent?.env.id ?? ''
+  })
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const cents = parseEuros(amount) ?? 0
@@ -480,8 +564,17 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
         Para un fondo, un extra o para reforzar el ahorro. El dinero no
         desaparece: cambia de sobre.
       </p>
-      <SelectEnv label="De" value={from} views={views} onChange={setFrom} />
-      <SelectEnv label="A" value={to} views={views} onChange={setTo} />
+      <SelectEnv
+        label={t('sheet.from')}
+        value={from}
+        views={views}
+        onChange={(id) => {
+          setFrom(id)
+          const child = views.find((v) => v.env.parentId === id)
+          if (child) setTo(child.env.id)
+        }}
+      />
+      <SelectEnv label={t('sheet.to')} value={to} views={views} onChange={setTo} />
       <label className="field">
         Importe
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -705,11 +798,17 @@ function SelectEnv({
       {label}
       <select value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{t('sheet.pick')}</option>
-        {ordered.map((v) => (
-          <option key={v.env.id} value={v.env.id}>
-            {v.env.emoji} {v.env.name} · {money(v.remaining)} · {kindLabel(v.env.kind, locale)}
-          </option>
-        ))}
+        {ordered.map((v) => {
+          const parent = v.env.parentId
+            ? ordered.find((p) => p.env.id === v.env.parentId)
+            : undefined
+          const name = parent ? `${parent.env.name} / ${v.env.name}` : v.env.name
+          return (
+            <option key={v.env.id} value={v.env.id}>
+              {v.env.emoji} {name} · {money(v.remaining)} · {kindLabel(v.env.kind, locale)}
+            </option>
+          )
+        })}
       </select>
     </label>
   )

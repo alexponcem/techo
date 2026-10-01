@@ -551,6 +551,9 @@ export interface CoverPlan {
   overflow: number
   fromLibre: number
   fromSavings: number
+  /** Apartado del fondo padre que pasa a la carpeta antes de tocar el ahorro. */
+  fromParent?: number
+  parentId?: string
   libreId?: string
   savingsId?: string
   possible: boolean
@@ -558,6 +561,25 @@ export interface CoverPlan {
   goalFromSavings: boolean
   weekExhausted?: boolean
   dayOver?: boolean
+}
+
+/** Si el fondo tiene una carpeta, el gasto va ahí. Si tiene varias, hay que elegir. Si no tiene, va al fondo. */
+export function fundSpendTarget(
+  envelopes: Envelope[],
+  selectedId: string,
+  folderId?: string,
+): { id: string; needsChoice: boolean; choices: Envelope[] } {
+  const env = envelopes.find((e) => e.id === selectedId)
+  if (!env || env.kind !== 'fund' || env.parentId) {
+    return { id: selectedId, needsChoice: false, choices: [] }
+  }
+  const choices = envelopes.filter((e) => e.parentId === env.id)
+  if (choices.length === 0) return { id: env.id, needsChoice: false, choices: [] }
+  if (choices.length === 1) return { id: choices[0].id, needsChoice: false, choices }
+  if (folderId && choices.some((c) => c.id === folderId)) {
+    return { id: folderId, needsChoice: false, choices }
+  }
+  return { id: '', needsChoice: true, choices }
 }
 
 export function coverPlan(
@@ -578,15 +600,20 @@ export function coverPlan(
   const savingsLeft = Math.max(0, savings?.remaining ?? 0)
 
   if (view.env.kind === 'fund') {
+    const parent = view.env.parentId ? views.find((v) => v.env.id === view.env.parentId) : undefined
+    const fromParent = Math.min(overflow, Math.max(0, parent?.remaining ?? 0))
+    const fromSavings = overflow - fromParent
     return {
       overflow,
       fromLibre: 0,
-      fromSavings: overflow,
+      fromParent,
+      parentId: fromParent > 0 ? parent?.env.id : undefined,
+      fromSavings,
       libreId: libre?.env.id,
       savingsId: savings?.env.id,
-      possible: overflow <= savingsLeft,
+      possible: fromSavings <= savingsLeft,
       needsSavingsReason: false,
-      goalFromSavings: true,
+      goalFromSavings: fromSavings > 0,
     }
   }
 
