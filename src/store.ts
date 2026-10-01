@@ -3,10 +3,15 @@ import { clampWeekStart, suggestedNextPay, todayISO } from './dates'
 import {
   activeCycle,
   assigned,
-  carryKinds,
   ensureRhythm,
   envelopeCash,
+  envelopesAfterRemoval,
+  envelopeTree,
+  fundCarryGap,
+  fundCloseSnap,
+  nextOpenings,
   openDailyPace,
+  reassignTxs,
   reportFor,
   takesFromPay,
   uid,
@@ -463,50 +468,25 @@ export function startNextCycle(
   expectedEndAt?: string,
   leftoverToId?: string,
   openingCash = 0,
+  fundChoice: Record<string, 'continue' | 'close'> = {},
 ) {
   const current = activeCycle(state)
   if (!current) return
   const end =
     expectedEndAt ??
     suggestedNextPay(startedAt, state.settings.payMode, state.settings.fixedDay)
-
-  const leftoverById = new Map<string, number>()
-  for (const env of state.envelopes) {
-    leftoverById.set(env.id, env.opening + env.planned)
-  }
-  for (const t of state.txs.filter((x) => x.cycleId === current.id)) {
-    if (t.type === 'expense') {
-      leftoverById.set(t.envelopeId, (leftoverById.get(t.envelopeId) ?? 0) - t.amount)
-    }
-    if (t.type === 'income') {
-      leftoverById.set(t.envelopeId, (leftoverById.get(t.envelopeId) ?? 0) + t.amount)
-    }
-    if (t.type === 'transfer') {
-      leftoverById.set(t.envelopeId, (leftoverById.get(t.envelopeId) ?? 0) - t.amount)
-      if (t.toEnvelopeId) {
-        leftoverById.set(t.toEnvelopeId, (leftoverById.get(t.toEnvelopeId) ?? 0) + t.amount)
-      }
-    }
-  }
-
+  const locale = localeOf(state)
   const savingsId = state.envelopes.find((e) => e.kind === 'savings')?.id ?? 'ahorro'
   const destId = leftoverToId ?? savingsId
-  let extra = 0
-  const openings = new Map<string, number>()
-  for (const env of state.envelopes) {
-    const left = leftoverById.get(env.id) ?? 0
-    if (carryKinds(env.kind)) {
-      openings.set(env.id, Math.max(0, left))
-    } else {
-      extra += Math.max(0, left)
-    }
-  }
-  openings.set(destId, (openings.get(destId) ?? 0) + extra)
-
+  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId, fundChoice)
+  const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id, fundChoice)
+  const cycleId = uid()
   const template = withBalancedBuffer(
     state.template.map((e) => ({ ...e, opening: 0 })),
     income,
-    localeOf(state),
+    locale,
+  ).map((e) =>
+    e.kind === 'fund' && fundChoice[e.id] === 'close' ? { ...e, fundEpoch: cycleId } : e,
   )
   const envelopes = template.map((e) => ({
     ...ensureRhythm(e),
@@ -514,7 +494,6 @@ export function startNextCycle(
   }))
 
   const snap = reportFor(state, current)
-  const cycleId = uid()
   const pace = openDailyPace(envelopes, startedAt, end)
   emit({
     ...state,
@@ -530,6 +509,7 @@ export function startNextCycle(
               savedNet: snap.savedNet,
               savingsUsed: snap.savingsUsed,
               savingsGoal: snap.savingsGoal,
+              fundSnap,
             }
           : c,
       ),
@@ -544,6 +524,45 @@ export function startNextCycle(
       },
     ],
   })
+}
+
+export function removeEnvelope(id: string, toId: string): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  const env = state.envelopes.find((e) => e.id === id)
+  const dest = state.envelopes.find((e) => e.id === toId)
+  if (!env || !dest) return { ok: false, error: t(locale, 'store.missing') }
+  if (env.kind === 'buffer' || env.kind === 'savings') return { ok: false, error: t(locale, 'store.keepEnvelope') }
+  const removeIds = envelopeTree(state.envelopes, id)
+  if (removeIds.includes(toId)) return { ok: false, error: t(locale, 'store.badDest') }
+  const envelopes = envelopesAfterRemoval(state.envelopes, removeIds, toId, cycle.income, locale)
+  const template = withBalancedBuffer(
+    envelopes.map((e) => ({ ...e, opening: 0 })),
+    cycle.income,
+    locale,
+  )
+  emit({
+    ...state,
+    txs: reassignTxs(state.txs, removeIds, toId),
+    envelopes,
+    template,
+  })
+  return { ok: true }
+}
+
+/** Trae al ciclo abierto el apartado de un fondo que se quedó en un cierre anterior. */
+export function restoreFundCarry(id: string): { ok: true; amount: number } | { ok: false; error: string } {
+  const locale = localeOf(state)
+  const env = state.envelopes.find((e) => e.id === id)
+  if (!env || env.kind !== 'fund') return { ok: false, error: t(locale, 'store.missing') }
+  const gap = fundCarryGap(state, id)
+  if (gap <= 0) return { ok: false, error: t(locale, 'fund.nothing') }
+  emit({
+    ...state,
+    envelopes: state.envelopes.map((e) => (e.id === id ? { ...e, opening: e.opening + gap } : e)),
+  })
+  return { ok: true, amount: gap }
 }
 
 export function setOpeningCash(cents: number) {

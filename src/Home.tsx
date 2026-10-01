@@ -2,6 +2,8 @@ import {
   accountSnapshot,
   pocketSplit,
   cycleTxs,
+  fundCarryGap,
+  fundSpentSince,
   homeGroupOf,
   homeGroups,
   guideForEnvelope,
@@ -15,7 +17,7 @@ import { useState } from 'react'
 import { clampWeekStart, formatRange, todayISO } from './dates'
 import { weekdayName, type MsgKey } from './i18n'
 import { kindLabel } from './template'
-import { markPaid, updateSettings, useAppState } from './store'
+import { markPaid, restoreFundCarry, updateSettings, useAppState } from './store'
 import { useLocale, useMoney, useT } from './useT'
 import type { Sheet as SheetState } from './types'
 
@@ -91,6 +93,10 @@ export function Home({
     ...g,
     items: views.filter((v) => homeGroupOf(v.env) === g.id && !v.env.parentId),
   }))
+  const fundGaps = state.envelopes
+    .filter((e) => e.kind === 'fund')
+    .map((e) => ({ env: e, gap: fundCarryGap(state, e.id) }))
+    .filter((row) => row.gap > 0)
 
   return (
     <div>
@@ -114,6 +120,21 @@ export function Home({
           {t('home.move')}
         </button>
       </div>
+
+      {fundGaps.length > 0 && (
+        <div className="card stack" style={{ marginBottom: 14 }}>
+          {fundGaps.map(({ env, gap }) => (
+            <div key={env.id} className="stack" style={{ gap: 8 }}>
+              <p style={{ margin: 0 }}>
+                {env.emoji} {t('fund.gap', { name: env.name, amount: money(gap) })}
+              </p>
+              <button type="button" className="btn full sage" onClick={() => restoreFundCarry(env.id)}>
+                {t('fund.restore')}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {hot.length > 0 && (
         <div className={`banner ${over.length + atLimit.length + almost.length > 0 ? 'red' : 'orange'}`}>
@@ -333,10 +354,11 @@ function EnvelopeCard({
   const ownPace = group === 'daily' ? guideForEnvelope(app, view.env.id) : null
   const { env, total, pct, light, paid } = view
   const folderRemaining = folders.reduce((s, c) => s + c.remaining, 0)
-  const folderSpent = folders.reduce((s, c) => s + c.spent, 0)
+  const spentLife =
+    env.kind === 'fund'
+      ? fundSpentSince(app, env.id) + folders.reduce((s, c) => s + fundSpentSince(app, c.env.id), 0)
+      : view.spent
   const remaining = view.remaining + folderRemaining
-  const spent = view.spent + folderSpent
-  const headline = remaining > 0 ? remaining : spent
   const week = view.week
   const weekPct =
     week && week.target > 0 ? Math.min(100, Math.round((week.spent / week.target) * 100)) : 0
@@ -352,13 +374,11 @@ function EnvelopeCard({
             : env.kind === 'savings'
               ? t('home.savingsUsed', { amount: money(view.used) })
               : env.kind === 'fund'
-                ? folders.length > 0
-                  ? remaining > 0 && spent > 0
-                    ? t('fund.both', { set: money(remaining), spent: money(spent) })
-                    : spent > 0
-                      ? t('fund.spentBit', { amount: money(spent) })
-                      : t('fund.setAside', { amount: money(remaining) })
-                  : t('home.fundSpent', { amount: money(view.spent) })
+                ? remaining > 0 && spentLife > 0
+                  ? t('fund.both', { set: money(remaining), spent: money(spentLife) })
+                  : spentLife > 0
+                    ? t('fund.spentBit', { amount: money(spentLife) })
+                    : t('fund.setAside', { amount: money(remaining) })
                 : week
                   ? t('home.weekLine', {
                       spent: money(week.spent),
@@ -372,7 +392,7 @@ function EnvelopeCard({
         </div>
       </div>
       <div className="right">
-        <div className="remain">{money(env.kind === 'fund' && folders.length > 0 ? headline : remaining)}</div>
+        <div className="remain">{money(remaining)}</div>
         <span className={`pill ${light}`}>{pillLabel(view, t)}</span>
       </div>
       <div className={`bar ${light}`}>
@@ -381,7 +401,7 @@ function EnvelopeCard({
       {folders.length > 0 &&
         folders.map((c) => (
           <span key={c.env.id} className="muted" style={{ fontSize: 12, gridColumn: '1 / -1' }}>
-            {c.env.emoji} {c.env.name} · {folderLine(t, money, c.remaining, c.spent)}
+            {c.env.emoji} {c.env.name} · {folderLine(t, money, c.remaining, fundSpentSince(app, c.env.id))}
           </span>
         ))}
       {week && group === 'cap' && (

@@ -5,6 +5,7 @@ import {
   daysInclusive,
   eachDay,
   formatDay,
+  formatRange,
   localDayFromStamp,
   todayISO,
   weekStartOn,
@@ -1166,4 +1167,244 @@ function fmt(cents: number, locale: Locale = 'es', currency: import('./types').C
 
 export function carryKinds(kind: EnvelopeKind): boolean {
   return kind === 'fund' || kind === 'savings'
+}
+
+/** El sobre y las carpetas que tiene dentro. */
+export function envelopeTree(envelopes: Envelope[], rootId: string): string[] {
+  const ids = [rootId]
+  const seen = new Set(ids)
+  let i = 0
+  while (i < ids.length) {
+    const parent = ids[i++]
+    for (const env of envelopes) {
+      if (env.parentId === parent && !seen.has(env.id)) {
+        seen.add(env.id)
+        ids.push(env.id)
+      }
+    }
+  }
+  return ids
+}
+
+/** Los movimientos del sobre borrado quedan cobrados en el destino. Un traspaso a sí mismo se quita. */
+export function reassignTxs(txs: Tx[], fromIds: string[], toId: string): Tx[] {
+  const from = new Set(fromIds)
+  const next: Tx[] = []
+  for (const tx of txs) {
+    if (tx.type === 'transfer') {
+      const envelopeId = from.has(tx.envelopeId) ? toId : tx.envelopeId
+      const toEnvelopeId = tx.toEnvelopeId && from.has(tx.toEnvelopeId) ? toId : tx.toEnvelopeId
+      if (toEnvelopeId && envelopeId === toEnvelopeId) continue
+      next.push({ ...tx, envelopeId, toEnvelopeId })
+      continue
+    }
+    if (from.has(tx.envelopeId)) next.push({ ...tx, envelopeId: toId })
+    else next.push(tx)
+  }
+  return next
+}
+
+/**
+ * Quita sobres y pasa su dinero al destino.
+ * Si el destino no sale del sueldo (fondo o ahorro), el planned que se libera
+ * volvería a Libre al recalcular: se anula con un opening negativo en Libre,
+ * así el euro queda solo en el destino.
+ */
+export function envelopesAfterRemoval(
+  envelopes: Envelope[],
+  removeIds: string[],
+  toId: string,
+  income: number,
+  locale: Locale,
+): Envelope[] {
+  const drop = new Set(removeIds)
+  const dest = envelopes.find((e) => e.id === toId)
+  if (!dest || drop.has(toId)) return envelopes
+  const removed = envelopes.filter((e) => drop.has(e.id))
+  const payPlanned = removed.filter(takesFromPay).reduce((s, e) => s + e.planned, 0)
+  const payOpening = removed.filter(takesFromPay).reduce((s, e) => s + e.opening, 0)
+  const otherCash = removed
+    .filter((e) => !takesFromPay(e))
+    .reduce((s, e) => s + e.opening + e.planned, 0)
+  let next = envelopes
+    .filter((e) => !drop.has(e.id))
+    .map((e) => {
+      if (e.id !== toId) return e
+      if (e.kind === 'buffer') return { ...e, opening: e.opening + payOpening + otherCash }
+      if (takesFromPay(e)) {
+        return { ...e, planned: e.planned + payPlanned, opening: e.opening + payOpening + otherCash }
+      }
+      return { ...e, opening: e.opening + payPlanned + payOpening + otherCash }
+    })
+  next = withBalancedBuffer(next, income, locale)
+  if (dest.kind !== 'buffer' && !takesFromPay(dest) && payPlanned > 0) {
+    next = next.map((e) => (e.kind === 'buffer' ? { ...e, opening: e.opening - payPlanned } : e))
+  }
+  return next
+}
+
+/** Apartado que pasa al ciclo siguiente. Un fondo cerrado suelta lo suyo al destino del sobrante. */
+export function nextOpenings(
+  envelopes: Envelope[],
+  txs: Tx[],
+  cycleId: string,
+  destId: string,
+  fundChoice: Record<string, 'continue' | 'close'> = {},
+): Map<string, number> {
+  const leftoverById = new Map<string, number>()
+  for (const env of envelopes) leftoverById.set(env.id, env.opening + env.planned)
+  for (const tx of txs) {
+    if (tx.cycleId !== cycleId) continue
+    if (tx.type === 'expense') {
+      leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) - tx.amount)
+    }
+    if (tx.type === 'income') {
+      leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) + tx.amount)
+    }
+    if (tx.type === 'transfer') {
+      leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) - tx.amount)
+      if (tx.toEnvelopeId) {
+        leftoverById.set(tx.toEnvelopeId, (leftoverById.get(tx.toEnvelopeId) ?? 0) + tx.amount)
+      }
+    }
+  }
+  const savingsId = envelopes.find((e) => e.kind === 'savings')?.id ?? 'ahorro'
+  const destClosed = envelopes.some(
+    (e) => e.id === destId && e.kind === 'fund' && fundChoice[e.id] === 'close',
+  )
+  const actualDest = destClosed ? savingsId : destId
+  let extra = 0
+  const openings = new Map<string, number>()
+  for (const env of envelopes) {
+    const left = leftoverById.get(env.id) ?? 0
+    const closedFund = env.kind === 'fund' && fundChoice[env.id] === 'close'
+    if (carryKinds(env.kind) && !closedFund) openings.set(env.id, Math.max(0, left))
+    else extra += Math.max(0, left)
+  }
+  openings.set(actualDest, (openings.get(actualDest) ?? 0) + extra)
+  return openings
+}
+
+export function fundCloseSnap(
+  envelopes: Envelope[],
+  txs: Tx[],
+  cycleId: string,
+  fundChoice: Record<string, 'continue' | 'close'>,
+): import('./types').FundSnap[] {
+  const mine = txs.filter((tx) => tx.cycleId === cycleId)
+  return envelopes
+    .filter((e) => e.kind === 'fund')
+    .map((e) => {
+      const n = netFor(e.id, mine)
+      const left = e.opening + e.planned + n.in - n.out - n.spent
+      return {
+        id: e.id,
+        left: Math.max(0, left),
+        spent: n.spent,
+        carried: fundChoice[e.id] !== 'close',
+      }
+    })
+}
+
+function orderedCycles(state: AppState): Cycle[] {
+  return [...state.cycles].sort((a, b) => a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id))
+}
+
+function cycleStartedAt(state: AppState, cycleId: string): string | undefined {
+  return state.cycles.find((c) => c.id === cycleId)?.startedAt
+}
+
+/** Gastado del fondo desde la última vez que se cerró, ciclos anteriores incluidos. */
+export function fundSpentSince(state: AppState, envId: string): number {
+  const env = state.envelopes.find((e) => e.id === envId)
+  const epochAt = env?.fundEpoch ? cycleStartedAt(state, env.fundEpoch) : undefined
+  let spent = 0
+  for (const tx of state.txs) {
+    if (tx.type !== 'expense' || tx.envelopeId !== envId) continue
+    if (epochAt) {
+      const at = cycleStartedAt(state, tx.cycleId)
+      if (at && at < epochAt) continue
+    }
+    spent += tx.amount
+  }
+  return spent
+}
+
+/**
+ * Apartado de ciclos ya cerrados que no llegó al opening de este.
+ * Si el cierre guardó foto, se usa esa. Si no, se reconstruye con los traspasos.
+ */
+export function fundCarryGap(state: AppState, envId: string): number {
+  const env = state.envelopes.find((e) => e.id === envId)
+  const active = activeCycle(state)
+  if (!env || env.kind !== 'fund' || !active) return 0
+  const ordered = orderedCycles(state)
+  const prev = [...ordered].reverse().find((c) => c.closedAt && c.id !== active.id)
+  if (!prev) return 0
+  if (prev.fundSnap) {
+    const snap = prev.fundSnap.find((s) => s.id === envId)
+    if (!snap || !snap.carried) return 0
+    return Math.max(0, snap.left - env.opening)
+  }
+  const epochAt = env.fundEpoch ? cycleStartedAt(state, env.fundEpoch) : undefined
+  let carried = 0
+  for (const cycle of ordered) {
+    if (!cycle.closedAt || cycle.id === active.id) continue
+    if (cycle.startedAt > prev.startedAt) continue
+    if (epochAt && cycle.startedAt < epochAt) continue
+    const n = netFor(envId, state.txs.filter((tx) => tx.cycleId === cycle.id))
+    carried = Math.max(0, carried + n.in - n.out - n.spent)
+  }
+  return Math.max(0, carried - env.opening)
+}
+
+export interface FundPastRow {
+  id: string
+  name: string
+  emoji: string
+  spent: number
+  movedIn: number
+  movedOut: number
+}
+
+export interface FundPastCycle {
+  cycleId: string
+  label: string
+  archived: boolean
+  rows: FundPastRow[]
+  txs: Tx[]
+}
+
+/** Movimientos de ciclos ya cerrados de este sobre (y de sus carpetas, si es un fondo). */
+export function fundPastCycles(state: AppState, envId: string, locale: Locale): FundPastCycle[] {
+  const env = state.envelopes.find((e) => e.id === envId)
+  if (!env) return []
+  const ids = envelopeTree(state.envelopes, envId)
+  const idSet = new Set(ids)
+  const epochAt = env.fundEpoch ? cycleStartedAt(state, env.fundEpoch) : undefined
+  const active = activeCycle(state)
+  const out: FundPastCycle[] = []
+  for (const cycle of orderedCycles(state)) {
+    if (!cycle.closedAt || cycle.id === active?.id) continue
+    const txs = state.txs.filter(
+      (tx) => tx.cycleId === cycle.id && (idSet.has(tx.envelopeId) || (tx.toEnvelopeId && idSet.has(tx.toEnvelopeId))),
+    )
+    const rows: FundPastRow[] = []
+    for (const id of ids) {
+      const rowEnv = state.envelopes.find((e) => e.id === id)
+      if (!rowEnv) continue
+      const n = netFor(id, state.txs.filter((tx) => tx.cycleId === cycle.id))
+      if (n.spent === 0 && n.in === 0 && n.out === 0) continue
+      rows.push({ id, name: rowEnv.name, emoji: rowEnv.emoji, spent: n.spent, movedIn: n.in, movedOut: n.out })
+    }
+    if (rows.length === 0 && txs.length === 0) continue
+    out.push({
+      cycleId: cycle.id,
+      label: formatRange(cycle.startedAt, cycle.closedAt ?? cycle.expectedEndAt, locale),
+      archived: Boolean(epochAt && cycle.startedAt < epochAt),
+      rows,
+      txs,
+    })
+  }
+  return out
 }

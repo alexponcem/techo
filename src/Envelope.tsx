@@ -1,5 +1,15 @@
 import { useState } from 'react'
-import { activeCycle, cycleTxs, envelopeView, rhythmOf, weekStartOfEnv } from './logic'
+import {
+  activeCycle,
+  cycleTxs,
+  envelopeTree,
+  envelopeView,
+  fundCarryGap,
+  fundPastCycles,
+  fundSpentSince,
+  rhythmOf,
+  weekStartOfEnv,
+} from './logic'
 import { parseEuros } from './money'
 import { useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
@@ -7,9 +17,11 @@ import { EMOJI_PICK, kindHint, kindLabel } from './template'
 import {
   addSubfund,
   markPaid,
+  removeEnvelope,
   removeExpense,
   removeTx,
   renameEnvelope,
+  restoreFundCarry,
   setEnvelopeWeekStart,
   setSplitDaily,
   updatePlanned,
@@ -44,6 +56,8 @@ export function EnvelopeScreen({
   const [pending, setPending] = useState<Tx | null>(null)
   const [folderName, setFolderName] = useState('')
   const [folderEmoji, setFolderEmoji] = useState('✈️')
+  const [removing, setRemoving] = useState(false)
+  const [destId, setDestId] = useState('')
 
   if (!cycle || !env) {
     return (
@@ -62,8 +76,18 @@ export function EnvelopeScreen({
     .filter((e) => e.parentId === env.id)
     .map((e) => envelopeView(e, allTxs, cycle, undefined, undefined, weekStartOfEnv(e, state), locale))
   const groupRemaining = view.remaining + childViews.reduce((s, c) => s + c.remaining, 0)
-  const groupSpent = view.spent + childViews.reduce((s, c) => s + c.spent, 0)
+  const lifeSpent =
+    env.kind === 'fund'
+      ? fundSpentSince(state, env.id) +
+        (env.parentId ? 0 : childViews.reduce((s, c) => s + fundSpentSince(state, c.env.id), 0))
+      : view.spent
   const shownRemaining = env.kind === 'fund' && !env.parentId ? groupRemaining : view.remaining
+  const past = fundPastCycles(state, env.id, locale)
+  const gaps = (env.kind === 'fund' ? [env, ...state.envelopes.filter((e) => e.parentId === env.id)] : [])
+    .map((e) => ({ env: e, gap: fundCarryGap(state, e.id) }))
+    .filter((row) => row.gap > 0)
+  const removeIds = new Set(envelopeTree(state.envelopes, env.id))
+  const dests = state.envelopes.filter((e) => !removeIds.has(e.id))
 
   function saveTecho() {
     if (!env) return
@@ -91,12 +115,12 @@ export function EnvelopeScreen({
           {env.name}
           {env.kind === 'savings'
             ? tr('env.savingsUsed', { amount: money(view.used), pct: view.pct })
-            : env.kind === 'fund' && childViews.length > 0
-              ? groupRemaining > 0 && groupSpent > 0
-                ? tr('fund.both', { set: money(groupRemaining), spent: money(groupSpent) })
-                : groupSpent > 0
-                  ? tr('fund.spentBit', { amount: money(groupSpent) })
-                  : tr('fund.setAside', { amount: money(groupRemaining) })
+            : env.kind === 'fund'
+              ? shownRemaining > 0 && lifeSpent > 0
+                ? tr('fund.both', { set: money(shownRemaining), spent: money(lifeSpent) })
+                : lifeSpent > 0
+                  ? tr('fund.spentBit', { amount: money(lifeSpent) })
+                  : tr('fund.setAside', { amount: money(shownRemaining) })
               : tr('env.leftOf', { total: money(view.total) })}
         </div>
       </div>
@@ -123,6 +147,21 @@ export function EnvelopeScreen({
                 ? tr('env.hintSav')
                 : kindHint(env.kind, locale)}
       </p>
+      {env.kind === 'fund' && lifeSpent > view.spent + childViews.reduce((s, c) => s + c.spent, 0) && (
+        <p className="muted" style={{ margin: 0 }}>
+          {tr('fund.memory')}
+        </p>
+      )}
+      {gaps.map(({ env: gapEnv, gap }) => (
+        <div key={gapEnv.id} className="card stack">
+          <p style={{ margin: 0 }}>
+            {gapEnv.emoji} {tr('fund.gap', { name: gapEnv.name, amount: money(gap) })}
+          </p>
+          <button type="button" className="btn full sage" onClick={() => restoreFundCarry(gapEnv.id)}>
+            {tr('fund.restore')}
+          </button>
+        </div>
+      ))}
       <div className="actions">
         <button className="btn sage" onClick={onAdd}>
           {env.kind === 'savings' ? tr('env.useSav') : tr('home.spend')}
@@ -224,10 +263,13 @@ export function EnvelopeScreen({
                   onClick={() => onOpen(child.env.id)}
                 >
                   {child.env.emoji} {child.env.name} ·{' '}
-                  {child.remaining > 0 && child.spent > 0
-                    ? tr('fund.both', { set: money(child.remaining), spent: money(child.spent) })
-                    : child.spent > 0
-                      ? tr('fund.spentBit', { amount: money(child.spent) })
+                  {child.remaining > 0 && fundSpentSince(state, child.env.id) > 0
+                    ? tr('fund.both', {
+                        set: money(child.remaining),
+                        spent: money(fundSpentSince(state, child.env.id)),
+                      })
+                    : fundSpentSince(state, child.env.id) > 0
+                      ? tr('fund.spentBit', { amount: money(fundSpentSince(state, child.env.id)) })
                       : tr('fund.setAside', { amount: money(child.remaining) })}
                 </button>
               ))}
@@ -296,6 +338,11 @@ export function EnvelopeScreen({
           )}
         </div>
       )}
+      {env.kind !== 'buffer' && env.kind !== 'savings' && (
+        <button type="button" className="btn danger full" onClick={() => { setRemoving(true); setDestId(''); setMsg('') }}>
+          {tr('env.remove')}
+        </button>
+      )}
       <div className="section-title">
         <span>{tr('env.txs')}</span>
         <span className="muted">{txs.length}</span>
@@ -334,6 +381,123 @@ export function EnvelopeScreen({
             </div>
           ))}
       </div>
+      {past.length > 0 && (
+        <>
+          <div className="section-title">
+            <span>{tr('fund.past')}</span>
+            <span className="muted">{past.length}</span>
+          </div>
+          {past.map((block) => (
+            <div className="card stack" key={block.cycleId}>
+              <strong>
+                {block.archived ? `${tr('fund.archive')} · ` : ''}
+                {block.label}
+              </strong>
+              {block.rows.map((row) => {
+                const bits = [
+                  row.movedIn > 0 ? tr('fund.inBit', { amount: money(row.movedIn) }) : '',
+                  row.movedOut > 0 ? tr('fund.outBit', { amount: money(row.movedOut) }) : '',
+                  row.spent > 0 ? tr('fund.spentBit', { amount: money(row.spent) }) : '',
+                ].filter(Boolean)
+                return (
+                  <p key={row.id} className="muted" style={{ margin: 0, fontSize: 13 }}>
+                    {row.emoji} {row.name}
+                    {bits.length > 0 ? ` · ${bits.join(' · ')}` : ''}
+                  </p>
+                )
+              })}
+              {block.txs
+                .slice()
+                .reverse()
+                .map((t) => {
+                  const owner = state.envelopes.find((e) => e.id === t.envelopeId)
+                  const intoTree = Boolean(t.toEnvelopeId && removeIds.has(t.toEnvelopeId))
+                  const fromTree = removeIds.has(t.envelopeId)
+                  const prefix =
+                    t.type === 'income' || (t.type === 'transfer' && intoTree && !fromTree)
+                      ? '+'
+                      : t.type === 'transfer' && intoTree && fromTree
+                        ? ''
+                        : '−'
+                  return (
+                    <div className="tx" key={t.id}>
+                      <div>
+                        <div>
+                          {labelTx(t.type, fromTree, tr)}
+                          {owner && owner.id !== id ? ` · ${owner.emoji} ${owner.name}` : ''}
+                        </div>
+                        <div className="muted">
+                          {new Date(t.at).toLocaleString(locale === 'en' ? 'en-US' : 'es-ES', {
+                            day: 'numeric',
+                            month: 'short',
+                          })}
+                          {t.note ? ` · ${t.note}` : ''}
+                        </div>
+                      </div>
+                      <div>
+                        {prefix}
+                        {money(t.amount)}
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          ))}
+        </>
+      )}
+      {removing && (
+        <div className="sheet-backdrop" onClick={() => setRemoving(false)}>
+          <div className="sheet stack" onClick={(e) => e.stopPropagation()}>
+            <div className="handle" />
+            <h2 className="serif" style={{ fontSize: 26 }}>
+              {tr('env.removeTitle', { name: env.name })}
+            </h2>
+            <p className="muted">{tr('env.removeBody')}</p>
+            <p>
+              {tr('fund.both', {
+                set: money(shownRemaining),
+                spent: money(view.spent + childViews.reduce((s, c) => s + c.spent, 0)),
+              })}
+            </p>
+            {childViews.length > 0 && !env.parentId ? <p className="muted">{tr('env.removeFolders')}</p> : null}
+            <p className="tiny">{tr('env.removeTo')}</p>
+            <div className="chips">
+              {dests.map((dest) => (
+                <button
+                  key={dest.id}
+                  type="button"
+                  className={`chip ${destId === dest.id ? 'on' : ''}`}
+                  onClick={() => setDestId(dest.id)}
+                >
+                  {dest.emoji} {dest.name}
+                </button>
+              ))}
+            </div>
+            {msg ? <p className="muted">{msg}</p> : null}
+            <div className="actions">
+              <button type="button" className="btn ghost" onClick={() => setRemoving(false)}>
+                {tr('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                disabled={!destId}
+                onClick={() => {
+                  if (!destId) return
+                  const result = removeEnvelope(env.id, destId)
+                  if (!result.ok) {
+                    setMsg(result.error)
+                    return
+                  }
+                  onBack()
+                }}
+              >
+                {tr('env.removeGo')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {pending && (
         <div className="sheet-backdrop" onClick={() => setPending(null)}>
           <div className="sheet stack" onClick={(e) => e.stopPropagation()}>

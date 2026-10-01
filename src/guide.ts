@@ -96,7 +96,7 @@ export const TUTORIAL: GuidePage[] = [
     items: [
       {
         k: 'Fondos',
-        v: 'Salen del ahorro, no del diario. Puedes apartar un poco cada ciclo o mover cuando lo necesites.',
+        v: 'Salen del ahorro, no del diario. Al cerrar el ciclo, si el fondo continúa, lo apartado se suma. Si se cerró, lo que quede va con lo que sobró.',
       },
       {
         k: 'Cerrar el ciclo',
@@ -210,7 +210,7 @@ const TUTORIAL_EN: GuidePage[] = [
     items: [
       {
         k: 'Goals',
-        v: 'They come from savings, not daily money. Set a little aside each cycle, or move it when you need it.',
+        v: 'They come from savings, not daily money. At close, a goal that continues adds up. If it closed, what’s left joins the leftover.',
       },
       {
         k: 'Close the cycle',

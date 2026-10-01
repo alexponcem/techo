@@ -21,6 +21,17 @@ export interface Envelope {
   parentId?: string
   /** Día de inicio de la semana de este techo semanal. 0 = domingo … 6 = sábado. */
   weekStartsOn?: number
+  /** Si el fondo se cerró, los ciclos anteriores a este id quedan en el archivo y no se suman. */
+  fundEpoch?: string
+}
+
+/** Saldo de un fondo al cerrar el ciclo, para poder recuperarlo. */
+export interface FundSnap {
+  id: string
+  left: number
+  spent: number
+  /** false = se cerró y lo apartado pasó al destino del sobrante. */
+  carried: boolean
 }
 
 export interface Cycle {
@@ -39,6 +50,8 @@ export interface Cycle {
   fairDaily?: number
   /** Efectivo que había al abrir el ciclo. El resto del dinero está en el banco. */
   openingCash?: number
+  /** Fondos al cerrar. Los ciclos viejos no lo traen: esos se reconstruyen por los movimientos. */
+  fundSnap?: FundSnap[]
 }
 
 export interface Tx {

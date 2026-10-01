@@ -184,7 +184,7 @@ const msg = {
   'home.newEnvelope': { es: '+ Nuevo sobre', en: '+ New envelope' },
   'home.inDaily': { es: 'En el diario', en: 'In daily' },
   'home.savingsUsed': { es: 'Usado {amount} este mes', en: 'Used {amount} this cycle' },
-  'home.fundSpent': { es: 'Fondo · gastado {amount} este ciclo', en: 'Goal · spent {amount} this cycle' },
+  'home.fundSpent': { es: 'Fondo · gastado {amount}', en: 'Goal · spent {amount}' },
   'home.weekLine': {
     es: 'Esta semana {spent} / ~{target} · mes {monthSpent} / {total}',
     en: 'This week {spent} / ~{target} · cycle {monthSpent} / {total}',
@@ -417,6 +417,31 @@ const msg = {
   'fund.setAside': { es: 'apartado {amount}', en: 'set aside {amount}' },
   'fund.spentBit': { es: 'gastado {amount}', en: 'spent {amount}' },
   'fund.both': { es: 'apartado {set} · gastado {spent}', en: 'set aside {set} · spent {spent}' },
+  'fund.inBit': { es: 'entró {amount}', en: 'in {amount}' },
+  'fund.outBit': { es: 'salió {amount}', en: 'out {amount}' },
+  'fund.askTitle': { es: 'Fondos el mes que viene', en: 'Goals next cycle' },
+  'fund.askHint': {
+    es: 'Si continúa, lo apartado se suma al siguiente ciclo. Si se cerró, lo que quede va con lo que sobró.',
+    en: 'If it continues, what’s set aside adds up next cycle. If it closed, what’s left joins the leftover.',
+  },
+  'fund.continue': { es: 'Continúa', en: 'Continues' },
+  'fund.closed': { es: 'Se cerró', en: 'Closed' },
+  'fund.past': { es: 'Ciclos anteriores', en: 'Earlier cycles' },
+  'fund.archive': { es: 'Antes de cerrarlo', en: 'Before it closed' },
+  'fund.memory': {
+    es: 'El gastado cuenta también los ciclos en los que este fondo siguió abierto.',
+    en: 'Spent also counts the cycles this goal stayed open.',
+  },
+  'fund.gap': {
+    es: '{name} tenía {amount} apartados en el ciclo anterior y no pasaron.',
+    en: '{name} had {amount} set aside last cycle and it didn’t come across.',
+  },
+  'fund.restore': { es: 'Traer a este ciclo', en: 'Bring into this cycle' },
+  'fund.nothing': { es: 'No hay nada que traer de un ciclo anterior.', en: 'Nothing to bring from an earlier cycle.' },
+  'fund.destMoved': {
+    es: 'Ese fondo se cerró, así que lo que sobró va al ahorro.',
+    en: 'That goal closed, so the leftover goes to savings.',
+  },
   'settings.extraIncome': { es: 'Registrar ingreso extra', en: 'Log extra income' },
   'settings.undo': { es: 'Deshacer último movimiento', en: 'Undo last movement' },
   'settings.export': { es: 'Exportar copia (JSON)', en: 'Export backup (JSON)' },
@@ -483,6 +508,18 @@ const msg = {
     es: 'Si era un gasto cubierto con ahorro o libre, también se deshace ese traspaso. Esto no se puede deshacer después (salvo “deshacer último” en ajustes, si era el último).',
     en: 'If it was covered with savings or Free, that transfer is undone too. You can’t undo this after (except “undo last” in Settings, if it was the last one).',
   },
+  'env.remove': { es: 'Eliminar sobre', en: 'Delete envelope' },
+  'env.removeTitle': { es: '¿Eliminar {name}?', en: 'Delete {name}?' },
+  'env.removeBody': {
+    es: 'Lo apartado y lo ya gastado pasan al sobre que elijas. Esos gastos quedan cobrados ahí.',
+    en: 'What’s set aside and what’s already spent move to the envelope you pick. Those spends are charged there.',
+  },
+  'env.removeFolders': {
+    es: 'Las carpetas de dentro también se eliminan y su dinero pasa al mismo sobre.',
+    en: 'Folders inside are deleted too, and their money goes to the same envelope.',
+  },
+  'env.removeTo': { es: '¿A qué sobre pasa el dinero?', en: 'Which envelope receives the money?' },
+  'env.removeGo': { es: 'Pasar y eliminar', en: 'Move and delete' },
   'env.txExpense': { es: 'Gasto', en: 'Spend' },
   'env.txIncome': { es: 'Ingreso', en: 'Income' },
   'env.txOut': { es: 'Salida a otro sobre', en: 'Sent to another envelope' },
@@ -565,12 +602,16 @@ const msg = {
 
   'cycle.title': { es: 'Cerrar ciclo', en: 'Close cycle' },
   'cycle.lead': {
-    es: 'Si no llegas al techo de un sobre, ese dinero no se pierde: al cerrar el ciclo pasa al ahorro o al fondo que elijas. Los fondos que ya tenían apartado se quedan como están.',
-    en: 'If you don’t hit an envelope’s cap, that money isn’t lost: at close it goes to savings or the goal you pick. Goals that already had money stay as they are.',
+    es: 'Lo que sobró en techos, cuotas y Libre va al sobre que elijas. En cada fondo dices si continúa (se acumula) o si se cerró (lo que quede va con ese sobrante).',
+    en: 'What’s left in caps, bills and Free goes to the envelope you pick. For each goal you say if it continues (it adds up) or it closed (what’s left joins that leftover).',
   },
   'cycle.savNow': { es: 'Ahorro ahora: {amount}.', en: 'Savings now: {amount}.' },
   'cycle.left': { es: ' Residual de techos/cuotas/libre: {amount}.', en: ' Left in caps/bills/Free: {amount}.' },
-  'cycle.fundsStay': { es: ' Fondos se quedan como están: {list}.', en: ' Goals stay as they are: {list}.' },
+  'cycle.fundsStay': { es: ' Los que siguen se acumulan: {list}.', en: ' These keep adding up: {list}.' },
+  'cycle.closedJoin': {
+    es: ' Fondos cerrados que pasan con lo que sobró: {amount}.',
+    en: ' Closed goals joining the leftover: {amount}.',
+  },
   'cycle.bring': { es: 'Traes {carried}', en: 'You bring {carried}' },
   'cycle.plusPay': { es: ' + sueldo {pay} = {pot}', en: ' + pay {pay} = {pot}' },
   'cycle.assign': {
@@ -714,6 +755,9 @@ const msg = {
   'store.paid': { es: 'Pagado', en: 'Paid' },
   'store.coveredFree': { es: 'Extra cubierto con Libre', en: 'Extra covered with Free' },
   'store.moved': { es: 'Reasignado', en: 'Reassigned' },
+  'store.missing': { es: 'Ese sobre ya no está.', en: 'That envelope is gone.' },
+  'store.keepEnvelope': { es: 'Libre y Ahorro se quedan. Elige otro sobre.', en: 'Free and Savings stay. Pick another envelope.' },
+  'store.badDest': { es: 'Elige un sobre que no sea este ni una carpeta suya.', en: 'Pick an envelope other than this one or its folders.' },
 } as const
 
 export type MsgKey = keyof typeof msg
