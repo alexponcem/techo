@@ -828,12 +828,23 @@ export function accountSnapshot(views: EnvelopeView[]): {
   }
 }
 
-/** Banco = total − efectivo. El cajero mueve entre los dos sin cambiar el total. */
+/** Lo que la tarjeta de crédito aún no ha cobrado del banco. Cuenta todos los ciclos. */
+export function creditFloat(state: AppState): number {
+  let owed = 0
+  for (const tx of state.txs) {
+    if (tx.type === 'expense' && tx.pocket === 'credit') owed += tx.amount
+    else if (tx.type === 'income' && tx.pocket === 'credit') owed -= tx.amount
+    else if (tx.type === 'cardpay') owed -= tx.amount
+  }
+  return owed
+}
+
+/** Banco = total − efectivo + lo que la tarjeta todavía no ha cobrado. */
 export function pocketSplit(
   state: AppState,
   total: number,
   afterFixed: number,
-): { cash: number; bank: number; afterCash: number; afterBank: number } {
+): { cash: number; bank: number; afterCash: number; afterBank: number; credit: number } {
   const cycle = activeCycle(state)
   let cash = cycle?.openingCash ?? 0
   if (cycle) {
@@ -849,11 +860,13 @@ export function pocketSplit(
       if (tx.type === 'income') cash += tx.amount
     }
   }
+  const credit = creditFloat(state)
   return {
     cash,
-    bank: total - cash,
+    bank: total - cash + credit,
     afterCash: cash,
-    afterBank: afterFixed - cash,
+    afterBank: afterFixed - cash + credit,
+    credit,
   }
 }
 

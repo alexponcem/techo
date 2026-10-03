@@ -231,6 +231,16 @@ export function Home({
             {t('home.billsDone')}
           </p>
         )}
+        {pockets.credit > 0 && (
+          <>
+            <p className="muted" style={{ fontSize: 13 }}>
+              {t('home.creditOwed', { amount: money(pockets.credit) })}
+            </p>
+            <button type="button" className="btn ghost full" onClick={() => onOpen({ name: 'card-pay' })}>
+              {t('home.payCard')}
+            </button>
+          </>
+        )}
         <button type="button" className="btn ghost full" onClick={() => onOpen({ name: 'cash' })}>
           {t('home.cashMove')}
         </button>

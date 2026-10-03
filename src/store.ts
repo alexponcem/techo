@@ -12,6 +12,7 @@ import {
   nextOpenings,
   accountSnapshot,
   openDailyPace,
+  creditFloat,
   pocketSplit,
   reassignTxs,
   reportFor,
@@ -25,7 +26,7 @@ import {
 import { t } from './i18n'
 import { isCurrency } from './money'
 import { alexPlan } from './template'
-import type { AppState, Currency, Envelope, Locale, PocketMove, Settings, Tx } from './types'
+import type { AppState, Currency, Envelope, Locale, Pocket, PocketMove, Settings, Tx } from './types'
 
 function localeOf(s: AppState | Settings): Locale {
   if ('settings' in s) return s.settings.locale ?? 'es'
@@ -249,7 +250,7 @@ export function addExpense(
   amount: number,
   note: string,
   at?: string,
-  pocket?: 'card' | 'cash',
+  pocket?: Pocket,
 ) {
   if (amount <= 0) return
   pushTx({ type: 'expense', envelopeId, amount, note, at, pocket: pocket ?? 'card' })
@@ -263,7 +264,7 @@ export function coverAndSpend(input: {
   fromLibre?: { id: string; amount: number }
   fromParent?: { id: string; amount: number }
   fromSavings?: { id: string; amount: number; reason: string }
-  pocket?: 'card' | 'cash'
+  pocket?: Pocket
 }) {
   const cycle = activeCycle(state)
   if (!cycle || input.amount <= 0) return
@@ -322,7 +323,7 @@ export function addIncome(
   envelopeId: string,
   amount: number,
   note: string,
-  pocket?: 'card' | 'cash',
+  pocket?: Pocket,
 ) {
   if (amount <= 0) return
   pushTx({ type: 'income', envelopeId, amount, note, pocket: pocket ?? 'card' })
@@ -371,7 +372,7 @@ export function removeExpense(id: string) {
 
 export function updateExpense(
   id: string,
-  patch: { amount: number; note: string; at: string; pocket?: 'card' | 'cash' },
+  patch: { amount: number; note: string; at: string; pocket?: Pocket },
 ) {
   const tx = state.txs.find((t) => t.id === id)
   if (!tx || tx.type !== 'expense' || patch.amount <= 0) return
@@ -703,6 +704,30 @@ export function movePocket(
     pocketMove: direction,
   })
   return { ok: true }
+}
+
+export function payCard(amount: number): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  if (amount <= 0) return { ok: false, error: t(locale, 'logic.needAmt') }
+  if (amount > creditFloat(state)) return { ok: false, error: t(locale, 'sheet.cardShort') }
+  pushTx({
+    type: 'cardpay',
+    envelopeId: '',
+    amount,
+    note: t(locale, 'store.cardPay'),
+  })
+  return { ok: true }
+}
+
+export function setTxPocket(id: string, pocket: Pocket) {
+  const tx = state.txs.find((row) => row.id === id)
+  if (!tx || (tx.type !== 'expense' && tx.type !== 'income')) return
+  emit({
+    ...state,
+    txs: state.txs.map((row) => (row.id === id ? { ...row, pocket } : row)),
+  })
 }
 
 export function setCycleSetAside(

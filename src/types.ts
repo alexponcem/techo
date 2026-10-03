@@ -1,8 +1,10 @@
 export type EnvelopeKind = 'fixed' | 'cap' | 'fund' | 'savings' | 'buffer'
 export type Rhythm = 'daily' | 'weekly' | 'none'
 export type PayMode = 'last-weekday' | 'fixed-day' | 'manual'
-export type TxType = 'expense' | 'income' | 'transfer' | 'pocket'
+export type TxType = 'expense' | 'income' | 'transfer' | 'pocket' | 'cardpay'
 export type PocketMove = 'to-cash' | 'to-bank'
+/** card = débito, sale del banco ya. cash = efectivo. credit = la deuda sube y el banco espera al pago. */
+export type Pocket = 'card' | 'cash' | 'credit'
 export type Light = 'green' | 'yellow' | 'orange' | 'red' | 'idle'
 
 export interface Envelope {
@@ -66,8 +68,8 @@ export interface Tx {
   amount: number
   note: string
   at: string
-  /** card = banco. cash = efectivo. Si falta, es tarjeta (movimientos antiguos). */
-  pocket?: 'card' | 'cash'
+  /** card = débito (banco). cash = efectivo. credit = tarjeta de crédito. Si falta, es débito. */
+  pocket?: Pocket
   /** Solo type pocket: mueve entre banco y efectivo, sin tocar sobres. */
   pocketMove?: PocketMove
 }
@@ -118,4 +120,5 @@ export type Sheet =
   | { name: 'income' }
   | { name: 'new-envelope' }
   | { name: 'cash' }
+  | { name: 'card-pay' }
   | null

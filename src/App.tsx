@@ -5,7 +5,7 @@ import { Home } from './Home'
 import { LanguageScreen } from './LanguageScreen'
 import { SettingsScreen } from './Settings'
 import { Setup } from './Setup'
-import { AddSheet, CashSheet, EditSheet, IncomeSheet, MoveSheet, NewEnvelopeSheet } from './Sheets'
+import { AddSheet, CardPaySheet, CashSheet, EditSheet, IncomeSheet, MoveSheet, NewEnvelopeSheet } from './Sheets'
 import { ActivityScreen, StatsScreen } from './Stats'
 import { useAppState } from './store'
 import { useLocale, useT } from './useT'
@@ -158,6 +158,7 @@ export default function App() {
       {sheet?.name === 'income' && <IncomeSheet onClose={() => closeSheet()} />}
       {sheet?.name === 'new-envelope' && <NewEnvelopeSheet onClose={() => closeSheet()} />}
       {sheet?.name === 'cash' && <CashSheet onClose={() => closeSheet()} />}
+      {sheet?.name === 'card-pay' && <CardPaySheet onClose={() => closeSheet()} />}
     </div>
   )
 }

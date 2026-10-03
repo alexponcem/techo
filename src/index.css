@@ -690,6 +690,11 @@ select:focus {
   font-size: 14px;
 }
 
+.tx > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .dots {
   display: flex;
   gap: 8px;

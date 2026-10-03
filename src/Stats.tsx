@@ -1,7 +1,9 @@
 import { formatDay, formatRange, localDayFromStamp } from './dates'
 import { displayNote } from './i18n'
 import { reportFor, type CycleReport } from './logic'
-import { useAppState } from './store'
+import { PocketChips } from './Sheets'
+import { setTxPocket, useAppState } from './store'
+import type { Pocket } from './types'
 import { useLocale, useMoney, useT } from './useT'
 
 const COLORS = ['#2c5a43', '#4a7a5e', '#6b8aa8', '#c65a12', '#8d6110', '#b4452c', '#7a6b8a']
@@ -152,7 +154,7 @@ function RecentList({ cycleId }: { cycleId: string }) {
     .filter(
       (tx) =>
         tx.cycleId === cycleId &&
-        (tx.type === 'expense' || tx.type === 'income' || tx.type === 'pocket'),
+        (tx.type === 'expense' || tx.type === 'income' || tx.type === 'pocket' || tx.type === 'cardpay'),
     )
     .slice()
     .reverse()
@@ -160,6 +162,9 @@ function RecentList({ cycleId }: { cycleId: string }) {
   return (
     <section className="card stack">
       <strong>{t('stats.recent')}</strong>
+      <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+        {t('stats.creditFix')}
+      </p>
       {rows.length === 0 ? (
         <p className="muted">{t('stats.noRecent')}</p>
       ) : (
@@ -167,21 +172,27 @@ function RecentList({ cycleId }: { cycleId: string }) {
           const env = state.envelopes.find((e) => e.id === tx.envelopeId)
           const sign = tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''
           const title =
-            tx.type === 'pocket'
+            tx.type === 'pocket' || tx.type === 'cardpay'
               ? tx.note
               : env
                 ? `${env.emoji} ${env.name}`
                 : tx.type === 'income'
                   ? t('env.txIncome')
                   : t('env.txExpense')
+          const paidWith: Pocket = tx.pocket === 'cash' || tx.pocket === 'credit' ? tx.pocket : 'card'
           return (
             <div className="tx" key={tx.id}>
               <div>
                 <div>{title}</div>
                 <div className="muted">
                   {formatDay(localDayFromStamp(tx.at), locale)}
-                  {tx.type !== 'pocket' && tx.note ? ` · ${displayNote(tx.note, locale)}` : ''}
+                  {tx.type !== 'pocket' && tx.type !== 'cardpay' && tx.note
+                    ? ` · ${displayNote(tx.note, locale)}`
+                    : ''}
                 </div>
+                {(tx.type === 'expense' || tx.type === 'income') && (
+                  <PocketChips value={paidWith} onChange={(next) => setTxPocket(tx.id, next)} />
+                )}
               </div>
               <div>
                 {sign}

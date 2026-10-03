@@ -36,12 +36,42 @@ import {
   getState,
   moveMoney,
   movePocket,
+  payCard,
   updateExpense,
   useAppState,
 } from './store'
-import type { EnvelopeKind, Rhythm } from './types'
+import type { EnvelopeKind, Pocket, Rhythm } from './types'
 
 const QUICK = [2, 5, 10, 15, 20, 25, 30, 50]
+
+export function PocketChips({
+  value,
+  onChange,
+}: {
+  value: Pocket
+  onChange: (next: Pocket) => void
+}) {
+  const t = useT()
+  const options = [
+    ['card', 'sheet.card'],
+    ['cash', 'sheet.cash'],
+    ['credit', 'sheet.credit'],
+  ] as const
+  return (
+    <div className="chips">
+      {options.map(([id, key]) => (
+        <button
+          key={id}
+          type="button"
+          className={`chip ${value === id ? 'on' : ''}`}
+          onClick={() => onChange(id)}
+        >
+          {t(key)}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function amountInput(cents: number): string {
   const whole = Math.trunc(cents / 100)
@@ -70,7 +100,7 @@ export function AddSheet({
   const [reason, setReason] = useState('')
   const [confirm, setConfirm] = useState(false)
   const [spendDay, setSpendDay] = useState(todayISO())
-  const [pocket, setPocket] = useState<'card' | 'cash'>('card')
+  const [pocket, setPocket] = useState<Pocket>('card')
   const [done, setDone] = useState<{ status: 'ok' | 'tight' | 'over'; title: string; body: string } | null>(
     null,
   )
@@ -280,22 +310,8 @@ export function AddSheet({
         </p>
       )}
       <p className="tiny">{t('sheet.payWith')}</p>
-      <div className="chips">
-        <button
-          type="button"
-          className={`chip ${pocket === 'card' ? 'on' : ''}`}
-          onClick={() => setPocket('card')}
-        >
-          {t('sheet.card')}
-        </button>
-        <button
-          type="button"
-          className={`chip ${pocket === 'cash' ? 'on' : ''}`}
-          onClick={() => setPocket('cash')}
-        >
-          {t('sheet.cash')}
-        </button>
-      </div>
+      <PocketChips value={pocket} onChange={setPocket} />
+      {pocket === 'credit' ? <p className="muted" style={{ fontSize: 13 }}>{t('sheet.creditHint')}</p> : null}
       {recentEnvelopes.length > 0 && (
         <>
           <p className="tiny">{t('sheet.recent')}</p>
@@ -473,7 +489,9 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
   const [amount, setAmount] = useState(tx ? String(tx.amount / 100) : '')
   const [note, setNote] = useState(tx?.note ? displayNote(tx.note, locale) : '')
   const [spendDay, setSpendDay] = useState(tx ? localDayFromStamp(tx.at) : todayISO())
-  const [pocket, setPocket] = useState<'card' | 'cash'>(tx?.pocket === 'cash' ? 'cash' : 'card')
+  const [pocket, setPocket] = useState<Pocket>(
+    tx?.pocket === 'cash' || tx?.pocket === 'credit' ? tx.pocket : 'card',
+  )
 
   if (!tx || tx.type !== 'expense') {
     return (
@@ -502,14 +520,8 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
       <p className="tiny">{t('sheet.payWith')}</p>
-      <div className="chips">
-        <button type="button" className={`chip ${pocket === 'card' ? 'on' : ''}`} onClick={() => setPocket('card')}>
-          {t('sheet.card')}
-        </button>
-        <button type="button" className={`chip ${pocket === 'cash' ? 'on' : ''}`} onClick={() => setPocket('cash')}>
-          {t('sheet.cash')}
-        </button>
-      </div>
+      <PocketChips value={pocket} onChange={setPocket} />
+      {pocket === 'credit' ? <p className="muted" style={{ fontSize: 13 }}>{t('sheet.creditHint')}</p> : null}
       <p className="tiny">{t('sheet.when')}</p>
       <div className="chips">
         <button
@@ -636,7 +648,7 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
     views.find((v) => v.env.kind === 'savings')?.env.id ?? '',
   )
   const cents = parseEuros(amount) ?? 0
-  const [pocket, setPocket] = useState<'card' | 'cash'>('card')
+  const [pocket, setPocket] = useState<Pocket>('card')
 
   function save() {
     if (!envelopeId || cents <= 0) return
@@ -652,14 +664,8 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
       <p className="tiny">{t('sheet.payWith')}</p>
-      <div className="chips">
-        <button type="button" className={`chip ${pocket === 'card' ? 'on' : ''}`} onClick={() => setPocket('card')}>
-          {t('sheet.card')}
-        </button>
-        <button type="button" className={`chip ${pocket === 'cash' ? 'on' : ''}`} onClick={() => setPocket('cash')}>
-          {t('sheet.cash')}
-        </button>
-      </div>
+      <PocketChips value={pocket} onChange={setPocket} />
+      {pocket === 'credit' ? <p className="muted" style={{ fontSize: 13 }}>{t('sheet.creditHint')}</p> : null}
       <SelectEnv label={t('sheet.envelope')} value={envelopeId} views={views} onChange={setEnvelopeId} />
       <button className="btn full sage" disabled={!envelopeId || cents <= 0} onClick={save}>
         {t('sheet.incomeBtn')}
@@ -717,6 +723,57 @@ export function CashSheet({ onClose }: { onClose: () => void }) {
       </button>
       <button type="button" className="btn full secondary" disabled={cents <= 0} onClick={() => go('to-bank')}>
         {t('sheet.toBank')}
+      </button>
+    </Sheet>
+  )
+}
+
+export function CardPaySheet({ onClose }: { onClose: () => void }) {
+  const t = useT()
+  const money = useMoney()
+  const state = useAppState()
+  const [amount, setAmount] = useState('')
+  const [msg, setMsg] = useState('')
+  const [error, setError] = useState('')
+  const cents = parseEuros(amount) ?? 0
+  const snap = accountSnapshot(viewsFor(state))
+  const pockets = pocketSplit(state, snap.inAccount, snap.afterFixed)
+
+  function pay() {
+    setError('')
+    setMsg('')
+    const result = payCard(cents)
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setMsg(t('sheet.cardOk'))
+    setAmount('')
+  }
+
+  return (
+    <Sheet title={t('sheet.cardTitle')} onClose={onClose}>
+      <p className="muted">{t('sheet.cardHint')}</p>
+      <p className="muted" style={{ fontSize: 13 }}>
+        {t('home.creditOwed', { amount: money(Math.max(0, pockets.credit)) })}
+      </p>
+      <label className="field">
+        {t('sheet.amount')}
+        <input
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => {
+            setAmount(e.target.value)
+            setError('')
+            setMsg('')
+          }}
+          placeholder={t('common.amountPh')}
+        />
+      </label>
+      {error ? <p className="deficit">{error}</p> : null}
+      {msg ? <p className="hint">{msg}</p> : null}
+      <button type="button" className="btn full sage" disabled={cents <= 0} onClick={pay}>
+        {t('home.payCard')}
       </button>
     </Sheet>
   )
