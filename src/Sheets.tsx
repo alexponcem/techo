@@ -23,6 +23,7 @@ import {
 } from './logic'
 import { parseEuros } from './money'
 import { kindLabel } from './template'
+import { displayNote } from './i18n'
 import { useCurrency, useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
 import {
@@ -114,7 +115,7 @@ export function AddSheet({
     if (!chargeId || cents <= 0 || route.needsChoice) return
     if (isSavings) {
       if (!reasonOk) return
-      addExpense(chargeId, cents, `AHORRO: ${note.trim()}`, at, pocket)
+      addExpense(chargeId, cents, t('store.savNote', { reason: note.trim() }), at, pocket)
       finish()
       return
     }
@@ -163,7 +164,7 @@ export function AddSheet({
               id: plan.savingsId,
               amount: plan.fromSavings,
               reason: plan.goalFromSavings
-                ? note.trim() || chargeView?.env.name || 'Fondo'
+                ? note.trim() || chargeView?.env.name || t('store.goalFallback')
                 : reason.trim(),
             }
           : undefined,
@@ -199,7 +200,7 @@ export function AddSheet({
             setAmount(e.target.value)
             setConfirm(false)
           }}
-          placeholder="0,00"
+          placeholder={t('common.amountPh')}
         />
       </label>
       <div className="chips">
@@ -316,9 +317,7 @@ export function AddSheet({
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder={
-            isSavings ? 'Ej. urgente, reparación…' : 'ej. café, super, hobby…'
-          }
+          placeholder={isSavings ? t('sheet.phSav') : t('sheet.phSpend')}
         />
       </label>
       {isSavings && <p className="muted">{t('sheet.savLock')}</p>}
@@ -409,22 +408,23 @@ export function AddSheet({
 
 export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void }) {
   const t = useT()
+  const locale = useLocale()
   const state = useAppState()
   const tx = state.txs.find((t) => t.id === txId)
   const cycle = activeCycle(state)
   const minDay = cycle?.startedAt ?? todayISO()
   const maxDay = todayISO()
   const [amount, setAmount] = useState(tx ? String(tx.amount / 100) : '')
-  const [note, setNote] = useState(tx?.note ?? '')
+  const [note, setNote] = useState(tx?.note ? displayNote(tx.note, locale) : '')
   const [spendDay, setSpendDay] = useState(tx ? localDayFromStamp(tx.at) : todayISO())
   const [pocket, setPocket] = useState<'card' | 'cash'>(tx?.pocket === 'cash' ? 'cash' : 'card')
 
   if (!tx || tx.type !== 'expense') {
     return (
       <Sheet title={t('sheet.edit')} onClose={onClose}>
-        <p>Ese movimiento no se puede editar.</p>
+        <p>{t('sheet.cantEdit')}</p>
         <button type="button" className="btn full" onClick={onClose}>
-          Cerrar
+          {t('common.close')}
         </button>
       </Sheet>
     )
@@ -442,7 +442,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
   return (
     <Sheet title={t('sheet.edit')} onClose={onClose}>
       <label className="field">
-        Importe
+        {t('sheet.amount')}
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
       <p className="tiny">{t('sheet.payWith')}</p>
@@ -474,7 +474,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
         )}
       </div>
       <label className="field">
-        Fecha
+        {t('sheet.date')}
         <input
           type="date"
           min={minDay}
@@ -519,7 +519,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
       from,
       to,
       cents,
-      fromSavings ? `AHORRO: ${reason.trim()}` : 'Reasignado',
+      fromSavings ? t('store.savNote', { reason: reason.trim() }) : t('store.moved'),
     )
     onClose()
   }
@@ -539,16 +539,16 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
       />
       <SelectEnv label={t('sheet.to')} value={to} views={views} onChange={setTo} />
       <label className="field">
-        Importe
+        {t('sheet.amount')}
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
       {fromSavings && (
         <label className="field">
-          Motivo (obligatorio: sales del ahorro)
+          {t('sheet.moveSavReason')}
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Ej. viaje urgente, reparación…"
+            placeholder={t('sheet.movePh')}
           />
         </label>
       )}
@@ -557,7 +557,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
           className="btn ghost full"
           onClick={() => setAmount((fromView.remaining / 100).toString())}
         >
-          Mover todo lo que queda ({money(fromView.remaining)})
+          {t('sheet.moveAll', { amount: money(fromView.remaining) })}
         </button>
       )}
       <button
@@ -565,7 +565,7 @@ export function MoveSheet({ onClose }: { onClose: () => void }) {
         disabled={!from || !to || from === to || cents <= 0 || (fromSavings && !reasonOk)}
         onClick={save}
       >
-        Mover
+        {t('sheet.moveBtn')}
       </button>
     </Sheet>
   )
@@ -783,6 +783,7 @@ export function Sheet({
   onClose: () => void
   children: ReactNode
 }) {
+  const t = useT()
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet stack" onClick={(e) => e.stopPropagation()}>
@@ -791,7 +792,7 @@ export function Sheet({
           <h2 className="serif" style={{ fontSize: 28 }}>
             {title}
           </h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Cerrar">
+          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>

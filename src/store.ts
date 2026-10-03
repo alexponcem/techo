@@ -249,7 +249,7 @@ export function coverAndSpend(input: {
       envelopeId: input.fromSavings.id,
       toEnvelopeId: input.envelopeId,
       amount: input.fromSavings.amount,
-      note: `AHORRO: ${input.fromSavings.reason}`,
+      note: t(localeOf(state), 'store.savNote', { reason: input.fromSavings.reason }),
     })
   }
   extra.push({

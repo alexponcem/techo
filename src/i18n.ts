@@ -11,9 +11,14 @@ const msg = {
     en: 'Techo means cap — a ceiling on spending.',
   },
   'lang.hint': {
-    es: 'Luego lo puedes cambiar en Ajustes. You can change this later in Settings.',
-    en: 'You can change this later in Settings. Luego lo puedes cambiar en Ajustes.',
+    es: 'Luego lo puedes cambiar en Ajustes.',
+    en: 'You can change this later in Settings.',
   },
+  'app.desc': {
+    es: 'Techo: controla tu dinero por sobres. El sueldo entra, cada gasto tiene techo, y te dice si cabe.',
+    en: 'Techo: your money, with a cap. Payday comes in, every spend has a ceiling, and it tells you if it fits.',
+  },
+  'common.amountPh': { es: '0,00', en: '0.00' },
 
   'nav.home': { es: 'Inicio', en: 'Home' },
   'nav.stats': { es: 'Estadísticas', en: 'Stats' },
@@ -409,7 +414,7 @@ const msg = {
   'fund.folders': { es: 'Carpetas', en: 'Folders' },
   'fund.hint': {
     es: 'Separa planes dentro de este fondo. Ej.: un viaje, otro viaje.',
-    en: 'Split plans inside this fund. E.g. one trip, another trip.',
+    en: 'Split plans inside this goal. E.g. one trip, another trip.',
   },
   'fund.add': { es: 'Nueva carpeta', en: 'New folder' },
   'fund.ph': { es: 'Ej. Japón, playa…', en: 'E.g. Japan, beach…' },
@@ -607,6 +612,10 @@ const msg = {
   },
   'sheet.movePh': { es: 'Ej. viaje urgente, reparación…', en: 'E.g. urgent trip, repair…' },
   'sheet.moveBtn': { es: 'Mover', en: 'Move' },
+  'sheet.moveAll': {
+    es: 'Mover todo lo que queda ({amount})',
+    en: 'Move everything left ({amount})',
+  },
   'sheet.income': { es: 'Dinero extra', en: 'Extra money' },
   'sheet.incomeHint': {
     es: 'Elige a qué sobre entra.',
@@ -797,6 +806,8 @@ const msg = {
   'store.paid': { es: 'Pagado', en: 'Paid' },
   'store.coveredFree': { es: 'Extra cubierto con Libre', en: 'Extra covered with Free' },
   'store.moved': { es: 'Reasignado', en: 'Reassigned' },
+  'store.savNote': { es: 'AHORRO: {reason}', en: 'SAVINGS: {reason}' },
+  'store.goalFallback': { es: 'Fondo', en: 'Goal' },
   'store.toFolder': { es: 'A la carpeta', en: 'To the folder' },
   'store.missing': { es: 'Ese sobre ya no está.', en: 'That envelope is gone.' },
   'store.keepEnvelope': { es: 'Libre y Ahorro se quedan. Elige otro sobre.', en: 'Free and Savings stay. Pick another envelope.' },
@@ -821,4 +832,12 @@ export function intlTag(locale: Locale): string {
 export function weekdayName(locale: Locale, day: number): string {
   const i = ((day % 7) + 7) % 7
   return t(locale, `weekday.${i}` as MsgKey)
+}
+
+/** Notas que la app escribió en un idioma fijo. Al mostrarlas, salen en el idioma actual. */
+export function displayNote(note: string, locale: Locale): string {
+  if (note === 'Reasignado' || note === 'Reassigned') return t(locale, 'store.moved')
+  const sav = note.match(/^(?:AHORRO|SAVINGS):\s*(.*)$/i)
+  if (!sav) return note
+  return t(locale, 'store.savNote', { reason: sav[1] ?? '' }).trim()
 }

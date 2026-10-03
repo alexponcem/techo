@@ -1,7 +1,7 @@
 import { formatRange } from './dates'
 import { reportFor, type CycleReport } from './logic'
 import { useAppState } from './store'
-import { useMoney, useT } from './useT'
+import { useLocale, useMoney, useT } from './useT'
 
 const COLORS = ['#2c5a43', '#4a7a5e', '#6b8aa8', '#c65a12', '#8d6110', '#b4452c', '#7a6b8a']
 
@@ -128,10 +128,11 @@ function LiveReport({ report }: { report: CycleReport }) {
 function PastRow({ report }: { report: CycleReport }) {
   const t = useT()
   const money = useMoney()
+  const locale = useLocale()
   return (
     <div className="card stack" style={{ gap: 8 }}>
       <div className="row">
-        <strong>{formatRange(report.cycle.startedAt, report.cycle.expectedEndAt)}</strong>
+        <strong>{formatRange(report.cycle.startedAt, report.cycle.expectedEndAt, locale)}</strong>
         <span className={`pill ${tonePill(report.verdict)}`}>{report.title}</span>
       </div>
       <div className="row">

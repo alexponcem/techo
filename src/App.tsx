@@ -65,7 +65,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.lang = locale
-  }, [locale])
+    document.querySelector('meta[name="description"]')?.setAttribute('content', t('app.desc'))
+  }, [locale, t])
 
   if (!state.settings.locale) {
     return (

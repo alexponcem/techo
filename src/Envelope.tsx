@@ -10,6 +10,7 @@ import {
   rhythmOf,
   weekStartOfEnv,
 } from './logic'
+import { displayNote } from './i18n'
 import { parseEuros } from './money'
 import { useLocale, useMoney, useT } from './useT'
 import { WeekStartSelect } from './WeekStartSelect'
@@ -319,7 +320,7 @@ export function EnvelopeScreen({
                     inputMode="decimal"
                     value={moveAmount}
                     onChange={(e) => setMoveAmount(e.target.value)}
-                    placeholder="0,00"
+                    placeholder={tr('common.amountPh')}
                   />
                   <button type="button" className="btn full" onClick={passToFolder}>
                     {tr('fund.moveBtn')}
@@ -416,7 +417,7 @@ export function EnvelopeScreen({
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
-                  {t.note ? ` · ${t.note}` : ''}
+                  {t.note ? ` · ${displayNote(t.note, locale)}` : ''}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -484,7 +485,7 @@ export function EnvelopeScreen({
                             day: 'numeric',
                             month: 'short',
                           })}
-                          {t.note ? ` · ${t.note}` : ''}
+                          {t.note ? ` · ${displayNote(t.note, locale)}` : ''}
                         </div>
                       </div>
                       <div>
@@ -561,7 +562,7 @@ export function EnvelopeScreen({
             <p>
               {sign(pending, id)}
               {money(pending.amount)}
-              {pending.note ? ` · ${pending.note}` : ''}
+              {pending.note ? ` · ${displayNote(pending.note, locale)}` : ''}
             </p>
             <p className="muted">
               {tr('env.deleteBody')}
