@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { clampWeekStart, suggestedNextPay, todayISO } from './dates'
+import { clampWeekStart, daysBetween, suggestedNextPay, todayISO } from './dates'
 import {
   activeCycle,
   assigned,
@@ -13,6 +13,7 @@ import {
   openDailyPace,
   reassignTxs,
   reportFor,
+  splitPlanned,
   takesFromPay,
   uid,
   withBalancedBuffer,
@@ -27,44 +28,90 @@ function localeOf(s: AppState | Settings): Locale {
   return s.locale ?? 'es'
 }
 
-const SEGURO: Envelope = {
-  id: 'seguro',
-  name: 'Seguro médico',
-  kind: 'fixed',
-  planned: 945,
-  emoji: '🏥',
-  opening: 0,
-  rhythm: 'none',
+/** Ids que solo trae el plan personal. Si aparecen, no se toca ese archivo. */
+const PERSONAL_PLAN = new Set(['futbol', 'gym', 'transporte', 'ropa'])
+
+function envelopeUsed(txs: Tx[], id: string): boolean {
+  return txs.some((t) => t.envelopeId === id || t.toEnvelopeId === id)
 }
 
-const MEDICINA: Envelope = {
-  id: 'medicina',
-  name: 'Medicina',
-  kind: 'fund',
-  planned: 0,
-  emoji: '💊',
-  opening: 0,
-  rhythm: 'none',
+function injectedSeguro(e: Envelope, txs: Tx[]): boolean {
+  return (
+    e.id === 'seguro' &&
+    e.name === 'Seguro médico' &&
+    e.planned === 945 &&
+    (e.opening ?? 0) === 0 &&
+    !e.parentId &&
+    !envelopeUsed(txs, e.id)
+  )
 }
 
-function insertAfter(list: Envelope[], afterId: string, row: Envelope): Envelope[] {
-  const i = list.findIndex((e) => e.id === afterId)
-  if (i < 0) return [...list, row]
-  return [...list.slice(0, i + 1), row, ...list.slice(i + 1)]
+function injectedMedicina(e: Envelope, txs: Tx[], locale: Locale): boolean {
+  return (
+    locale === 'en' &&
+    e.id === 'medicina' &&
+    e.name === 'Medicina' &&
+    e.planned === 0 &&
+    (e.opening ?? 0) === 0 &&
+    !e.parentId &&
+    !envelopeUsed(txs, e.id)
+  )
 }
 
-function withMissingEnvelopes(list: Envelope[], income: number): Envelope[] {
-  let next = list.map(ensureRhythm)
-  let added = false
-  if (!next.some((e) => e.id === 'seguro')) {
-    next = insertAfter(next, 'movil', { ...SEGURO })
-    added = true
+function dropInjectedRows(
+  list: Envelope[],
+  txs: Tx[],
+  locale: Locale,
+): { list: Envelope[]; restored: number } {
+  let restored = 0
+  const next = list.filter((e) => {
+    if (injectedSeguro(e, txs)) {
+      restored += e.planned
+      return false
+    }
+    if (injectedMedicina(e, txs, locale)) return false
+    return true
+  })
+  if (restored <= 0) return { list: next, restored: 0 }
+  return {
+    restored,
+    list: next.map((e) => (e.kind === 'buffer' ? { ...e, planned: e.planned + restored } : e)),
   }
-  if (!next.some((e) => e.id === 'medicina')) {
-    next = insertAfter(next, 'ropa', { ...MEDICINA })
-    added = true
+}
+
+/** Esos dos sobres se habían copiado a cualquier plan que no los tuviera. */
+function withoutInjectedPersonal(state: AppState): AppState {
+  const rows = [...state.envelopes, ...(state.template ?? [])]
+  if (rows.some((e) => PERSONAL_PLAN.has(e.id))) {
+    return {
+      ...state,
+      envelopes: state.envelopes.map(ensureRhythm),
+      template: (state.template ?? []).map(ensureRhythm),
+    }
   }
-  return added ? withBalancedBuffer(next, income, 'es') : next
+  const locale = localeOf(state)
+  const txs = state.txs ?? []
+  const envelopes = dropInjectedRows(state.envelopes.map(ensureRhythm), txs, locale)
+  const template = dropInjectedRows((state.template ?? []).map(ensureRhythm), txs, locale)
+  if (
+    envelopes.restored === 0 &&
+    envelopes.list.length === state.envelopes.length &&
+    template.list.length === (state.template ?? []).length
+  ) {
+    return { ...state, envelopes: envelopes.list, template: template.list }
+  }
+  let cycles = state.cycles
+  const cycle = [...cycles].reverse().find((c) => !c.closedAt)
+  if (cycle?.fairDaily != null && envelopes.restored > 0) {
+    const origin = cycle.paceStartedAt || cycle.startedAt
+    const days = Math.max(1, daysBetween(origin, cycle.expectedEndAt))
+    const poisoned = Math.round(splitPlanned(state.envelopes) / days)
+    if (cycle.fairDaily === poisoned) {
+      const fixed = Math.round(splitPlanned(envelopes.list) / days)
+      cycles = cycles.map((c) => (c.id === cycle.id ? { ...c, fairDaily: fixed } : c))
+    }
+  }
+  return { ...state, envelopes: envelopes.list, template: template.list, cycles }
 }
 
 const KEY = 'techo.v1'
@@ -85,9 +132,7 @@ function load(): AppState {
     if (!raw) return empty()
     const parsed = JSON.parse(raw) as AppState
     if (parsed.version !== 1) return empty()
-    const cycle = [...parsed.cycles].reverse().find((c) => !c.closedAt)
-    const income = cycle?.income ?? parsed.cycles[0]?.income ?? 139_100
-    const migrated = {
+    const migrated = withoutInjectedPersonal({
       ...parsed,
       settings: {
         payMode: parsed.settings?.payMode ?? 'last-weekday',
@@ -98,9 +143,7 @@ function load(): AppState {
         locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
         currency: parsed.settings?.currency === 'USD' ? ('USD' as const) : ('EUR' as const),
       },
-      envelopes: withMissingEnvelopes(parsed.envelopes, income),
-      template: withMissingEnvelopes(parsed.template, income),
-    }
+    })
     const next = withFrozenDailyPace(migrated)
     localStorage.setItem(KEY, JSON.stringify(next))
     return next
@@ -618,24 +661,23 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
     if (!Array.isArray(parsed.envelopes) || !Array.isArray(parsed.cycles) || !Array.isArray(parsed.txs)) {
       return { ok: false, error: t(ui, 'store.incomplete') }
     }
-    const cycle = [...parsed.cycles].reverse().find((c) => !c.closedAt)
-    const income = cycle?.income ?? parsed.cycles[0]?.income ?? 139_100
     emit(
-      withFrozenDailyPace({
-        ...parsed,
-        onboarded: parsed.onboarded || parsed.cycles.length > 0,
-        settings: {
-          payMode: parsed.settings?.payMode ?? 'last-weekday',
-          fixedDay: parsed.settings?.fixedDay ?? 1,
-          weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
-          dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
-          seenHomeTour: parsed.settings?.seenHomeTour ?? true,
-          locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
-        currency: parsed.settings?.currency === 'USD' ? ('USD' as const) : ('EUR' as const),
-        },
-        template: withMissingEnvelopes(parsed.template?.length ? parsed.template : parsed.envelopes, income),
-        envelopes: withMissingEnvelopes(parsed.envelopes, income),
-      }),
+      withFrozenDailyPace(
+        withoutInjectedPersonal({
+          ...parsed,
+          onboarded: parsed.onboarded || parsed.cycles.length > 0,
+          settings: {
+            payMode: parsed.settings?.payMode ?? 'last-weekday',
+            fixedDay: parsed.settings?.fixedDay ?? 1,
+            weekStartsOn: parsed.settings?.weekStartsOn ?? 5,
+            dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
+            seenHomeTour: parsed.settings?.seenHomeTour ?? true,
+            locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
+            currency: parsed.settings?.currency === 'USD' ? ('USD' as const) : ('EUR' as const),
+          },
+          template: parsed.template?.length ? parsed.template : parsed.envelopes,
+        }),
+      ),
     )
     return { ok: true }
   } catch {
