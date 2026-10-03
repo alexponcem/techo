@@ -1,5 +1,18 @@
 import { intlTag } from './i18n'
-import type { Currency, Locale } from './types'
+import { CURRENCIES, type Currency, type Locale } from './types'
+
+export function isCurrency(value: string): value is Currency {
+  return (CURRENCIES as readonly string[]).includes(value)
+}
+
+export function currencyLabel(locale: Locale, code: Currency): string {
+  try {
+    const name = new Intl.DisplayNames([intlTag(locale)], { type: 'currency' }).of(code)
+    return name ? `${name} (${code})` : code
+  } catch {
+    return code
+  }
+}
 
 export function euros(cents: number, locale: Locale = 'es', currency: Currency = 'EUR'): string {
   return new Intl.NumberFormat(intlTag(locale), {

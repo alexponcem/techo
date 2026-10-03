@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import { clampWeekStart } from './dates'
-import { parseEuros } from './money'
+import { CURRENCIES } from './types'
+import { currencyLabel, isCurrency, parseEuros } from './money'
 import { weekdayName } from './i18n'
 import { HowItWorks } from './Setup'
-import { exportJson, importJson, resetAll, setOpeningCash, undoLast, updateSettings, useAppState } from './store'
+import { downloadBackup, importJson, resetAll, setOpeningCash, undoLast, updateSettings, useAppState } from './store'
 import { useLocale, useMoney, useT } from './useT'
 import type { Locale } from './types'
 
@@ -22,16 +23,6 @@ export function SettingsScreen({
   const fileRef = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
   const [showHow, setShowHow] = useState(false)
-
-  function download() {
-    const blob = new Blob([exportJson()], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'techo-backup.json'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   function onFile(file: File | undefined) {
     if (!file) return
@@ -100,15 +91,16 @@ export function SettingsScreen({
           {t('settings.currency')}
           <select
             value={state.settings.currency ?? 'EUR'}
-            onChange={(e) =>
-              updateSettings({
-                ...state.settings,
-                currency: e.target.value === 'USD' ? 'USD' : 'EUR',
-              })
-            }
+            onChange={(e) => {
+              if (!isCurrency(e.target.value)) return
+              updateSettings({ ...state.settings, currency: e.target.value })
+            }}
           >
-            <option value="EUR">{t('currency.eur')}</option>
-            <option value="USD">{t('currency.usd')}</option>
+            {CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {currencyLabel(locale, code)}
+              </option>
+            ))}
           </select>
         </label>
         <label className="field">
@@ -158,7 +150,7 @@ export function SettingsScreen({
       <button className="btn secondary full" onClick={undoLast}>
         {t('settings.undo')}
       </button>
-      <button className="btn secondary full" onClick={download}>
+      <button className="btn secondary full" onClick={() => downloadBackup()}>
         {t('settings.export')}
       </button>
       <input

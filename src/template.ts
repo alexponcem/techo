@@ -25,14 +25,26 @@ export function alexPlan(): Envelope[] {
 export function blankPlan(locale: Locale = 'es'): Envelope[] {
   return [
     { id: 'ahorro', name: t(locale, 'names.savings'), kind: 'savings', planned: 0, emoji: '🌱', opening: 0, rhythm: 'none' },
-    { id: 'arriendo', name: t(locale, 'names.rent'), kind: 'fixed', planned: 0, emoji: '🏠', opening: 0, rhythm: 'none' },
-    { id: 'movil', name: t(locale, 'names.phone'), kind: 'fixed', planned: 0, emoji: '📱', opening: 0, rhythm: 'none' },
-    { id: 'comida', name: t(locale, 'names.food'), kind: 'cap', planned: 0, emoji: '🍽️', opening: 0, rhythm: 'weekly' },
-    { id: 'ocio', name: t(locale, 'names.leisure'), kind: 'cap', planned: 0, emoji: '🎬', opening: 0, rhythm: 'daily', splitDaily: false },
-    { id: 'viajes', name: t(locale, 'names.travel'), kind: 'fund', planned: 0, emoji: '✈️', opening: 0, rhythm: 'none' },
-    { id: 'medicina', name: t(locale, 'names.medicine'), kind: 'fund', planned: 0, emoji: '💊', opening: 0, rhythm: 'none' },
     { id: 'libre', name: t(locale, 'names.free'), kind: 'buffer', planned: 0, emoji: '💧', opening: 0, rhythm: 'daily', splitDaily: true },
   ]
+}
+
+export type ExampleId = 'arriendo' | 'movil' | 'comida' | 'ocio' | 'viajes'
+
+export function exampleEnvelope(locale: Locale, id: ExampleId): Envelope {
+  if (id === 'arriendo') {
+    return { id, name: t(locale, 'names.rent'), kind: 'fixed', planned: 0, emoji: '🏠', opening: 0, rhythm: 'none' }
+  }
+  if (id === 'movil') {
+    return { id, name: t(locale, 'names.phone'), kind: 'fixed', planned: 0, emoji: '📱', opening: 0, rhythm: 'none' }
+  }
+  if (id === 'comida') {
+    return { id, name: t(locale, 'names.food'), kind: 'cap', planned: 0, emoji: '🍽️', opening: 0, rhythm: 'weekly' }
+  }
+  if (id === 'ocio') {
+    return { id, name: t(locale, 'names.leisure'), kind: 'cap', planned: 0, emoji: '🎬', opening: 0, rhythm: 'daily', splitDaily: false }
+  }
+  return { id, name: t(locale, 'names.travel'), kind: 'fund', planned: 0, emoji: '✈️', opening: 0, rhythm: 'none' }
 }
 
 export const EMOJI_PICK = [

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { t } from './i18n'
+import { currencyLabel, isCurrency } from './money'
 import { updateSettings, useAppState } from './store'
-import type { Currency, Locale } from './types'
+import { CURRENCIES, type Currency, type Locale } from './types'
 
 export function LanguageScreen() {
   const state = useAppState()
@@ -32,14 +33,21 @@ export function LanguageScreen() {
         <b>{t('en', 'lang.en')}</b>
         <span className="muted">{t('en', 'lang.enSub')}</span>
       </button>
-      <button type="button" className={`choice ${currency === 'EUR' ? 'on' : ''}`} onClick={() => setCurrency('EUR')}>
-        <b>{t(locale, 'currency.eur')}</b>
-        <span className="muted">EUR</span>
-      </button>
-      <button type="button" className={`choice ${currency === 'USD' ? 'on' : ''}`} onClick={() => setCurrency('USD')}>
-        <b>{t(locale, 'currency.usd')}</b>
-        <span className="muted">USD</span>
-      </button>
+      <label className="field">
+        {t(locale, 'settings.currency')}
+        <select
+          value={currency}
+          onChange={(e) => {
+            if (isCurrency(e.target.value)) setCurrency(e.target.value)
+          }}
+        >
+          {CURRENCIES.map((code) => (
+            <option key={code} value={code}>
+              {currencyLabel(locale, code)}
+            </option>
+          ))}
+        </select>
+      </label>
       <button type="button" className="btn full sage" onClick={go}>
         {t(locale, 'sheet.continue')}
       </button>

@@ -10,22 +10,30 @@ import {
   fundCarryGap,
   fundCloseSnap,
   nextOpenings,
+  accountSnapshot,
   openDailyPace,
+  pocketSplit,
   reassignTxs,
   reportFor,
   splitPlanned,
   takesFromPay,
   uid,
+  viewsFor,
   withBalancedBuffer,
   withFrozenDailyPace,
 } from './logic'
 import { t } from './i18n'
+import { isCurrency } from './money'
 import { alexPlan } from './template'
-import type { AppState, Envelope, Locale, Settings, Tx } from './types'
+import type { AppState, Currency, Envelope, Locale, PocketMove, Settings, Tx } from './types'
 
 function localeOf(s: AppState | Settings): Locale {
   if ('settings' in s) return s.settings.locale ?? 'es'
   return s.locale ?? 'es'
+}
+
+function currencyOf(value: unknown): Currency {
+  return typeof value === 'string' && isCurrency(value) ? value : 'EUR'
 }
 
 /** Ids que solo trae el plan personal. Si aparecen, no se toca ese archivo. */
@@ -141,7 +149,8 @@ function load(): AppState {
         dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
         seenHomeTour: parsed.settings?.seenHomeTour ?? true,
         locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
-        currency: parsed.settings?.currency === 'USD' ? ('USD' as const) : ('EUR' as const),
+        currency: currencyOf(parsed.settings?.currency),
+        lastExportAt: parsed.settings?.lastExportAt,
       },
     })
     const next = withFrozenDailyPace(migrated)
@@ -230,6 +239,7 @@ function pushTx(tx: Omit<Tx, 'id' | 'cycleId' | 'at'> & { at?: string }) {
     amount: tx.amount,
     note: tx.note,
     pocket: tx.pocket,
+    pocketMove: tx.pocketMove,
   }
   emit({ ...state, txs: [...state.txs, next] })
 }
@@ -551,11 +561,17 @@ export function startNextCycle(
   const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id, fundChoice)
   const cycleId = uid()
   const template = withBalancedBuffer(
-    state.template.map((e) => ({ ...e, opening: 0 })),
+    state.template.map((e) => {
+      const fresh = { ...e, opening: 0 }
+      if (fresh.kind !== 'fund' || fundChoice[fresh.id] !== 'close') return fresh
+      const closed = { ...fresh, fundEpoch: cycleId }
+      if ((fresh.cycleSetAside ?? 0) <= 0) return closed
+      const rest = { ...closed }
+      delete rest.cycleSetAside
+      return { ...rest, planned: 0 }
+    }),
     income,
     locale,
-  ).map((e) =>
-    e.kind === 'fund' && fundChoice[e.id] === 'close' ? { ...e, fundEpoch: cycleId } : e,
   )
   const envelopes = template.map((e) => ({
     ...ensureRhythm(e),
@@ -651,6 +667,83 @@ export function exportJson(): string {
   return JSON.stringify(state, null, 2)
 }
 
+export function downloadBackup() {
+  const stamped: AppState = {
+    ...state,
+    settings: { ...state.settings, lastExportAt: new Date().toISOString() },
+  }
+  emit(stamped)
+  const blob = new Blob([JSON.stringify(stamped, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'techo-backup.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function movePocket(
+  amount: number,
+  direction: PocketMove,
+): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  if (amount <= 0) return { ok: false, error: t(locale, 'logic.needAmt') }
+  if (direction === 'to-bank') {
+    const snap = accountSnapshot(viewsFor(state))
+    const pockets = pocketSplit(state, snap.inAccount, snap.afterFixed)
+    if (amount > pockets.cash) return { ok: false, error: t(locale, 'sheet.cashShort') }
+  }
+  pushTx({
+    type: 'pocket',
+    envelopeId: '',
+    amount,
+    note: t(locale, direction === 'to-cash' ? 'store.toCash' : 'store.toBank'),
+    pocketMove: direction,
+  })
+  return { ok: true }
+}
+
+export function setCycleSetAside(
+  id: string,
+  cents: number,
+): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  const env = state.envelopes.find((e) => e.id === id)
+  if (!env || env.kind !== 'fund' || env.parentId) return { ok: false, error: t(locale, 'store.missing') }
+  const amount = Math.max(0, Math.round(cents))
+  const patched = state.envelopes.map((e) => {
+    if (e.id !== id) return e
+    if (amount <= 0) {
+      const rest = { ...e }
+      delete rest.cycleSetAside
+      return { ...rest, planned: 0 }
+    }
+    return { ...e, planned: amount, cycleSetAside: amount }
+  })
+  const envelopes = withBalancedBuffer(patched, cycle.income, locale)
+  const buffer = envelopes.find((e) => e.kind === 'buffer')
+  if ((buffer?.planned ?? 0) < 0) return { ok: false, error: t(locale, 'store.negFree') }
+  emit({
+    ...state,
+    envelopes,
+    template: state.template.map((row) => {
+      const match = envelopes.find((e) => e.id === row.id)
+      if (!match) return row
+      if (match.cycleSetAside == null) {
+        const rest = { ...row }
+        delete rest.cycleSetAside
+        return { ...rest, planned: match.planned, name: match.name }
+      }
+      return { ...row, planned: match.planned, cycleSetAside: match.cycleSetAside, name: match.name }
+    }),
+  })
+  return { ok: true }
+}
+
 export function importJson(raw: string): { ok: true } | { ok: false; error: string } {
   try {
     const parsed = JSON.parse(raw) as AppState
@@ -673,7 +766,8 @@ export function importJson(raw: string): { ok: true } | { ok: false; error: stri
             dailyWeekStartsOn: parsed.settings?.dailyWeekStartsOn ?? 1,
             seenHomeTour: parsed.settings?.seenHomeTour ?? true,
             locale: parsed.settings?.locale ?? (parsed.onboarded ? 'es' : undefined),
-            currency: parsed.settings?.currency === 'USD' ? ('USD' as const) : ('EUR' as const),
+            currency: currencyOf(parsed.settings?.currency),
+            lastExportAt: parsed.settings?.lastExportAt,
           },
           template: parsed.template?.length ? parsed.template : parsed.envelopes,
         }),

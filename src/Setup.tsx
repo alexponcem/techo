@@ -6,7 +6,7 @@ import { kindExplain, tutorialFor } from './guide'
 import { assigned, takesFromPay, withBalancedBuffer } from './logic'
 import { parseEuros } from './money'
 import { importJson, startFirstCycle } from './store'
-import { kindLabel, blankPlan } from './template'
+import { kindLabel, blankPlan, exampleEnvelope, type ExampleId } from './template'
 import { useLocale, useMoney, useT } from './useT'
 import type { Envelope, EnvelopeKind, PayMode, Rhythm } from './types'
 
@@ -45,7 +45,25 @@ export function Setup() {
   function setPlanned(id: string, raw: string) {
     const cents = parseEuros(raw)
     if (cents === null && raw !== '') return
-    setEnvelopes((prev) => prev.map((e) => (e.id === id ? { ...e, planned: cents ?? 0 } : e)))
+    const planned = cents ?? 0
+    setEnvelopes((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? e.cycleSetAside != null
+            ? { ...e, planned, cycleSetAside: planned }
+            : { ...e, planned }
+          : e,
+      ),
+    )
+  }
+
+  function addExample(id: ExampleId) {
+    const row = exampleEnvelope(locale, id)
+    setEnvelopes((prev) => [
+      ...prev.filter((e) => e.kind !== 'buffer' && e.id !== id),
+      row,
+      ...prev.filter((e) => e.kind === 'buffer'),
+    ])
   }
 
   function addRow() {
@@ -327,9 +345,20 @@ export function Setup() {
           <li>{t('setup.liWeekly')}</li>
           <li>{t('setup.liGoal')}</li>
         </ul>
-        <p className="muted">
-          {t('setup.envHint')}
-        </p>
+        <p className="muted">{t('setup.envHint')}</p>
+        <p className="tiny">{t('setup.examples')}</p>
+        <div className="chips" style={{ flexWrap: 'wrap' }}>
+          {(['arriendo', 'movil', 'comida', 'ocio', 'viajes'] as ExampleId[])
+            .filter((id) => !envelopes.some((e) => e.id === id))
+            .map((id) => {
+              const sample = exampleEnvelope(locale, id)
+              return (
+                <button key={id} type="button" className="chip" onClick={() => addExample(id)}>
+                  {sample.emoji} {sample.name}
+                </button>
+              )
+            })}
+        </div>
         {balanced
           .filter((e) => e.kind !== 'buffer')
           .map((e) => (
@@ -441,6 +470,34 @@ export function Setup() {
                     </span>
                   </label>
                 </>
+              )}
+              {e.kind === 'fund' && (
+                <label className="field" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={e.cycleSetAside != null}
+                    onChange={(ev) =>
+                      setEnvelopes((prev) =>
+                        prev.map((x) => {
+                          if (x.id !== e.id) return x
+                          if (!ev.target.checked) {
+                            const rest = { ...x }
+                            delete rest.cycleSetAside
+                            return rest
+                          }
+                          return { ...x, cycleSetAside: x.planned }
+                        }),
+                      )
+                    }
+                    style={{ marginTop: 4 }}
+                  />
+                  <span>
+                    <span style={{ fontWeight: 500 }}>{t('fund.eachCycle')}</span>
+                    <span className="muted" style={{ display: 'block', fontSize: 13 }}>
+                      {t('fund.eachCycleHint')}
+                    </span>
+                  </span>
+                </label>
               )}
               <label className="field">
                 {e.kind === 'fund' ? t('setup.amountGoal') : t('setup.amount')}

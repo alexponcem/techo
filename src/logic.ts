@@ -43,8 +43,9 @@ export function ensureRhythm(env: Envelope): Envelope {
   }
 }
 
-/** Cuotas, ahorro y techos se reservan al cobrar. Fondos salen del ahorro. */
+/** Cuotas, ahorro y techos salen del cobro. Un fondo solo si aparta una cifra cada ciclo. */
 export function takesFromPay(env: Envelope): boolean {
+  if (env.kind === 'fund') return (env.cycleSetAside ?? 0) > 0 && !env.parentId
   return env.kind === 'savings' || env.kind === 'fixed' || env.kind === 'cap'
 }
 
@@ -816,7 +817,7 @@ export function accountSnapshot(views: EnvelopeView[]): {
   }
 }
 
-/** Banco = total − efectivo. El efectivo baja con gastos en cash y sube si entra dinero en cash. */
+/** Banco = total − efectivo. El cajero mueve entre los dos sin cambiar el total. */
 export function pocketSplit(
   state: AppState,
   total: number,
@@ -826,7 +827,13 @@ export function pocketSplit(
   let cash = cycle?.openingCash ?? 0
   if (cycle) {
     for (const tx of state.txs) {
-      if (tx.cycleId !== cycle.id || tx.pocket !== 'cash') continue
+      if (tx.cycleId !== cycle.id) continue
+      if (tx.type === 'pocket') {
+        if (tx.pocketMove === 'to-cash') cash += tx.amount
+        if (tx.pocketMove === 'to-bank') cash -= tx.amount
+        continue
+      }
+      if (tx.pocket !== 'cash') continue
       if (tx.type === 'expense') cash -= tx.amount
       if (tx.type === 'income') cash += tx.amount
     }

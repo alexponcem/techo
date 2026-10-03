@@ -1,7 +1,8 @@
 export type EnvelopeKind = 'fixed' | 'cap' | 'fund' | 'savings' | 'buffer'
 export type Rhythm = 'daily' | 'weekly' | 'none'
 export type PayMode = 'last-weekday' | 'fixed-day' | 'manual'
-export type TxType = 'expense' | 'income' | 'transfer'
+export type TxType = 'expense' | 'income' | 'transfer' | 'pocket'
+export type PocketMove = 'to-cash' | 'to-bank'
 export type Light = 'green' | 'yellow' | 'orange' | 'red' | 'idle'
 
 export interface Envelope {
@@ -23,6 +24,8 @@ export interface Envelope {
   weekStartsOn?: number
   /** Si el fondo se cerró, los ciclos anteriores a este id quedan en el archivo y no se suman. */
   fundEpoch?: string
+  /** Si es mayor que 0, esta cifra sale del cobro en cada ciclo y se junta en el fondo. */
+  cycleSetAside?: number
 }
 
 /** Saldo de un fondo al cerrar el ciclo, para poder recuperarlo. */
@@ -65,10 +68,13 @@ export interface Tx {
   at: string
   /** card = banco. cash = efectivo. Si falta, es tarjeta (movimientos antiguos). */
   pocket?: 'card' | 'cash'
+  /** Solo type pocket: mueve entre banco y efectivo, sin tocar sobres. */
+  pocketMove?: PocketMove
 }
 
 export type Locale = 'es' | 'en'
-export type Currency = 'EUR' | 'USD'
+export const CURRENCIES = ['EUR', 'USD', 'GBP', 'MXN', 'COP', 'ARS', 'CLP', 'PEN', 'BRL', 'CAD'] as const
+export type Currency = (typeof CURRENCIES)[number]
 
 export interface Settings {
   payMode: PayMode
@@ -82,6 +88,8 @@ export interface Settings {
   locale?: Locale
   /** Divisa en la que se muestran los importes. */
   currency?: Currency
+  /** Última copia descargada. Sirve para recordar que el plan vive en este aparato. */
+  lastExportAt?: string
 }
 
 export interface AppState {
@@ -108,4 +116,5 @@ export type Sheet =
   | { name: 'move' }
   | { name: 'income' }
   | { name: 'new-envelope' }
+  | { name: 'cash' }
   | null

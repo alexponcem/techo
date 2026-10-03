@@ -1,4 +1,5 @@
-import { formatRange } from './dates'
+import { formatDay, formatRange, localDayFromStamp } from './dates'
+import { displayNote } from './i18n'
 import { reportFor, type CycleReport } from './logic'
 import { useAppState } from './store'
 import { useLocale, useMoney, useT } from './useT'
@@ -24,6 +25,7 @@ export function StatsScreen() {
       </h2>
 
       {live && <LiveReport report={live} />}
+      {current && <RecentList cycleId={current.id} />}
 
       {closed.length > 0 && (
         <>
@@ -122,6 +124,58 @@ function LiveReport({ report }: { report: CycleReport }) {
         )}
       </section>
     </>
+  )
+}
+
+function RecentList({ cycleId }: { cycleId: string }) {
+  const state = useAppState()
+  const t = useT()
+  const money = useMoney()
+  const locale = useLocale()
+  const rows = state.txs
+    .filter(
+      (tx) =>
+        tx.cycleId === cycleId &&
+        (tx.type === 'expense' || tx.type === 'income' || tx.type === 'pocket'),
+    )
+    .slice(-12)
+    .reverse()
+
+  return (
+    <section className="card stack">
+      <strong>{t('stats.recent')}</strong>
+      {rows.length === 0 ? (
+        <p className="muted">{t('stats.noRecent')}</p>
+      ) : (
+        rows.map((tx) => {
+          const env = state.envelopes.find((e) => e.id === tx.envelopeId)
+          const sign = tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''
+          const title =
+            tx.type === 'pocket'
+              ? tx.note
+              : env
+                ? `${env.emoji} ${env.name}`
+                : tx.type === 'income'
+                  ? t('env.txIncome')
+                  : t('env.txExpense')
+          return (
+            <div className="tx" key={tx.id}>
+              <div>
+                <div>{title}</div>
+                <div className="muted">
+                  {formatDay(localDayFromStamp(tx.at), locale)}
+                  {tx.type !== 'pocket' && tx.note ? ` · ${displayNote(tx.note, locale)}` : ''}
+                </div>
+              </div>
+              <div>
+                {sign}
+                {money(tx.amount)}
+              </div>
+            </div>
+          )
+        })
+      )}
+    </section>
   )
 }
 

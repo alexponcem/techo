@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { suggestedNextPay, todayISO } from './dates'
 import { activeCycle, fundSpentSince, viewsFor } from './logic'
 import { parseEuros } from './money'
-import { startNextCycle, useAppState } from './store'
+import { downloadBackup, startNextCycle, useAppState } from './store'
 import { useMoney, useT } from './useT'
 import type { EnvelopeView } from './logic'
 
@@ -179,6 +179,9 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
         {t('cycle.next')}
         <input type="date" value={expectedEndAt} onChange={(e) => setExpectedEndAt(e.target.value)} />
       </label>
+      <button type="button" className="btn ghost full" onClick={() => downloadBackup()}>
+        {t('cycle.backup')}
+      </button>
       <button className="btn full sage" disabled={cents <= 0} onClick={close}>
         {t('cycle.close')}
       </button>

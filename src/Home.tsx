@@ -14,12 +14,18 @@ import {
   type HomeGroupId,
 } from './logic'
 import { useState } from 'react'
-import { clampWeekStart, formatRange, todayISO } from './dates'
+import { clampWeekStart, daysBetween, formatRange, localDayFromStamp, todayISO } from './dates'
 import { weekdayName, type MsgKey } from './i18n'
 import { kindLabel } from './template'
-import { markPaid, restoreFundCarry, updateSettings, useAppState } from './store'
+import { downloadBackup, markPaid, restoreFundCarry, updateSettings, useAppState } from './store'
 import { useLocale, useMoney, useT } from './useT'
 import type { Sheet as SheetState } from './types'
+
+function backupDue(lastExportAt: string | undefined, startedAt: string): boolean {
+  const today = todayISO()
+  if (!lastExportAt) return daysBetween(startedAt, today) >= 7
+  return daysBetween(localDayFromStamp(lastExportAt), today) >= 21
+}
 
 function pillLabel(view: EnvelopeView, tr: (k: MsgKey, vars?: Record<string, string | number>) => string): string {
   if (view.paid) return tr('home.pillPaid')
@@ -111,6 +117,23 @@ export function Home({
           {t('home.move')}
         </button>
       </div>
+
+      {todayISO() >= cycle.expectedEndAt && (
+        <div className="banner orange">
+          <div>{t('home.paydayDue')}</div>
+          <button type="button" className="btn full" style={{ marginTop: 10 }} onClick={onCycle}>
+            {t('home.paydayGo')}
+          </button>
+        </div>
+      )}
+      {backupDue(state.settings.lastExportAt, cycle.startedAt) && (
+        <div className="hint" style={{ marginBottom: 14 }}>
+          <div>{t('home.backup')}</div>
+          <button type="button" className="btn full sage" style={{ marginTop: 10 }} onClick={() => downloadBackup()}>
+            {t('home.backupBtn')}
+          </button>
+        </div>
+      )}
 
       {fundGaps.length > 0 && (
         <div className="card stack" style={{ marginBottom: 14 }}>
@@ -208,7 +231,9 @@ export function Home({
             {t('home.billsDone')}
           </p>
         )}
-
+        <button type="button" className="btn ghost full" onClick={() => onOpen({ name: 'cash' })}>
+          {t('home.cashMove')}
+        </button>
       </section>
 
       {groups.map((g) =>
@@ -343,11 +368,17 @@ function EnvelopeCard({
             : env.kind === 'savings'
               ? t('home.savingsUsed', { amount: money(view.used) })
               : env.kind === 'fund'
-                ? remaining > 0 && spentLife > 0
-                  ? t('fund.both', { set: money(remaining), spent: money(spentLife) })
-                  : spentLife > 0
-                    ? t('fund.spentBit', { amount: money(spentLife) })
-                    : t('fund.setAside', { amount: money(remaining) })
+                ? `${
+                    remaining > 0 && spentLife > 0
+                      ? t('fund.both', { set: money(remaining), spent: money(spentLife) })
+                      : spentLife > 0
+                        ? t('fund.spentBit', { amount: money(spentLife) })
+                        : t('fund.setAside', { amount: money(remaining) })
+                  }${
+                    (env.cycleSetAside ?? 0) > 0
+                      ? t('fund.eachBit', { amount: money(env.cycleSetAside ?? 0) })
+                      : ''
+                  }`
                 : week
                   ? `${t('home.weekLine', {
                       spent: money(week.spent),

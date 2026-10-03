@@ -9,12 +9,14 @@ import {
 } from './dates'
 import { EMOJI_PICK } from './template'
 import {
+  accountSnapshot,
   activeCycle,
   coverPlan,
   fundSpendTarget,
   guideForEnvelope,
   inDailySplit,
   kindOrder,
+  pocketSplit,
   saveReview,
   uid,
   verdictFor,
@@ -33,12 +35,20 @@ import {
   coverAndSpend,
   getState,
   moveMoney,
+  movePocket,
   updateExpense,
   useAppState,
 } from './store'
 import type { EnvelopeKind, Rhythm } from './types'
 
 const QUICK = [2, 5, 10, 15, 20, 25, 30, 50]
+
+function amountInput(cents: number): string {
+  const whole = Math.trunc(cents / 100)
+  const frac = Math.abs(cents % 100)
+  if (frac === 0) return String(whole)
+  return `${whole}.${String(frac).padStart(2, '0')}`.replace(/0$/, '')
+}
 
 export function AddSheet({
   presetId,
@@ -101,6 +111,19 @@ export function AddSheet({
     isDaily && guide && cents > guide.hoy && cents <= Math.max(0, chargeView?.remaining ?? 0) && !plan
 
   const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
+  const cycleExpenses = cycle
+    ? state.txs.filter((tx) => tx.cycleId === cycle.id && tx.type === 'expense')
+    : []
+  const lastExpense = cycleExpenses.length > 0 ? cycleExpenses[cycleExpenses.length - 1] : undefined
+  const lastAmount = lastExpense?.amount ?? 0
+  const recentEnvelopes: { id: string; label: string }[] = []
+  for (let i = cycleExpenses.length - 1; i >= 0 && recentEnvelopes.length < 3; i--) {
+    const env = state.envelopes.find((e) => e.id === cycleExpenses[i].envelopeId)
+    if (!env) continue
+    const target = env.parentId ? (state.envelopes.find((e) => e.id === env.parentId) ?? env) : env
+    if (recentEnvelopes.some((row) => row.id === target.id)) continue
+    recentEnvelopes.push({ id: target.id, label: `${target.emoji} ${target.name}` })
+  }
 
   function parentCover() {
     if (!plan?.fromParent || !plan.parentId) return undefined
@@ -204,6 +227,18 @@ export function AddSheet({
         />
       </label>
       <div className="chips">
+        {lastAmount > 0 && (
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              setAmount(amountInput(lastAmount))
+              setConfirm(false)
+            }}
+          >
+            {t('sheet.lastAmount', { amount: money(lastAmount) })}
+          </button>
+        )}
         {QUICK.map((n) => (
           <button key={n} className="chip" onClick={() => setAmount(String(n))}>
             {money(n * 100)}
@@ -261,6 +296,27 @@ export function AddSheet({
           {t('sheet.cash')}
         </button>
       </div>
+      {recentEnvelopes.length > 0 && (
+        <>
+          <p className="tiny">{t('sheet.recent')}</p>
+          <div className="chips">
+            {recentEnvelopes.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                className={`chip ${envelopeId === row.id || selectedEnv?.parentId === row.id ? 'on' : ''}`}
+                onClick={() => {
+                  setEnvelopeId(row.id)
+                  setFolderId('')
+                  setConfirm(false)
+                }}
+              >
+                {row.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <p className="tiny">{t('sheet.envelope')}</p>
       <div className="chips">
         {views
@@ -612,6 +668,60 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
   )
 }
 
+export function CashSheet({ onClose }: { onClose: () => void }) {
+  const t = useT()
+  const money = useMoney()
+  const state = useAppState()
+  const [amount, setAmount] = useState('')
+  const [msg, setMsg] = useState('')
+  const [error, setError] = useState('')
+  const cents = parseEuros(amount) ?? 0
+  const snap = accountSnapshot(viewsFor(state))
+  const pockets = pocketSplit(state, snap.inAccount, snap.afterFixed)
+
+  function go(direction: 'to-cash' | 'to-bank') {
+    setError('')
+    setMsg('')
+    const result = movePocket(cents, direction)
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setMsg(t('sheet.cashOk'))
+    setAmount('')
+  }
+
+  return (
+    <Sheet title={t('sheet.cashTitle')} onClose={onClose}>
+      <p className="muted">{t('sheet.cashHint')}</p>
+      <p className="muted" style={{ fontSize: 13 }}>
+        {t('home.inAccountHint', { bank: money(pockets.bank), cash: money(pockets.cash) })}
+      </p>
+      <label className="field">
+        {t('sheet.amount')}
+        <input
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => {
+            setAmount(e.target.value)
+            setError('')
+            setMsg('')
+          }}
+          placeholder={t('common.amountPh')}
+        />
+      </label>
+      {error ? <p className="deficit">{error}</p> : null}
+      {msg ? <p className="hint">{msg}</p> : null}
+      <button type="button" className="btn full sage" disabled={cents <= 0} onClick={() => go('to-cash')}>
+        {t('sheet.toCash')}
+      </button>
+      <button type="button" className="btn full secondary" disabled={cents <= 0} onClick={() => go('to-bank')}>
+        {t('sheet.toBank')}
+      </button>
+    </Sheet>
+  )
+}
+
 export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
   const t = useT()
   const state = useAppState()
@@ -619,6 +729,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<EnvelopeKind>('cap')
   const [rhythm, setRhythm] = useState<Rhythm>('weekly')
   const [splitDaily, setSplit] = useState(false)
+  const [eachCycle, setEachCycle] = useState(false)
   const [weekStartsOn, setWeekStartsOn] = useState(() => state.settings.weekStartsOn ?? 5)
   const [amount, setAmount] = useState('')
   const [emoji, setEmoji] = useState('✦')
@@ -646,6 +757,7 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
       rhythm: kind === 'cap' ? (splitDaily ? 'daily' : rhythm) : 'none',
       splitDaily: kind === 'cap' && splitDaily,
       weekStartsOn: kind === 'cap' && !splitDaily && rhythm === 'weekly' ? weekStartsOn : undefined,
+      ...(kind === 'fund' && eachCycle && cents > 0 ? { cycleSetAside: cents } : {}),
     })
     if (!result.ok) {
       setError(result.error)
@@ -688,6 +800,22 @@ export function NewEnvelopeSheet({ onClose }: { onClose: () => void }) {
           <option value="fund">{t('setup.typeGoal')}</option>
         </select>
       </label>
+      {kind === 'fund' && (
+        <label className="field" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={eachCycle}
+            onChange={(e) => setEachCycle(e.target.checked)}
+            style={{ marginTop: 4 }}
+          />
+          <span>
+            <span style={{ fontWeight: 500 }}>{t('fund.eachCycle')}</span>
+            <span className="muted" style={{ display: 'block', fontSize: 13 }}>
+              {t('fund.eachCycleHint')}
+            </span>
+          </span>
+        </label>
+      )}
       {kind === 'cap' && (
         <>
           <label className="field" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>

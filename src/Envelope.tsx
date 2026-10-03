@@ -24,6 +24,7 @@ import {
   removeTx,
   renameEnvelope,
   restoreFundCarry,
+  setCycleSetAside,
   setEnvelopeWeekStart,
   setSplitDaily,
   updatePlanned,
@@ -267,6 +268,33 @@ export function EnvelopeScreen({
             </>
           )}
           {msg ? <p className="muted">{msg}</p> : null}
+          {env.kind === 'fund' && !env.parentId && (
+            <div className="stack" style={{ gap: 8 }}>
+              <label className="field">
+                {tr('fund.eachCycle')}
+                <input
+                  key={`${env.id}-${env.cycleSetAside ?? 0}`}
+                  inputMode="decimal"
+                  defaultValue={String((env.cycleSetAside ?? 0) / 100)}
+                  onBlur={(e) => {
+                    const cents = parseEuros(e.target.value)
+                    if (cents == null || cents < 0) {
+                      setMsg(tr('env.needAmount'))
+                      return
+                    }
+                    const result = setCycleSetAside(env.id, cents)
+                    setMsg(result.ok ? tr('fund.eachOk') : result.error)
+                  }}
+                />
+              </label>
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                {tr('fund.eachCycleHint')}
+              </p>
+              <button type="button" className="btn full" onClick={onAdd}>
+                {tr('fund.payFromHere')}
+              </button>
+            </div>
+          )}
           {env.kind === 'fund' && !env.parentId && (
             <div className="stack" style={{ gap: 8 }}>
               <strong>{tr('fund.folders')}</strong>
