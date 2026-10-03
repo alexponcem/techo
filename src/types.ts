@@ -105,6 +105,7 @@ export interface AppState {
 export type Screen =
   | { name: 'setup' }
   | { name: 'home' }
+  | { name: 'activity' }
   | { name: 'stats' }
   | { name: 'envelope'; id: string }
   | { name: 'settings' }

@@ -127,7 +127,7 @@ p {
   bottom: 0;
   width: min(430px, 100%);
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr auto 1fr;
   gap: 8px;
   align-items: center;
   padding: 8px 16px calc(10px + var(--safe-bottom));
@@ -154,10 +154,16 @@ p {
   border: 0;
   background: transparent;
   border-radius: 14px;
-  padding: 10px 8px;
+  padding: 10px 4px;
+  font-size: 13px;
   font-weight: 750;
   color: var(--ink-soft);
   cursor: pointer;
+}
+
+.tabbar button.tab-add {
+  font-size: 28px;
+  padding: 0;
 }
 
 .tabbar button.on {

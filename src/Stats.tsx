@@ -25,7 +25,6 @@ export function StatsScreen() {
       </h2>
 
       {live && <LiveReport report={live} />}
-      {current && <RecentList cycleId={current.id} />}
 
       {closed.length > 0 && (
         <>
@@ -127,6 +126,23 @@ function LiveReport({ report }: { report: CycleReport }) {
   )
 }
 
+export function ActivityScreen() {
+  const t = useT()
+  const state = useAppState()
+  const current = [...state.cycles].reverse().find((c) => !c.closedAt)
+  return (
+    <div className="stack">
+      <header className="topbar">
+        <div className="brand">Techo</div>
+      </header>
+      <h2 className="serif" style={{ fontSize: 28, marginTop: -8 }}>
+        {t('nav.activity')}
+      </h2>
+      {current ? <RecentList cycleId={current.id} /> : <p className="muted">{t('stats.noRecent')}</p>}
+    </div>
+  )
+}
+
 function RecentList({ cycleId }: { cycleId: string }) {
   const state = useAppState()
   const t = useT()
@@ -138,7 +154,7 @@ function RecentList({ cycleId }: { cycleId: string }) {
         tx.cycleId === cycleId &&
         (tx.type === 'expense' || tx.type === 'income' || tx.type === 'pocket'),
     )
-    .slice(-12)
+    .slice()
     .reverse()
 
   return (

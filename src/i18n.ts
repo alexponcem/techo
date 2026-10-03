@@ -21,6 +21,7 @@ const msg = {
   'common.amountPh': { es: '0,00', en: '0.00' },
 
   'nav.home': { es: 'Inicio', en: 'Home' },
+  'nav.activity': { es: 'Actividad', en: 'Activity' },
   'nav.stats': { es: 'Estadísticas', en: 'Stats' },
   'nav.add': { es: 'Añadir gasto', en: 'Add spend' },
   'nav.cycle': { es: 'Ciclo', en: 'Cycle' },
@@ -138,8 +139,8 @@ const msg = {
   },
   'home.thisWeek': { es: 'Esta semana', en: 'This week' },
   'home.weekMeta': {
-    es: 'techo inicial {cap} · {daily}/día · quedan {days} {dayWord}',
-    en: 'starting cap {cap} · {daily}/day · {days} {dayWord} left',
+    es: 'techo inicial {cap} · ritmo inicial {daily}/día · quedan {days} {dayWord}',
+    en: 'starting cap {cap} · starting pace {daily}/day · {days} {dayWord} left',
   },
   'home.month': { es: 'Al mes', en: 'This cycle' },
   'home.monthMeta': {

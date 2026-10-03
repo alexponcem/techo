@@ -717,23 +717,34 @@ export function guideForEnvelope(
   const spentToday = spentOnDay(txs, [env.id], today)
   const cashBeforeToday = remaining + Math.max(0, spentToday)
   const behind = cashBeforeToday < fair * daysLeft
-  const guideDaily = behind ? Math.round(cashBeforeToday / daysLeft) : fair
-  const hoy = Math.max(0, guideDaily - spentToday)
+  const baseDaily = behind ? Math.round(cashBeforeToday / daysLeft) : fair
+  const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
+  const w = dailyPaceWindow(cycle, today, weekStart)
+  const paceFrom =
+    env.splitJoinedOn && env.splitJoinedOn > w.sliceStart ? env.splitJoinedOn : w.sliceStart
+  const yesterday = addDays(today, -1)
+  const daysBefore = w.todayIn && paceFrom < today ? daysBetween(paceFrom, today) : 0
+  const spentBefore = paceFrom <= yesterday ? spentInRange(txs, [env.id], paceFrom, yesterday) : 0
+  // Lo que no se gastó en días anteriores de esta semana se suma a hoy.
+  // No pasa a la semana siguiente. Si el mes ya va por debajo, el ritmo sigue repartido.
+  const carry = baseDaily * daysBefore - spentBefore
+  const stacked = !behind && carry > 0
+  const todayBudget = stacked ? Math.min(cashBeforeToday, baseDaily + carry) : baseDaily
+  const hoy = Math.max(0, Math.min(remaining, todayBudget - spentToday))
   const daysAfter = Math.max(0, daysLeft - 1)
   const futureDaily =
     daysAfter > 0 ? (remaining < fair * daysAfter ? Math.round(remaining / daysAfter) : fair) : 0
-  const referenceDaily = spentToday > guideDaily ? futureDaily : guideDaily
-  const weekStart = clampWeekStart(state.settings.dailyWeekStartsOn ?? 1)
-  const w = dailyPaceWindow(cycle, today, weekStart)
+  const referenceDaily = spentToday > todayBudget ? futureDaily : fair
   const weekDaysLeft = w.todayIn ? Math.max(1, daysInclusive(today, w.sliceEnd)) : Math.max(0, w.daysAfter)
   const weekAssigned = fair * Math.max(0, w.daysInWeek)
-  const weekLeft =
-    spentToday > guideDaily
+  const weekLeft = stacked
+    ? Math.min(remaining, Math.max(0, weekAssigned - spentBefore - spentToday))
+    : spentToday > baseDaily
       ? futureDaily * w.daysAfter
-      : Math.max(0, guideDaily * weekDaysLeft - spentToday)
+      : Math.max(0, baseDaily * weekDaysLeft - spentToday)
   return {
     fairDaily: fair,
-    guideDaily,
+    guideDaily: todayBudget,
     hoy,
     weekLeft,
     weekAssigned,
@@ -741,7 +752,7 @@ export function guideForEnvelope(
     daysLeft: weekDaysLeft,
     originalMonth,
     referenceDaily,
-    overPace: spentToday > guideDaily,
+    overPace: spentToday > todayBudget,
   }
 }
 

@@ -6,7 +6,7 @@ import { LanguageScreen } from './LanguageScreen'
 import { SettingsScreen } from './Settings'
 import { Setup } from './Setup'
 import { AddSheet, CashSheet, EditSheet, IncomeSheet, MoveSheet, NewEnvelopeSheet } from './Sheets'
-import { StatsScreen } from './Stats'
+import { ActivityScreen, StatsScreen } from './Stats'
 import { useAppState } from './store'
 import { useLocale, useT } from './useT'
 import type { Screen, Sheet } from './types'
@@ -110,6 +110,7 @@ export default function App() {
         />
       )}
       {screen.name === 'cycle' && <CycleScreen onBack={backHome} />}
+      {screen.name === 'activity' && <ActivityScreen />}
       {screen.name === 'stats' && <StatsScreen />}
 
       <nav className="tabbar">
@@ -119,6 +120,13 @@ export default function App() {
           onClick={backHome}
         >
           {t('nav.home')}
+        </button>
+        <button
+          type="button"
+          className={screen.name === 'activity' ? 'on' : ''}
+          onClick={() => setScreen({ name: 'activity' })}
+        >
+          {t('nav.activity')}
         </button>
         <button
           type="button"

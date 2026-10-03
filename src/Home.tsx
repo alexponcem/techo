@@ -177,7 +177,7 @@ export function Home({
             <div className="v">{money(libreGuide?.weekLeft ?? 0)}</div>
             <div className="s">
               {t('home.weekMeta', {
-                daily: money(libreGuide?.referenceDaily ?? 0),
+                daily: money(libreGuide?.fairDaily ?? 0),
                 cap: money(libreGuide?.weekAssigned ?? 0),
                 days: libreGuide?.daysLeft ?? pace.days,
                 dayWord: (libreGuide?.daysLeft ?? pace.days) === 1 ? t('common.day') : t('common.days'),
