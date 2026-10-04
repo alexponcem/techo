@@ -839,6 +839,32 @@ export function creditFloat(state: AppState): number {
   return owed
 }
 
+/** Si los pagos superan lo que sigue en crédito, recorta el pago más reciente. */
+export function releaseUnmatchedCardPay(txs: Tx[]): Tx[] {
+  let charges = 0
+  let paid = 0
+  for (const tx of txs) {
+    if (tx.type === 'expense' && tx.pocket === 'credit') charges += tx.amount
+    else if (tx.type === 'income' && tx.pocket === 'credit') charges -= tx.amount
+    else if (tx.type === 'cardpay') paid += tx.amount
+  }
+  let excess = paid - charges
+  if (excess <= 0) return txs
+  const next = txs.slice()
+  for (let i = next.length - 1; i >= 0 && excess > 0; i--) {
+    const tx = next[i]
+    if (tx.type !== 'cardpay') continue
+    if (tx.amount <= excess) {
+      excess -= tx.amount
+      next.splice(i, 1)
+    } else {
+      next[i] = { ...tx, amount: tx.amount - excess }
+      excess = 0
+    }
+  }
+  return next
+}
+
 /** Banco = total − efectivo + lo que la tarjeta todavía no ha cobrado. */
 export function pocketSplit(
   state: AppState,

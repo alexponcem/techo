@@ -13,6 +13,7 @@ import {
   accountSnapshot,
   openDailyPace,
   creditFloat,
+  releaseUnmatchedCardPay,
   pocketSplit,
   reassignTxs,
   reportFor,
@@ -154,7 +155,9 @@ function load(): AppState {
         lastExportAt: parsed.settings?.lastExportAt,
       },
     })
-    const next = withFrozenDailyPace(migrated)
+    const paced = withFrozenDailyPace(migrated)
+    const txs = releaseUnmatchedCardPay(paced.txs)
+    const next = txs === paced.txs ? paced : { ...paced, txs }
     localStorage.setItem(KEY, JSON.stringify(next))
     return next
   } catch {
@@ -166,8 +169,10 @@ let state: AppState = load()
 const listeners = new Set<() => void>()
 
 function emit(next: AppState) {
-  state = next
-  localStorage.setItem(KEY, JSON.stringify(next))
+  const txs = releaseUnmatchedCardPay(next.txs)
+  const settled = txs === next.txs ? next : { ...next, txs }
+  state = settled
+  localStorage.setItem(KEY, JSON.stringify(settled))
   listeners.forEach((l) => l())
 }
 
