@@ -85,6 +85,8 @@ export function Home({
   const atLimit = views.filter((v) => v.alert === 'limit')
   const snap = accountSnapshot(views)
   const pockets = pocketSplit(state, snap.inAccount, snap.afterFixed)
+  const onHand = pockets.bank + pockets.cash
+  const onHandAfterBills = pockets.afterBank + pockets.afterCash
   const unpaidNames = snap.unpaid.map((v) => v.env.name).join(', ')
   const groups = homeGroups(locale).map((g) => ({
     ...g,
@@ -209,7 +211,7 @@ export function Home({
 
       <section className="saldo">
         <div className="tiny">{t('home.inAccount')}</div>
-        <div className="saldo-amount">{money(snap.inAccount)}</div>
+        <div className="saldo-amount">{money(onHand)}</div>
         <p className="muted" style={{ fontSize: 13 }}>
           {t('home.inAccountHint', { bank: money(pockets.bank), cash: money(pockets.cash) })}
         </p>
@@ -217,7 +219,7 @@ export function Home({
           <div className="saldo-next">
             <div className="row">
               <span>{t('home.whenBillsLeave')}</span>
-              <b>{money(snap.afterFixed)}</b>
+              <b>{money(onHandAfterBills)}</b>
             </div>
             <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
               {t('home.afterPockets', { bank: money(pockets.afterBank), cash: money(pockets.afterCash) })}
