@@ -564,7 +564,7 @@ export function EnvelopeScreen({
             <span>{tr('fund.past')}</span>
             <span className="muted">{past.length}</span>
           </div>
-          {past.map((block) => (
+          {[...past].reverse().map((block) => (
             <div className="card stack" key={block.cycleId}>
               <strong>
                 {block.archived ? `${tr('fund.archive')} · ` : ''}

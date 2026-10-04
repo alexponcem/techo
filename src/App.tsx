@@ -63,6 +63,22 @@ export default function App() {
     restoreScroll(y, saved && screen.name === 'home' ? envId : undefined)
   }
 
+  const envelopeId = screen.name === 'envelope' ? screen.id : ''
+  useEffect(() => {
+    if (!envelopeId) return
+    const apply = () => window.scrollTo(0, 0)
+    apply()
+    const frame = requestAnimationFrame(() => {
+      apply()
+      requestAnimationFrame(apply)
+    })
+    const timer = window.setTimeout(apply, 80)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [envelopeId])
+
   useEffect(() => {
     document.documentElement.lang = locale
     document.querySelector('meta[name="description"]')?.setAttribute('content', t('app.desc'))
