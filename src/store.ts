@@ -9,6 +9,7 @@ import {
   envelopeTree,
   fundCarryGap,
   fundCloseSnap,
+  fundLifeSnapshot,
   nextOpenings,
   accountSnapshot,
   openDailyPace,
@@ -27,7 +28,7 @@ import {
 import { t } from './i18n'
 import { isCurrency } from './money'
 import { alexPlan } from './template'
-import type { AppState, Currency, Envelope, Locale, Pocket, PocketMove, Settings, Tx } from './types'
+import type { AppState, Currency, Envelope, FundLife, Locale, Pocket, PocketMove, Settings, Tx } from './types'
 
 function localeOf(s: AppState | Settings): Locale {
   if ('settings' in s) return s.settings.locale ?? 'es'
@@ -563,14 +564,35 @@ export function startNextCycle(
   const locale = localeOf(state)
   const savingsId = state.envelopes.find((e) => e.kind === 'savings')?.id ?? 'ahorro'
   const destId = leftoverToId ?? savingsId
-  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId, fundChoice)
-  const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id, fundChoice)
+  const choice: Record<string, 'continue' | 'close'> = { ...fundChoice }
+  for (const env of state.envelopes) {
+    if (env.kind === 'fund' && env.fundClosedInCycle === current.id) choice[env.id] = 'close'
+  }
+  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId, choice)
+  const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id, choice)
   const cycleId = uid()
+  const today = todayISO()
+  const lives = new Map<string, FundLife>()
+  for (const env of state.envelopes) {
+    if (env.kind === 'fund' && choice[env.id] === 'close') lives.set(env.id, fundLifeSnapshot(state, env.id, today))
+  }
   const template = withBalancedBuffer(
     state.template.map((e) => {
-      const fresh = { ...e, opening: 0 }
-      if (fresh.kind !== 'fund' || fundChoice[fresh.id] !== 'close') return fresh
-      const closed = { ...fresh, fundEpoch: cycleId }
+      const live = state.envelopes.find((row) => row.id === e.id)
+      const fresh: Envelope = {
+        ...e,
+        opening: 0,
+        fundEpoch: live?.fundEpoch ?? e.fundEpoch,
+        fundLives: live?.fundLives ?? e.fundLives,
+      }
+      delete fresh.fundClosedInCycle
+      if (fresh.kind !== 'fund' || choice[fresh.id] !== 'close') return fresh
+      const life = lives.get(fresh.id)
+      const closed: Envelope = {
+        ...fresh,
+        fundEpoch: cycleId,
+        fundLives: life ? [...(fresh.fundLives ?? []), life] : fresh.fundLives,
+      }
       if ((fresh.cycleSetAside ?? 0) <= 0) return closed
       const rest = { ...closed }
       delete rest.cycleSetAside
@@ -638,6 +660,49 @@ export function removeEnvelope(id: string, toId: string): { ok: true } | { ok: f
     txs: reassignTxs(state.txs, removeIds, toId),
     envelopes,
     template,
+  })
+  return { ok: true }
+}
+
+function mapFunds(ids: Set<string>, patch: (env: Envelope) => Envelope) {
+  const apply = (env: Envelope) => (ids.has(env.id) && env.kind === 'fund' ? patch(env) : env)
+  emit({
+    ...state,
+    envelopes: state.envelopes.map(apply),
+    template: state.template.map(apply),
+  })
+}
+
+/** Cierra el fondo hoy. El gasto sigue en Inicio hasta que acabe este ciclo de cobro. */
+export function closeFund(id: string): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  const env = state.envelopes.find((e) => e.id === id)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  if (!env || env.kind !== 'fund') return { ok: false, error: t(locale, 'store.missing') }
+  const ids = new Set(envelopeTree(state.envelopes, id))
+  mapFunds(ids, (row) => ({ ...row, fundClosedInCycle: cycle.id }))
+  return { ok: true }
+}
+
+/** Deshace un cierre de este ciclo. Las carpetas y el fondo padre vuelven a seguir. */
+export function reopenFund(id: string): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  const env = state.envelopes.find((e) => e.id === id)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  if (!env || env.kind !== 'fund') return { ok: false, error: t(locale, 'store.missing') }
+  const ids = new Set(envelopeTree(state.envelopes, id))
+  let parent = env.parentId
+  while (parent) {
+    ids.add(parent)
+    parent = state.envelopes.find((e) => e.id === parent)?.parentId
+  }
+  mapFunds(ids, (row) => {
+    if (row.fundClosedInCycle !== cycle.id) return row
+    const next = { ...row }
+    delete next.fundClosedInCycle
+    return next
   })
   return { ok: true }
 }

@@ -26,8 +26,20 @@ export interface Envelope {
   weekStartsOn?: number
   /** Si el fondo se cerró, los ciclos anteriores a este id quedan en el archivo y no se suman. */
   fundEpoch?: string
+  /** Ciclo de cobro en el que se cerró. Inicio sigue mostrando el gasto hasta que ese ciclo acaba. */
+  fundClosedInCycle?: string
+  /** Cada vez que el fondo se cerró, con sus fechas. No son ciclos de cobro. */
+  fundLives?: FundLife[]
   /** Si es mayor que 0, esta cifra sale del cobro en cada ciclo y se junta en el fondo. */
   cycleSetAside?: number
+}
+
+/** Un viaje del fondo, de cuando empezó a cuando se cerró. */
+export interface FundLife {
+  from: string
+  to: string
+  spent: number
+  left: number
 }
 
 /** Saldo de un fondo al cerrar el ciclo, para poder recuperarlo. */

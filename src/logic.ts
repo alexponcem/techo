@@ -12,7 +12,7 @@ import {
 } from './dates'
 import { t } from './i18n'
 import { euros } from './money'
-import type { AppState, Cycle, Envelope, EnvelopeKind, Light, Locale, Rhythm, Tx } from './types'
+import type { AppState, Cycle, Envelope, EnvelopeKind, FundLife, Light, Locale, Rhythm, Tx } from './types'
 
 function loc(state: AppState): Locale {
   return state.settings.locale ?? 'es'
@@ -1414,6 +1414,53 @@ export function fundSpentSince(state: AppState, envId: string): number {
     spent += tx.amount
   }
   return spent
+}
+
+function inFundTree(envelopes: Envelope[], rootId: string, tx: Tx): boolean {
+  const ids = new Set(envelopeTree(envelopes, rootId))
+  return ids.has(tx.envelopeId) || Boolean(tx.toEnvelopeId && ids.has(tx.toEnvelopeId))
+}
+
+/** Foto del viaje abierto: gastado desde que se reabrió y lo que queda ahora. */
+export function fundLifeSnapshot(state: AppState, envId: string, to: string): FundLife {
+  const env = state.envelopes.find((e) => e.id === envId)
+  const cycle = activeCycle(state)
+  const ids = env ? envelopeTree(state.envelopes, envId) : [envId]
+  const epochAt = env?.fundEpoch ? cycleStartedAt(state, env.fundEpoch) : undefined
+  let spent = 0
+  for (const id of ids) spent += fundSpentSince(state, id)
+  let left = 0
+  if (cycle) {
+    const mine = state.txs.filter((tx) => tx.cycleId === cycle.id)
+    for (const id of ids) {
+      const row = state.envelopes.find((e) => e.id === id)
+      if (!row) continue
+      const n = netFor(id, mine)
+      left += Math.max(0, row.opening + row.planned + n.in - n.out - n.spent)
+    }
+  }
+  let from = epochAt
+  for (const tx of state.txs) {
+    if (!inFundTree(state.envelopes, envId, tx)) continue
+    if (epochAt) {
+      const started = cycleStartedAt(state, tx.cycleId)
+      if (started && started < epochAt) continue
+    }
+    const day = localDayFromStamp(tx.at)
+    if (epochAt && day < epochAt) continue
+    if (!from || day < from) from = day
+  }
+  return { from: from ?? cycle?.startedAt ?? to, to, spent, left }
+}
+
+/** Movimientos de un viaje cerrado, no de un ciclo de cobro. */
+export function fundLifeTxs(state: AppState, envId: string, life: FundLife): Tx[] {
+  return state.txs.filter((tx) => {
+    if (tx.type === 'pocket' || tx.type === 'cardpay') return false
+    if (!inFundTree(state.envelopes, envId, tx)) return false
+    const day = localDayFromStamp(tx.at)
+    return day >= life.from && day <= life.to
+  })
 }
 
 /**

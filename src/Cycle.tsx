@@ -24,11 +24,16 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
   const [fundChoice, setFundChoice] = useState<Record<string, 'continue' | 'close'>>({})
 
   if (!cycle) return null
+  const cycleId = cycle.id
 
   const cents = parseEuros(income) ?? 0
   const savings = views.find((v) => v.env.kind === 'savings')
   const funds = views.filter((v) => v.env.kind === 'fund')
-  const choice = (id: string) => fundChoice[id] ?? 'continue'
+  const choice = (id: string) => {
+    const row = funds.find((v) => v.env.id === id)
+    if (row?.env.fundClosedInCycle === cycleId) return 'close' as const
+    return fundChoice[id] ?? 'continue'
+  }
   const closing = funds.filter((v) => choice(v.env.id) === 'close')
   const keeping = funds.filter((v) => choice(v.env.id) !== 'close' && v.remaining > 0)
   const loose = views
@@ -76,22 +81,28 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
                 : t('fund.setAside', { amount: money(v.remaining) })}
           </span>
         </div>
-        <div className="chips">
-          <button
-            type="button"
-            className={`chip ${picked === 'continue' ? 'on' : ''}`}
-            onClick={() => setFundChoice((prev) => ({ ...prev, [v.env.id]: 'continue' }))}
-          >
-            {t('fund.continue')}
-          </button>
-          <button
-            type="button"
-            className={`chip ${picked === 'close' ? 'on' : ''}`}
-            onClick={() => setFundChoice((prev) => ({ ...prev, [v.env.id]: 'close' }))}
-          >
-            {t('fund.closed')}
-          </button>
-        </div>
+        {v.env.fundClosedInCycle === cycleId ? (
+          <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+            {t('fund.already')}
+          </p>
+        ) : (
+          <div className="chips">
+            <button
+              type="button"
+              className={`chip ${picked === 'continue' ? 'on' : ''}`}
+              onClick={() => setFundChoice((prev) => ({ ...prev, [v.env.id]: 'continue' }))}
+            >
+              {t('fund.continue')}
+            </button>
+            <button
+              type="button"
+              className={`chip ${picked === 'close' ? 'on' : ''}`}
+              onClick={() => setFundChoice((prev) => ({ ...prev, [v.env.id]: 'close' }))}
+            >
+              {t('fund.closed')}
+            </button>
+          </div>
+        )}
       </div>
     )
   }

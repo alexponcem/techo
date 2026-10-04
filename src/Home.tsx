@@ -357,8 +357,10 @@ function EnvelopeCard({
   const money = useMoney()
   const locale = useLocale()
   const app = useAppState()
-  const ownPace = group === 'daily' ? guideForEnvelope(app, view.env.id) : null
   const { env, total, pct, light, paid } = view
+  const openCycle = [...app.cycles].reverse().find((c) => !c.closedAt)
+  const closedHere = Boolean(openCycle && env.fundClosedInCycle === openCycle.id)
+  const ownPace = group === 'daily' ? guideForEnvelope(app, view.env.id) : null
   const folderRemaining = folders.reduce((s, c) => s + c.remaining, 0)
   const spentLife =
     env.kind === 'fund'
@@ -390,7 +392,7 @@ function EnvelopeCard({
                     (env.cycleSetAside ?? 0) > 0
                       ? t('fund.eachBit', { amount: money(env.cycleSetAside ?? 0) })
                       : ''
-                  }`
+                  }${closedHere ? t('fund.closedBit') : ''}`
                 : week
                   ? `${t('home.weekLine', {
                       spent: money(week.spent),
@@ -422,6 +424,7 @@ function EnvelopeCard({
         folders.map((c) => (
           <span key={c.env.id} className="muted" style={{ fontSize: 12, gridColumn: '1 / -1' }}>
             {c.env.emoji} {c.env.name} · {folderLine(t, money, c.remaining, fundSpentSince(app, c.env.id))}
+            {openCycle && c.env.fundClosedInCycle === openCycle.id ? t('fund.closedBit') : ''}
           </span>
         ))}
       {view.alert && (

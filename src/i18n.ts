@@ -458,6 +458,25 @@ const msg = {
   },
   'fund.continue': { es: 'Continúa', en: 'Continues' },
   'fund.closed': { es: 'Se cerró', en: 'Closed' },
+  'fund.closeNow': { es: 'Cerrar este fondo', en: 'Close this goal' },
+  'fund.closeHint': {
+    es: 'Inicio sigue mostrando lo apartado y lo gastado hasta que acabe este ciclo. En el siguiente queda en el historial del fondo y en Inicio ya no sale ese gasto.',
+    en: 'Home keeps showing what’s set aside and spent until this cycle ends. Next cycle it stays in the goal’s history and that spending leaves Home.',
+  },
+  'fund.closedNow': {
+    es: 'Cerrado en este ciclo. En Inicio se sigue viendo hasta el próximo cobro.',
+    en: 'Closed this cycle. Home keeps showing it until the next payday.',
+  },
+  'fund.closedOk': { es: 'Listo. Este fondo se archiva al acabar el ciclo.', en: 'Done. This goal is archived when the cycle ends.' },
+  'fund.reopen': { es: 'Seguir con este fondo', en: 'Keep this goal going' },
+  'fund.reopened': { es: 'Sigue abierto.', en: 'It’s open again.' },
+  'fund.closedBit': { es: ' · cerrado este ciclo', en: ' · closed this cycle' },
+  'fund.lives': { es: 'Historial del fondo', en: 'Goal history' },
+  'fund.lifeLine': { es: 'gastado {spent} · quedó {left}', en: 'spent {spent} · {left} left' },
+  'fund.already': {
+    es: 'Lo cerraste en este ciclo. Lo que quede se va con lo que sobró.',
+    en: 'You closed it this cycle. What’s left joins the leftover.',
+  },
   'fund.past': { es: 'Ciclos anteriores', en: 'Earlier cycles' },
   'fund.archive': { es: 'Antes de cerrarlo', en: 'Before it closed' },
   'fund.memory': {

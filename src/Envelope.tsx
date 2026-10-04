@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { formatRange } from './dates'
 import {
   activeCycle,
   cycleTxs,
   envelopeTree,
   envelopeView,
   fundCarryGap,
+  fundLifeTxs,
   fundPastCycles,
   fundSpentSince,
   rhythmOf,
@@ -17,8 +19,10 @@ import { WeekStartSelect } from './WeekStartSelect'
 import { EMOJI_PICK, kindLabel } from './template'
 import {
   addSubfund,
+  closeFund,
   markPaid,
   moveMoney,
+  reopenFund,
   removeEnvelope,
   removeExpense,
   removeTx,
@@ -295,6 +299,43 @@ export function EnvelopeScreen({
               </button>
             </div>
           )}
+          {env.kind === 'fund' && (
+            <div className="stack" style={{ gap: 8 }}>
+              {env.fundClosedInCycle === cycle.id ? (
+                <>
+                  <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                    {tr('fund.closedNow')}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn ghost full"
+                    onClick={() => {
+                      reopenFund(env.id)
+                      setMsg(tr('fund.reopened'))
+                    }}
+                  >
+                    {tr('fund.reopen')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn full"
+                    onClick={() => {
+                      const result = closeFund(env.id)
+                      setMsg(result.ok ? tr('fund.closedOk') : result.error)
+                    }}
+                  >
+                    {tr('fund.closeNow')}
+                  </button>
+                  <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                    {tr('fund.closeHint')}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
           {env.kind === 'fund' && !env.parentId && (
             <div className="stack" style={{ gap: 8 }}>
               <strong>{tr('fund.folders')}</strong>
@@ -463,7 +504,61 @@ export function EnvelopeScreen({
             </div>
           ))}
       </div>
-      {past.length > 0 && (
+      {(env.fundLives?.length ?? 0) > 0 && (
+        <>
+          <div className="section-title">
+            <span>{tr('fund.lives')}</span>
+            <span className="muted">{env.fundLives?.length}</span>
+          </div>
+          {[...(env.fundLives ?? [])].reverse().map((life) => {
+            const rows = fundLifeTxs(state, env.id, life)
+            return (
+              <div className="card stack" key={`${life.from}-${life.to}-${life.spent}`}>
+                <strong>{formatRange(life.from, life.to, locale)}</strong>
+                <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                  {tr('fund.lifeLine', { spent: money(life.spent), left: money(life.left) })}
+                </p>
+                {rows
+                  .slice()
+                  .reverse()
+                  .map((t) => {
+                    const owner = state.envelopes.find((e) => e.id === t.envelopeId)
+                    const intoTree = Boolean(t.toEnvelopeId && removeIds.has(t.toEnvelopeId))
+                    const fromTree = removeIds.has(t.envelopeId)
+                    const prefix =
+                      t.type === 'income' || (t.type === 'transfer' && intoTree && !fromTree)
+                        ? '+'
+                        : t.type === 'transfer' && intoTree && fromTree
+                          ? ''
+                          : '−'
+                    return (
+                      <div className="tx" key={t.id}>
+                        <div>
+                          <div>
+                            {labelTx(t.type, fromTree, tr)}
+                            {owner && owner.id !== id ? ` · ${owner.emoji} ${owner.name}` : ''}
+                          </div>
+                          <div className="muted">
+                            {new Date(t.at).toLocaleString(locale === 'en' ? 'en-US' : 'es-ES', {
+                              day: 'numeric',
+                              month: 'short',
+                            })}
+                            {t.note ? ` · ${displayNote(t.note, locale)}` : ''}
+                          </div>
+                        </div>
+                        <div>
+                          {prefix}
+                          {money(t.amount)}
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )
+          })}
+        </>
+      )}
+      {past.length > 0 && (env.fundLives?.length ?? 0) === 0 && (
         <>
           <div className="section-title">
             <span>{tr('fund.past')}</span>
