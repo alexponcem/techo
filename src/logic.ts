@@ -1329,13 +1329,12 @@ export function envelopesAfterRemoval(
   return next
 }
 
-/** Apartado que pasa al ciclo siguiente. Un fondo cerrado suelta lo suyo al destino del sobrante. */
+/** Apartado que pasa al ciclo siguiente. El dinero de un fondo se queda en ese fondo. */
 export function nextOpenings(
   envelopes: Envelope[],
   txs: Tx[],
   cycleId: string,
   destId: string,
-  fundChoice: Record<string, 'continue' | 'close'> = {},
 ): Map<string, number> {
   const leftoverById = new Map<string, number>()
   for (const env of envelopes) leftoverById.set(env.id, env.opening + env.planned)
@@ -1354,20 +1353,14 @@ export function nextOpenings(
       }
     }
   }
-  const savingsId = envelopes.find((e) => e.kind === 'savings')?.id ?? 'ahorro'
-  const destClosed = envelopes.some(
-    (e) => e.id === destId && e.kind === 'fund' && fundChoice[e.id] === 'close',
-  )
-  const actualDest = destClosed ? savingsId : destId
   let extra = 0
   const openings = new Map<string, number>()
   for (const env of envelopes) {
     const left = leftoverById.get(env.id) ?? 0
-    const closedFund = env.kind === 'fund' && fundChoice[env.id] === 'close'
-    if (carryKinds(env.kind) && !closedFund) openings.set(env.id, Math.max(0, left))
+    if (carryKinds(env.kind)) openings.set(env.id, Math.max(0, left))
     else extra += Math.max(0, left)
   }
-  openings.set(actualDest, (openings.get(actualDest) ?? 0) + extra)
+  openings.set(destId, (openings.get(destId) ?? 0) + extra)
   return openings
 }
 
@@ -1375,7 +1368,6 @@ export function fundCloseSnap(
   envelopes: Envelope[],
   txs: Tx[],
   cycleId: string,
-  fundChoice: Record<string, 'continue' | 'close'>,
 ): import('./types').FundSnap[] {
   const mine = txs.filter((tx) => tx.cycleId === cycleId)
   return envelopes
@@ -1387,7 +1379,7 @@ export function fundCloseSnap(
         id: e.id,
         left: Math.max(0, left),
         spent: n.spent,
-        carried: fundChoice[e.id] !== 'close',
+        carried: true,
       }
     })
 }

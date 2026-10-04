@@ -34,16 +34,11 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
     if (row?.env.fundClosedInCycle === cycleId) return 'close' as const
     return fundChoice[id] ?? 'continue'
   }
-  const closing = funds.filter((v) => choice(v.env.id) === 'close')
-  const keeping = funds.filter((v) => choice(v.env.id) !== 'close' && v.remaining > 0)
+  const keeping = funds.filter((v) => v.remaining > 0)
   const loose = views
     .filter((v) => v.env.kind !== 'fund' && v.env.kind !== 'savings')
     .reduce((s, v) => s + Math.max(0, v.remaining), 0)
-  const closingLeft = closing.reduce((s, v) => s + Math.max(0, v.remaining), 0)
-  const leftover = loose + closingLeft
-  const savingsId = savings?.env.id ?? 'ahorro'
-  const destClosed = choice(leftoverTo) === 'close' && funds.some((f) => f.env.id === leftoverTo)
-  const actualDest = destClosed ? savingsId : leftoverTo
+  const leftover = loose
   const leftoverTargets = [
     ...(savings ? [{ id: savings.env.id, label: `${savings.env.emoji} ${savings.env.name}` }] : []),
     ...funds.map((f) => ({ id: f.env.id, label: `${f.env.emoji} ${f.env.name}` })),
@@ -61,7 +56,7 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
 
   function close() {
     if (cents <= 0) return
-    startNextCycle(cents, startedAt, expectedEndAt, actualDest, parseEuros(cashText) ?? 0, fundChoice)
+    startNextCycle(cents, startedAt, expectedEndAt, leftoverTo, parseEuros(cashText) ?? 0, fundChoice)
     onBack()
   }
 
@@ -129,7 +124,6 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
       <div className="hint">
         {t('cycle.savNow', { amount: money(savingsNow) })}
         {t('cycle.left', { amount: money(loose) })}
-        {closingLeft > 0 ? t('cycle.closedJoin', { amount: money(closingLeft) }) : ''}
         {keeping.length > 0
           ? t('cycle.fundsStay', {
               list: keeping.map((f) => `${f.env.name} ${money(f.remaining)}`).join(', '),
@@ -148,14 +142,13 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
           <button
             key={target.id}
             type="button"
-            className={`chip ${actualDest === target.id ? 'on' : ''}`}
+            className={`chip ${leftoverTo === target.id ? 'on' : ''}`}
             onClick={() => setLeftoverTo(target.id)}
           >
             {target.label}
           </button>
         ))}
       </div>
-      {destClosed ? <p className="muted">{t('fund.destMoved')}</p> : null}
       {funds.length > 0 && (
         <div className="card stack">
           <strong>{t('fund.askTitle')}</strong>

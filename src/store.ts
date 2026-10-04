@@ -568,8 +568,8 @@ export function startNextCycle(
   for (const env of state.envelopes) {
     if (env.kind === 'fund' && env.fundClosedInCycle === current.id) choice[env.id] = 'close'
   }
-  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId, choice)
-  const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id, choice)
+  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId)
+  const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id)
   const cycleId = uid()
   const today = todayISO()
   const lives = new Map<string, FundLife>()
@@ -588,15 +588,11 @@ export function startNextCycle(
       delete fresh.fundClosedInCycle
       if (fresh.kind !== 'fund' || choice[fresh.id] !== 'close') return fresh
       const life = lives.get(fresh.id)
-      const closed: Envelope = {
+      return {
         ...fresh,
         fundEpoch: cycleId,
         fundLives: life ? [...(fresh.fundLives ?? []), life] : fresh.fundLives,
       }
-      if ((fresh.cycleSetAside ?? 0) <= 0) return closed
-      const rest = { ...closed }
-      delete rest.cycleSetAside
-      return { ...rest, planned: 0 }
     }),
     income,
     locale,

@@ -47,7 +47,7 @@ export interface FundSnap {
   id: string
   left: number
   spent: number
-  /** false = se cerró y lo apartado pasó al destino del sobrante. */
+  /** El apartado se quedó en el fondo. */
   carried: boolean
 }
 
