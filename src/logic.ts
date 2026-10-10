@@ -403,6 +403,16 @@ export function capFinished(env: Envelope, cycleId: string | undefined): boolean
   return env.kind === 'cap' && !!cycleId && env.capClosedInCycle === cycleId
 }
 
+/** Lo que salió al dar el techo por terminado. No cuenta como gasto del mes. */
+function capCloseOut(envId: string, txs: Tx[]): number {
+  let n = 0
+  for (const t of txs) {
+    if (t.type !== 'transfer' || t.envelopeId !== envId) continue
+    if (t.note === 'Terminé este ciclo' || t.note === 'Done for this cycle') n += t.amount
+  }
+  return n
+}
+
 /** Lo gastado sobre el dinero que este sobre tiene ahora (lo asignado, más lo que entró, menos lo que salió). */
 function spentShare(spent: number, pool: number): number {
   if (pool <= 0) return spent > 0 ? 100 : 0
@@ -424,6 +434,8 @@ export function envelopeView(
   const spent = n.spent
   const used = n.spent + n.out
   const savingsBase = env.opening + env.planned + n.in
+  const finished = capFinished(env, cycle.id)
+  const usagePool = finished ? pool + capCloseOut(env.id, txs) : pool
   const total = env.kind === 'savings' ? savingsBase : pool
   const pct =
     env.kind === 'savings'
@@ -432,9 +444,8 @@ export function envelopeView(
           ? 100
           : 0
         : Math.round((used / savingsBase) * 100)
-      : spentShare(spent, pool)
+      : spentShare(spent, usagePool)
   const paid = env.kind === 'fixed' && remaining <= 0 && pool > 0
-  const finished = capFinished(env, cycle.id)
   const week = finished ? undefined : weekSlice(env, txs, cycle, today, remaining, weekStartsOn, locale)
   const status = usageStatus(ensureRhythm(env), spent, pool, remaining, week, finished)
   return {

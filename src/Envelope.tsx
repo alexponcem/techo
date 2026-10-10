@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatRange } from './dates'
+import { formatRange, formatStamp } from './dates'
 import {
   activeCycle,
   cycleTxs,
@@ -156,7 +156,9 @@ export function EnvelopeScreen({
                   ? tr('fund.spentBit', { amount: money(lifeSpent) })
                   : tr('fund.setAside', { amount: money(shownRemaining) })
               : tr('env.leftOf', { total: money(view.total) })}
-          {env.kind === 'cap' && env.capClosedInCycle === cycle.id ? tr('cap.doneBit') : ''}
+          {env.kind === 'cap' && env.capClosedInCycle === cycle.id
+            ? `${tr('cap.doneBit')}${view.pct > 0 || view.total > 0 ? tr('home.usedPct', { pct: view.pct }) : ''}`
+            : ''}
         </div>
       </div>
       {view.week && env.kind === 'cap' && (
@@ -562,12 +564,7 @@ export function EnvelopeScreen({
               <div>
                 <div>{labelTx(t.type, t.envelopeId === id, tr)}</div>
                 <div className="muted">
-                  {new Date(t.at).toLocaleString(locale === 'en' ? 'en-US' : 'es-ES', {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatStamp(t.at, locale)}
                   {t.note ? ` · ${displayNote(t.note, locale)}` : ''}
                 </div>
               </div>

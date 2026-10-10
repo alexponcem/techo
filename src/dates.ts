@@ -25,6 +25,38 @@ export function stampAtNoon(isoDay: string): string {
   return parseISODate(isoDay).toISOString()
 }
 
+/** Hoy guarda la hora real. Otro día usa esa misma hora, para que el día no se mueva. */
+export function stampSpend(isoDay: string, now = new Date()): string {
+  if (isoDay === toISODate(now)) return now.toISOString()
+  const [y, m, d] = isoDay.split('-').map(Number)
+  return new Date(
+    y,
+    (m ?? 1) - 1,
+    d ?? 1,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds(),
+  ).toISOString()
+}
+
+/** Si el día no cambia, se queda la hora guardada. Si cambia, esa hora pasa al día nuevo. */
+export function stampEdited(isoDay: string, previousAt: string): string {
+  const prev = new Date(previousAt)
+  if (Number.isNaN(prev.getTime())) return stampSpend(isoDay)
+  if (localDayFromStamp(previousAt) === isoDay) return previousAt
+  const [y, m, d] = isoDay.split('-').map(Number)
+  return new Date(
+    y,
+    (m ?? 1) - 1,
+    d ?? 1,
+    prev.getHours(),
+    prev.getMinutes(),
+    prev.getSeconds(),
+    prev.getMilliseconds(),
+  ).toISOString()
+}
+
 export function clampDay(isoDay: string, min: string, max: string): string {
   if (isoDay < min) return min
   if (isoDay > max) return max
@@ -44,6 +76,17 @@ export function formatDay(iso: string, locale: Locale = 'es'): string {
   return new Intl.DateTimeFormat(intlTag(locale), {
     day: 'numeric',
     month: 'short',
+  }).format(d)
+}
+
+export function formatStamp(iso: string, locale: Locale = 'es'): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return formatDay(iso, locale)
+  return new Intl.DateTimeFormat(intlTag(locale), {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(d)
 }
 

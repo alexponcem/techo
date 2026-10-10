@@ -3,7 +3,8 @@ import {
   clampDay,
   formatDay,
   localDayFromStamp,
-  stampAtNoon,
+  stampEdited,
+  stampSpend,
   todayISO,
   yesterdayISO,
 } from './dates'
@@ -147,7 +148,7 @@ export function AddSheet({
     cents <= Math.max(0, chargeView?.remaining ?? 0) &&
     !plan
 
-  const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
+  const at = stampSpend(clampDay(spendDay, minDay, maxDay))
   const cycleExpenses = cycle
     ? state.txs.filter((tx) => tx.cycleId === cycle.id && tx.type === 'expense')
     : []
@@ -513,10 +514,11 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
 
   const cents = parseEuros(amount) ?? 0
   const day = clampDay(spendDay, minDay, maxDay)
+  const savedAt = tx.at
 
   function save() {
     if (cents <= 0) return
-    updateExpense(txId, { amount: cents, note, at: stampAtNoon(day), pocket })
+    updateExpense(txId, { amount: cents, note, at: stampEdited(day, savedAt), pocket })
     onClose()
   }
 

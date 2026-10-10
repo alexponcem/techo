@@ -28,7 +28,9 @@ function backupDue(lastExportAt: string | undefined, startedAt: string): boolean
 }
 
 function pillLabel(view: EnvelopeView, tr: (k: MsgKey, vars?: Record<string, string | number>) => string): string {
-  if (view.env.kind === 'cap' && view.env.capClosedInCycle && view.remaining >= 0) return tr('cap.donePill')
+  if (view.env.kind === 'cap' && view.env.capClosedInCycle && view.remaining >= 0) {
+    return view.total > 0 || view.pct > 0 ? `${Math.max(0, view.pct)}%` : tr('cap.donePill')
+  }
   if (view.paid) return tr('home.pillPaid')
   if (view.env.kind === 'savings') return view.used > 0 ? `${view.pct}%` : tr('home.pillOk')
   if (view.env.kind === 'fund') {
@@ -416,7 +418,7 @@ function EnvelopeCard({
         <div className="name">{env.name}</div>
         <div className="meta">
           {capDone
-            ? `${kindLabel(env.kind, locale)}${t('cap.doneBit')}`
+            ? `${kindLabel(env.kind, locale)}${t('cap.doneBit')}${total > 0 || pct > 0 ? t('home.usedPct', { pct }) : ''}`
             : group === 'daily'
             ? t('home.ownPace', { hoy: money(ownPace?.hoy ?? 0) })
             : env.kind === 'savings'
@@ -457,7 +459,7 @@ function EnvelopeCard({
             : pillLabel(view, t)}
         </span>
       </div>
-      <div className={`bar ${light}`}>
+      <div className={`bar ${capDone && remaining >= 0 ? '' : light}`}>
         <span style={{ width: `${barPct}%` }} />
       </div>
       {folders.length > 0 &&

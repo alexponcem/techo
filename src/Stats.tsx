@@ -1,4 +1,4 @@
-import { formatDay, formatRange, localDayFromStamp } from './dates'
+import { formatRange, formatStamp } from './dates'
 import { displayNote } from './i18n'
 import { reportFor, type CycleReport } from './logic'
 import { PocketChips } from './Sheets'
@@ -195,7 +195,7 @@ function RecentList({ cycleId }: { cycleId: string }) {
               <div>
                 <div>{title}</div>
                 <div className="muted">
-                  {formatDay(localDayFromStamp(tx.at), locale)}
+                  {formatStamp(tx.at, locale)}
                   {tx.type !== 'pocket' && tx.type !== 'cardpay' && tx.note
                     ? ` · ${displayNote(tx.note, locale)}`
                     : ''}
