@@ -20,8 +20,10 @@ import { EMOJI_PICK, kindLabel } from './template'
 import {
   addSubfund,
   closeFund,
+  finishCap,
   markPaid,
   moveMoney,
+  reopenCap,
   reopenFund,
   removeEnvelope,
   removeExpense,
@@ -67,6 +69,8 @@ export function EnvelopeScreen({
   const [destId, setDestId] = useState('')
   const [moveTo, setMoveTo] = useState('')
   const [moveAmount, setMoveAmount] = useState('')
+  const [finishing, setFinishing] = useState(false)
+  const [finishTo, setFinishTo] = useState('')
 
   if (!cycle || !env) {
     return (
@@ -152,6 +156,7 @@ export function EnvelopeScreen({
                   ? tr('fund.spentBit', { amount: money(lifeSpent) })
                   : tr('fund.setAside', { amount: money(shownRemaining) })
               : tr('env.leftOf', { total: money(view.total) })}
+          {env.kind === 'cap' && env.capClosedInCycle === cycle.id ? tr('cap.doneBit') : ''}
         </div>
       </div>
       {view.week && env.kind === 'cap' && (
@@ -459,6 +464,83 @@ export function EnvelopeScreen({
               </span>
             </label>
           )}
+          {env.kind === 'cap' &&
+            (env.capClosedInCycle === cycle.id ? (
+              <div className="stack" style={{ gap: 8 }}>
+                <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                  {tr('cap.doneNow')}
+                </p>
+                <button
+                  type="button"
+                  className="btn ghost full"
+                  onClick={() => {
+                    reopenCap(env.id)
+                    setMsg(tr('cap.reopened'))
+                  }}
+                >
+                  {tr('cap.reopen')}
+                </button>
+              </div>
+            ) : finishing ? (
+              <div className="stack" style={{ gap: 8 }}>
+                <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                  {view.remaining > 0 ? tr('cap.finishHint') : tr('cap.finishNone')}
+                </p>
+                {view.remaining > 0 && (
+                  <div className="chips" style={{ flexWrap: 'wrap' }}>
+                    {state.envelopes
+                      .filter((row) => row.id !== env.id)
+                      .map((row) => (
+                        <button
+                          key={row.id}
+                          type="button"
+                          className={`chip ${finishTo === row.id ? 'on' : ''}`}
+                          onClick={() => setFinishTo(row.id)}
+                        >
+                          {row.emoji} {row.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="btn full sage"
+                  disabled={view.remaining > 0 && !finishTo}
+                  onClick={() => {
+                    const result = finishCap(env.id, finishTo)
+                    if (!result.ok) {
+                      setMsg(result.error)
+                      return
+                    }
+                    setFinishing(false)
+                    setMsg(tr('cap.finishOk'))
+                  }}
+                >
+                  {view.remaining > 0 ? tr('cap.finishGo') : tr('cap.finish')}
+                </button>
+                <button type="button" className="btn ghost full" onClick={() => setFinishing(false)}>
+                  {tr('common.cancel')}
+                </button>
+              </div>
+            ) : (
+              <div className="stack" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn full"
+                  onClick={() => {
+                    const savings = state.envelopes.find((row) => row.kind === 'savings')
+                    setFinishTo(savings?.id ?? '')
+                    setFinishing(true)
+                    setMsg('')
+                  }}
+                >
+                  {tr('cap.finish')}
+                </button>
+                <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                  {view.remaining > 0 ? tr('cap.finishHint') : tr('cap.finishNone')}
+                </p>
+              </div>
+            ))}
         </div>
       )}
       {env.kind !== 'buffer' && env.kind !== 'savings' && (

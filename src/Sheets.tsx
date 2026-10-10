@@ -11,6 +11,7 @@ import { EMOJI_PICK } from './template'
 import {
   accountSnapshot,
   activeCycle,
+  capFinished,
   coverPlan,
   fundSpendTarget,
   guideForEnvelope,
@@ -137,8 +138,14 @@ export function AddSheet({
   const reasonOk = (isSavings ? note : reason).trim().length >= 4
   const guide = chargeId ? guideForEnvelope(state, chargeId) : null
   const isDaily = Boolean(chargeView && inDailySplit(chargeView.env))
+  const capDone = Boolean(chargeView && cycle && capFinished(chargeView.env, cycle.id))
   const paceOver =
-    isDaily && guide && cents > guide.hoy && cents <= Math.max(0, chargeView?.remaining ?? 0) && !plan
+    isDaily &&
+    !capDone &&
+    guide &&
+    cents > guide.hoy &&
+    cents <= Math.max(0, chargeView?.remaining ?? 0) &&
+    !plan
 
   const at = stampAtNoon(clampDay(spendDay, minDay, maxDay))
   const cycleExpenses = cycle

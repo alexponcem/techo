@@ -586,6 +586,7 @@ export function startNextCycle(
         fundLives: live?.fundLives ?? e.fundLives,
       }
       delete fresh.fundClosedInCycle
+      delete fresh.capClosedInCycle
       if (fresh.kind !== 'fund' || choice[fresh.id] !== 'close') return fresh
       const life = lives.get(fresh.id)
       return {
@@ -667,6 +668,74 @@ function mapFunds(ids: Set<string>, patch: (env: Envelope) => Envelope) {
     envelopes: state.envelopes.map(apply),
     template: state.template.map(apply),
   })
+}
+
+function markCap(id: string, cycleId: string | undefined) {
+  const apply = (row: Envelope): Envelope => {
+    if (row.id !== id || row.kind !== 'cap') return row
+    if (!cycleId) {
+      if (!row.capClosedInCycle) return row
+      const next = { ...row }
+      delete next.capClosedInCycle
+      return next
+    }
+    return { ...row, capClosedInCycle: cycleId }
+  }
+  emit({
+    ...state,
+    envelopes: state.envelopes.map(apply),
+    template: state.template.map(apply),
+  })
+}
+
+/** Termina un techo en este ciclo: mueve lo que queda y deja de pedir ritmo. El límite vuelve el próximo cobro. */
+export function finishCap(id: string, toId: string): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  const env = state.envelopes.find((e) => e.id === id)
+  const dest = state.envelopes.find((e) => e.id === toId)
+  if (!env || env.kind !== 'cap') return { ok: false, error: t(locale, 'store.missing') }
+  if (env.capClosedInCycle === cycle.id) return { ok: true }
+  const mine = state.txs.filter((tx) => tx.cycleId === cycle.id)
+  const left = envelopeCash(env, mine)
+  if (left > 0 && (!dest || dest.id === id)) return { ok: false, error: t(locale, 'store.badDest') }
+  const txs =
+    left > 0 && dest
+      ? [
+          ...state.txs,
+          {
+            id: uid(),
+            cycleId: cycle.id,
+            at: new Date().toISOString(),
+            type: 'transfer' as const,
+            envelopeId: id,
+            toEnvelopeId: dest.id,
+            amount: left,
+            note: t(locale, 'store.capDone'),
+          },
+        ]
+      : state.txs
+  const mark = (row: Envelope): Envelope =>
+    row.id === id && row.kind === 'cap' ? { ...row, capClosedInCycle: cycle.id } : row
+  emit({
+    ...state,
+    txs,
+    envelopes: state.envelopes.map(mark),
+    template: state.template.map(mark),
+  })
+  return { ok: true }
+}
+
+/** Vuelve a pedir ritmo en este ciclo. El dinero se queda donde se envió. */
+export function reopenCap(id: string): { ok: true } | { ok: false; error: string } {
+  const cycle = activeCycle(state)
+  const locale = localeOf(state)
+  const env = state.envelopes.find((e) => e.id === id)
+  if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
+  if (!env || env.kind !== 'cap') return { ok: false, error: t(locale, 'store.missing') }
+  markCap(id, undefined)
+  return { ok: true }
 }
 
 /** Cierra el fondo hoy. El gasto sigue en Inicio hasta que acabe este ciclo de cobro. */

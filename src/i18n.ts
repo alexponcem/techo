@@ -230,6 +230,28 @@ const msg = {
   'home.pillFromSav': { es: 'Del ahorro', en: 'From savings' },
   'home.pillEmpty': { es: 'Vacío', en: 'Empty' },
   'home.pillLimit': { es: 'Al límite', en: 'At the cap' },
+  'cap.donePill': { es: 'Listo', en: 'Done' },
+  'cap.doneBit': { es: ' · listo este ciclo', en: ' · done this cycle' },
+  'cap.finish': { es: 'Terminé por este ciclo', en: 'Done for this cycle' },
+  'cap.finishGo': { es: 'Mover y terminar', en: 'Move and finish' },
+  'cap.finishHint': {
+    es: 'Lo que queda pasa al sobre que elijas. El próximo cobro este techo vuelve con el mismo límite.',
+    en: 'What’s left goes to the envelope you pick. Next payday this cap returns with the same limit.',
+  },
+  'cap.finishNone': {
+    es: 'Este techo ya está vacío. Hasta el próximo cobro no pide ritmo.',
+    en: 'This cap is already empty. It asks for no pace until the next payday.',
+  },
+  'cap.finishOk': { es: 'Listo por este ciclo.', en: 'Done for this cycle.' },
+  'cap.doneNow': {
+    es: 'Terminado por este ciclo. El límite vuelve con el próximo cobro.',
+    en: 'Finished for this cycle. The limit returns next payday.',
+  },
+  'cap.reopen': { es: 'Seguir con este techo', en: 'Keep this cap going' },
+  'cap.reopened': {
+    es: 'Sigue en este ciclo. El dinero se queda donde lo enviaste.',
+    en: 'It’s back on for this cycle. The money stays where you sent it.',
+  },
   'home.alertHalf': { es: 'Pasó el 50% ({pct}%)', en: 'Past 50% ({pct}%)' },
   'home.alertNear': { es: 'Se acerca al límite ({pct}%)', en: 'Near the cap ({pct}%)' },
   'home.alertAlmost': { es: 'Casi al límite ({pct}%)', en: 'Almost at the cap ({pct}%)' },
@@ -744,6 +766,7 @@ const msg = {
 
   'stats.title': { es: 'Estadísticas', en: 'Stats' },
   'stats.recent': { es: 'Últimos movimientos', en: 'Latest activity' },
+  'stats.moved': { es: '{from} → {to}', en: '{from} → {to}' },
   'stats.noRecent': { es: 'Todavía no hay movimientos en este ciclo.', en: 'No activity in this cycle yet.' },
   'stats.creditFix': {
     es: 'Si un gasto fue con crédito, márcalo aquí. El sobre no cambia. El banco sí, hasta que pagues la tarjeta.',
@@ -880,6 +903,7 @@ const msg = {
   'store.paid': { es: 'Pagado', en: 'Paid' },
   'store.coveredFree': { es: 'Extra cubierto con Libre', en: 'Extra covered with Free' },
   'store.moved': { es: 'Reasignado', en: 'Reassigned' },
+  'store.capDone': { es: 'Terminé este ciclo', en: 'Done for this cycle' },
   'store.savNote': { es: 'AHORRO: {reason}', en: 'SAVINGS: {reason}' },
   'store.goalFallback': { es: 'Fondo', en: 'Goal' },
   'store.toFolder': { es: 'A la carpeta', en: 'To the folder' },
@@ -914,6 +938,7 @@ export function weekdayName(locale: Locale, day: number): string {
 /** Notas que la app escribió en un idioma fijo. Al mostrarlas, salen en el idioma actual. */
 export function displayNote(note: string, locale: Locale): string {
   if (note === 'Reasignado' || note === 'Reassigned') return t(locale, 'store.moved')
+  if (note === 'Terminé este ciclo' || note === 'Done for this cycle') return t(locale, 'store.capDone')
   const sav = note.match(/^(?:AHORRO|SAVINGS):\s*(.*)$/i)
   if (!sav) return note
   return t(locale, 'store.savNote', { reason: sav[1] ?? '' }).trim()

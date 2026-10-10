@@ -28,6 +28,7 @@ function backupDue(lastExportAt: string | undefined, startedAt: string): boolean
 }
 
 function pillLabel(view: EnvelopeView, tr: (k: MsgKey, vars?: Record<string, string | number>) => string): string {
+  if (view.env.kind === 'cap' && view.env.capClosedInCycle && view.remaining >= 0) return tr('cap.donePill')
   if (view.paid) return tr('home.pillPaid')
   if (view.env.kind === 'savings') return view.used > 0 ? `${view.pct}%` : tr('home.pillOk')
   if (view.env.kind === 'fund') {
@@ -360,7 +361,8 @@ function EnvelopeCard({
   const { env, total, pct, light, paid } = view
   const openCycle = [...app.cycles].reverse().find((c) => !c.closedAt)
   const closedHere = Boolean(openCycle && env.fundClosedInCycle === openCycle.id)
-  const ownPace = group === 'daily' ? guideForEnvelope(app, view.env.id) : null
+  const capDone = env.kind === 'cap' && env.capClosedInCycle === openCycle?.id
+  const ownPace = group === 'daily' && !capDone ? guideForEnvelope(app, view.env.id) : null
   const folderRemaining = folders.reduce((s, c) => s + c.remaining, 0)
   const spentLife =
     env.kind === 'fund'
@@ -370,14 +372,16 @@ function EnvelopeCard({
   const week = view.week
   const weekPct =
     week && week.target > 0 ? Math.min(100, Math.round((week.spent / week.target) * 100)) : 0
-  const barPct = group === 'cap' && week ? weekPct : Math.min(100, pct)
+  const barPct = !capDone && group === 'cap' && week ? weekPct : Math.min(100, Math.max(0, pct))
   return (
     <button className="env" id={`sobre-${env.id}`} onClick={onOpen}>
       <div className="emoji">{env.emoji}</div>
       <div>
         <div className="name">{env.name}</div>
         <div className="meta">
-          {group === 'daily'
+          {capDone
+            ? `${kindLabel(env.kind, locale)}${t('cap.doneBit')}`
+            : group === 'daily'
             ? t('home.ownPace', { hoy: money(ownPace?.hoy ?? 0) })
             : env.kind === 'savings'
               ? t('home.savingsUsed', { amount: money(view.used) })
@@ -401,7 +405,7 @@ function EnvelopeCard({
                       total: money(total),
                     })}${week.pace === 'fast' ? t('home.paceFast') : week.pace === 'over' ? t('home.paceOver') : ''}`
                   : kindLabel(env.kind, locale)}
-          {env.kind !== 'fund' && !week && total > 0 ? t('home.usedPct', { pct }) : ''}
+          {!capDone && env.kind !== 'fund' && !week && total > 0 ? t('home.usedPct', { pct }) : ''}
           {env.opening > 0 ? t('home.brought', { amount: money(env.opening) }) : ''}
         </div>
       </div>

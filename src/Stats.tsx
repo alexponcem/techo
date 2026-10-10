@@ -154,7 +154,11 @@ function RecentList({ cycleId }: { cycleId: string }) {
     .filter(
       (tx) =>
         tx.cycleId === cycleId &&
-        (tx.type === 'expense' || tx.type === 'income' || tx.type === 'pocket' || tx.type === 'cardpay'),
+        (tx.type === 'expense' ||
+          tx.type === 'income' ||
+          tx.type === 'transfer' ||
+          tx.type === 'pocket' ||
+          tx.type === 'cardpay'),
     )
     .slice()
     .reverse()
@@ -170,9 +174,15 @@ function RecentList({ cycleId }: { cycleId: string }) {
       ) : (
         rows.map((tx) => {
           const env = state.envelopes.find((e) => e.id === tx.envelopeId)
+          const dest = tx.toEnvelopeId ? state.envelopes.find((e) => e.id === tx.toEnvelopeId) : undefined
           const sign = tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''
           const title =
-            tx.type === 'pocket' || tx.type === 'cardpay'
+            tx.type === 'transfer'
+              ? t('stats.moved', {
+                  from: env ? `${env.emoji} ${env.name}` : t('env.txOut'),
+                  to: dest ? `${dest.emoji} ${dest.name}` : t('env.txIn'),
+                })
+              : tx.type === 'pocket' || tx.type === 'cardpay'
               ? tx.note
               : env
                 ? `${env.emoji} ${env.name}`

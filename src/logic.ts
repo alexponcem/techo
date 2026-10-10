@@ -185,6 +185,7 @@ export function saveReview(
     title: t(locale, 'logic.logged'),
     body: t(locale, 'logic.loggedIn', { name: env.name, when }),
   }
+  if (capFinished(env, cycle.id)) return plain
   // El ritmo diario es de Libre y de los techos marcados. Un fondo, una cuota o el ahorro no lo usan.
   if (inDailySplit(env)) {
     const guide = guideForEnvelope(state, envelopeId, day)
@@ -323,8 +324,10 @@ export function weekSlice(
   // Una semana del ciclo, no el trozo que queda si el ciclo empieza a mitad de semana.
   // Si no, 130 € con solo 3 días dentro de la semana salen como ~12,58.
   const weekRate = Math.round((env.planned * 7) / cycleDays)
-  const target = Math.min(Math.max(0, env.planned), weekRate)
   const spent = spentInRange(txs, [env.id], w.sliceStart, w.sliceEnd)
+  // El consejo no pide más dinero del que sigue en el sobre.
+  const rawTarget = Math.min(Math.max(0, env.planned), weekRate)
+  const target = Math.min(rawTarget, spent + Math.max(0, _remaining))
   let pace: 'ok' | 'fast' | 'over' = 'ok'
   if (target > 0 && spent > target * 1.2) pace = 'over'
   else if (target > 0 && spent > target) pace = 'fast'
@@ -395,6 +398,17 @@ export function spentInRange(txs: Tx[], envelopeIds: string[], from: string, to:
   return n
 }
 
+/** Techo marcado como terminado en el ciclo de cobro abierto. */
+export function capFinished(env: Envelope, cycleId: string | undefined): boolean {
+  return env.kind === 'cap' && !!cycleId && env.capClosedInCycle === cycleId
+}
+
+/** Lo gastado sobre el dinero que este sobre tiene ahora (lo asignado, más lo que entró, menos lo que salió). */
+function spentShare(spent: number, pool: number): number {
+  if (pool <= 0) return spent > 0 ? 100 : 0
+  return Math.round((spent / pool) * 100)
+}
+
 export function envelopeView(
   env: Envelope,
   txs: Tx[],
@@ -405,26 +419,24 @@ export function envelopeView(
   locale: Locale = 'es',
 ): EnvelopeView {
   const n = netFor(env.id, txs)
-  const total = env.opening + env.planned
-  const remaining = remainingOverride ?? total + n.in - n.out - n.spent
+  const pool = env.opening + env.planned + n.in - n.out
+  const remaining = remainingOverride ?? pool - n.spent
   const spent = n.spent
   const used = n.spent + n.out
-  const base = env.kind === 'savings' ? env.opening + env.planned + n.in : total
+  const savingsBase = env.opening + env.planned + n.in
+  const total = env.kind === 'savings' ? savingsBase : pool
   const pct =
     env.kind === 'savings'
-      ? base <= 0
+      ? savingsBase <= 0
         ? used > 0
           ? 100
           : 0
-        : Math.round((used / base) * 100)
-      : total <= 0
-        ? spent > 0
-          ? 100
-          : 0
-        : Math.round((spent / total) * 100)
-  const paid = env.kind === 'fixed' && remaining <= 0 && total > 0
-  const week = weekSlice(env, txs, cycle, today, remaining, weekStartsOn, locale)
-  const status = usageStatus(ensureRhythm(env), spent, total, remaining, week)
+        : Math.round((used / savingsBase) * 100)
+      : spentShare(spent, pool)
+  const paid = env.kind === 'fixed' && remaining <= 0 && pool > 0
+  const finished = capFinished(env, cycle.id)
+  const week = finished ? undefined : weekSlice(env, txs, cycle, today, remaining, weekStartsOn, locale)
+  const status = usageStatus(ensureRhythm(env), spent, pool, remaining, week, finished)
   return {
     env: ensureRhythm(env),
     spent,
@@ -452,21 +464,24 @@ export function viewsFor(state: AppState, today = todayISO()): EnvelopeView[] {
 function usageStatus(
   env: Envelope,
   spent: number,
-  total: number,
+  pool: number,
   remaining: number,
-  week?: WeekSlice,
+  week: WeekSlice | undefined,
+  finished: boolean,
 ): { light: Light; alert: UsageAlert } {
+  if (finished) {
+    if (remaining < 0) return { light: 'red', alert: 'over' }
+    return { light: 'idle', alert: null }
+  }
   if (env.kind === 'fixed' || env.kind === 'savings' || env.kind === 'fund') {
     if (env.kind !== 'fixed' && remaining < 0) return { light: 'red', alert: 'over' }
     if (env.kind === 'fixed') return { light: 'green', alert: null }
     return { light: remaining > 0 ? 'green' : 'idle', alert: null }
   }
-  if (remaining < 0 || (total > 0 && spent > total)) {
-    return { light: 'red', alert: 'over' }
-  }
-  if (total <= 0) return { light: remaining < 0 ? 'red' : 'idle', alert: null }
+  if (remaining < 0) return { light: 'red', alert: 'over' }
+  if (pool <= 0) return { light: 'idle', alert: null }
 
-  const pct = Math.round((spent / total) * 100)
+  const pct = Math.round((spent / pool) * 100)
   const fromPct = band(pct)
   if (fromPct.alert) return fromPct
 
@@ -697,6 +712,21 @@ export function guideForEnvelope(
   const cycle = activeCycle(state)
   const env = state.envelopes.find((e) => e.id === envelopeId)
   if (!cycle || !env) return null
+  if (capFinished(env, cycle.id)) {
+    const txs = cycleTxs(state, cycle.id)
+    return {
+      fairDaily: 0,
+      guideDaily: 0,
+      hoy: 0,
+      weekLeft: 0,
+      weekAssigned: 0,
+      remaining: Math.max(0, envelopeCash(env, txs)),
+      daysLeft: 0,
+      originalMonth: Math.max(0, env.planned),
+      referenceDaily: 0,
+      overPace: false,
+    }
+  }
   const origin = cycle.paceStartedAt ?? paceStartedAt(cycle.startedAt, today)
   const last = lastSpendDay(cycle)
   const paceDays = Math.max(1, daysBetween(origin, cycle.expectedEndAt))

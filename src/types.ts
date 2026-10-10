@@ -28,6 +28,8 @@ export interface Envelope {
   fundEpoch?: string
   /** Ciclo de cobro en el que se cerró. Inicio sigue mostrando el gasto hasta que ese ciclo acaba. */
   fundClosedInCycle?: string
+  /** Techo dado por terminado en este ciclo de cobro. El límite vuelve el próximo cobro. */
+  capClosedInCycle?: string
   /** Cada vez que el fondo se cerró, con sus fechas. No son ciclos de cobro. */
   fundLives?: FundLife[]
   /** Si es mayor que 0, esta cifra sale del cobro en cada ciclo y se junta en el fondo. */
