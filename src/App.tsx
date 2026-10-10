@@ -64,8 +64,9 @@ export default function App() {
   }
 
   const envelopeId = screen.name === 'envelope' ? screen.id : ''
+  const pinTop = envelopeId || (screen.name === 'activity' ? 'activity' : '')
   useEffect(() => {
-    if (!envelopeId) return
+    if (!pinTop) return
     const apply = () => window.scrollTo(0, 0)
     apply()
     const frame = requestAnimationFrame(() => {
@@ -77,7 +78,7 @@ export default function App() {
       cancelAnimationFrame(frame)
       window.clearTimeout(timer)
     }
-  }, [envelopeId])
+  }, [pinTop])
 
   useEffect(() => {
     document.documentElement.lang = locale
