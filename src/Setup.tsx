@@ -1,91 +1,68 @@
-import { useMemo, useRef, useState } from 'react'
-import { clampWeekStart, lastPaydayGuess, suggestedNextPay } from './dates'
-import { weekdayName } from './i18n'
-import { WeekStartSelect } from './WeekStartSelect'
-import { kindExplain, tutorialFor } from './guide'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { suggestedNextPay, lastPaydayGuess } from './dates'
+import { tutorialFor } from './guide'
 import { assigned, takesFromPay, withBalancedBuffer } from './logic'
 import { parseEuros } from './money'
 import { importJson, startFirstCycle } from './store'
-import { kindLabel, blankPlan, exampleEnvelope, type ExampleId } from './template'
+import { guidedPlan } from './template'
 import { useLocale, useMoney, useT } from './useT'
-import type { Envelope, EnvelopeKind, PayMode, Rhythm } from './types'
+import type { PayMode } from './types'
 
-type Step = 'welcome' | 'tutorial' | 'income' | 'envelopes' | 'review'
+type Step = 'welcome' | 'pay' | 'save' | 'bill' | 'cap' | 'libre'
+
+const ORDER: Step[] = ['pay', 'save', 'bill', 'cap', 'libre']
 
 export function Setup() {
   const t = useT()
   const money = useMoney()
   const locale = useLocale()
-  const pages = tutorialFor(locale)
-  const explain = kindExplain(locale)
   const [step, setStep] = useState<Step>('welcome')
-  const [tip, setTip] = useState(0)
   const [incomeText, setIncomeText] = useState('')
   const [startedAt, setStartedAt] = useState(lastPaydayGuess())
   const [payMode, setPayMode] = useState<PayMode>('last-weekday')
   const [fixedDay, setFixedDay] = useState(1)
-  const [weekStartsOn, setWeekStartsOn] = useState(5)
   const [expectedEndAt, setExpectedEndAt] = useState(() =>
     suggestedNextPay(lastPaydayGuess(), 'last-weekday', 1),
   )
-  const [envelopes, setEnvelopes] = useState<Envelope[]>(() => blankPlan(locale))
-  const [savedText, setSavedText] = useState('0')
-  const [cashText, setCashText] = useState('0')
+  const [saveText, setSaveText] = useState('')
+  const [savedText, setSavedText] = useState('')
+  const [billName, setBillName] = useState('')
+  const [billAmount, setBillAmount] = useState('')
+  const [capName, setCapName] = useState('')
+  const [capAmount, setCapAmount] = useState('')
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const income = parseEuros(incomeText) ?? 0
+  const savings = parseEuros(saveText) ?? 0
   const savingsOpening = parseEuros(savedText) ?? 0
-  const openingCash = parseEuros(cashText) ?? 0
-  const balanced = useMemo(() => withBalancedBuffer(envelopes, income, locale), [envelopes, income, locale])
+  const billCents = parseEuros(billAmount) ?? 0
+  const capCents = parseEuros(capAmount) ?? 0
+  const plan = useMemo(
+    () =>
+      guidedPlan(locale, {
+        savings,
+        billName,
+        billAmount: billCents,
+        capName,
+        capAmount: capCents,
+      }),
+    [locale, savings, billName, billCents, capName, capCents],
+  )
+  const balanced = useMemo(() => withBalancedBuffer(plan, income, locale), [plan, income, locale])
   const plannedOthers = assigned(balanced.filter((e) => takesFromPay(e)))
   const deficit = plannedOthers - income
   const buffer = balanced.find((e) => e.kind === 'buffer')
 
-  function setPlanned(id: string, raw: string) {
-    const cents = parseEuros(raw)
-    if (cents === null && raw !== '') return
-    const planned = cents ?? 0
-    setEnvelopes((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? e.cycleSetAside != null
-            ? { ...e, planned, cycleSetAside: planned }
-            : { ...e, planned }
-          : e,
-      ),
-    )
+  function go(next: Step) {
+    setError('')
+    setStep(next)
   }
 
-  function addExample(id: ExampleId) {
-    const row = exampleEnvelope(locale, id)
-    setEnvelopes((prev) => [
-      ...prev.filter((e) => e.kind !== 'buffer' && e.id !== id),
-      row,
-      ...prev.filter((e) => e.kind === 'buffer'),
-    ])
-  }
-
-  function addRow() {
-    const id = `sobre-${Date.now()}`
-    setEnvelopes((prev) => [
-      ...prev.filter((e) => e.kind !== 'buffer'),
-      {
-        id,
-        name: t('names.newEnvelope'),
-        kind: 'cap',
-        planned: 0,
-        emoji: '✦',
-        opening: 0,
-        rhythm: 'daily',
-        splitDaily: false,
-      },
-      ...prev.filter((e) => e.kind === 'buffer'),
-    ])
-  }
-
-  function removeRow(id: string) {
-    setEnvelopes((prev) => prev.filter((e) => e.id !== id && e.kind !== 'buffer'))
+  function overBy(used: number): boolean {
+    if (used <= income) return false
+    setError(t('setup.overPlan', { amount: money(used - income) }))
+    return true
   }
 
   function start() {
@@ -106,13 +83,13 @@ export function Setup() {
         settings: {
           payMode,
           fixedDay,
-          weekStartsOn: clampWeekStart(weekStartsOn),
+          weekStartsOn: 5,
           dailyWeekStartsOn: 1,
           locale,
         },
         template: balanced,
         savingsOpening,
-        openingCash,
+        openingCash: 0,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : t('setup.openFail'))
@@ -126,7 +103,7 @@ export function Setup() {
         <h1>Techo</h1>
         <p>{t('welcome.p1')}</p>
         <p className="muted">{t('welcome.p2')}</p>
-        <button className="choice" onClick={() => setStep('tutorial')}>
+        <button className="choice" onClick={() => go('pay')}>
           <b>{t('welcome.create')}</b>
           <span className="muted">{t('welcome.createSub')}</span>
         </button>
@@ -160,75 +137,29 @@ export function Setup() {
     )
   }
 
-  if (step === 'tutorial') {
-    const page = pages[tip]
-    return (
-      <div className="stack">
-        <button
-          className="back"
-          onClick={() => {
-            if (tip > 0) setTip(tip - 1)
-            else setStep('welcome')
-          }}
-        >
-          {t('common.back')}
-        </button>
-        <p className="tiny">
-          {tip + 1} / {pages.length} · {page.screen}
-        </p>
-        <h2 className="serif" style={{ fontSize: 28 }}>
-          {page.title}
-        </h2>
-        {page.lead ? <p>{page.lead}</p> : null}
-        {page.items && page.items.length > 0 && (
-          <ul className="guide-list">
-            {page.items.map((it) => (
-              <li key={it.k}>
-                <b>{it.k}.</b> {it.v}
-              </li>
-            ))}
-          </ul>
-        )}
-        {page.tip ? <div className="hint">{page.tip}</div> : null}
-        <div className="dots">
-          {pages.map((_, i) => (
-            <span key={i} className={i === tip ? 'dot on' : 'dot'} />
-          ))}
-        </div>
-        <button
-          type="button"
-          className="btn full sage"
-          onClick={() => {
-            if (tip < pages.length - 1) setTip(tip + 1)
-            else setStep('income')
-          }}
-        >
-          {tip < pages.length - 1 ? t('common.next') : t('setup.myNumbers')}
-        </button>
-        {tip > 0 && (
-          <button type="button" className="btn ghost full" onClick={() => setTip(tip - 1)}>
-            {t('setup.prev')}
-          </button>
-        )}
-        <button type="button" className="btn ghost full" onClick={() => setStep('income')}>
-          {t('common.skipGuide')}
-        </button>
-      </div>
-    )
-  }
+  const n = ORDER.indexOf(step) + 1
 
-  if (step === 'income') {
+  if (step === 'pay') {
     return (
-      <div className="stack">
-        <button className="back" onClick={() => setStep('tutorial')}>
-          {t('common.back')}
-        </button>
-        <h2 className="serif" style={{ fontSize: 32 }}>
-          {t('setup.cycle')}
-        </h2>
-        <p className="muted">
-          {t('setup.cycleHint')}
-        </p>
+      <Frame
+        n={n}
+        title={t('guide.payTitle')}
+        lead={t('guide.payLead')}
+        onBack={() => go('welcome')}
+        primary={t('common.next')}
+        onPrimary={() => {
+          if (income <= 0) {
+            setError(t('setup.needIncome'))
+            return
+          }
+          if (!(expectedEndAt > startedAt)) {
+            setError(t('guide.badDates'))
+            return
+          }
+          go('save')
+        }}
+        error={error}
+      >
         <label className="field">
           {t('setup.income')}
           <input
@@ -238,30 +169,6 @@ export function Setup() {
             placeholder="1500"
           />
         </label>
-        <label className="field">
-          {t('setup.saved')}
-          <input
-            inputMode="decimal"
-            value={savedText}
-            onChange={(e) => setSavedText(e.target.value)}
-            placeholder="0"
-          />
-        </label>
-        <p className="muted" style={{ fontSize: 13 }}>
-          {t('setup.savedHint')}
-        </p>
-        <label className="field">
-          {t('setup.cash')}
-          <input
-            inputMode="decimal"
-            value={cashText}
-            onChange={(e) => setCashText(e.target.value)}
-            placeholder="0"
-          />
-        </label>
-        <p className="muted" style={{ fontSize: 13 }}>
-          {t('setup.cashHint')}
-        </p>
         <label className="field">
           {t('setup.payday')}
           <input
@@ -307,292 +214,237 @@ export function Setup() {
           {t('setup.nextPay')}
           <input type="date" value={expectedEndAt} onChange={(e) => setExpectedEndAt(e.target.value)} />
         </label>
-        <label className="field">
-          {t('setup.weekDefault')}
-          <select
-            value={weekStartsOn}
-            onChange={(e) => setWeekStartsOn(clampWeekStart(Number(e.target.value)))}
-          >
-            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-              <option key={i} value={i}>
-                {weekdayName(locale, i)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="muted" style={{ fontSize: 13 }}>
-          {t('setup.weekDefaultHint')}
-        </p>
-        <button className="btn full" onClick={() => setStep('envelopes')} disabled={income <= 0}>
-          {t('setup.toEnvelopes')}
-        </button>
-      </div>
+      </Frame>
     )
   }
 
-  if (step === 'envelopes') {
+  if (step === 'save') {
     return (
-      <div className="stack">
-        <button className="back" onClick={() => setStep('income')}>
-          {t('common.back')}
-        </button>
-        <h2 className="serif" style={{ fontSize: 32 }}>
-          {t('setup.envelopes')}
-        </h2>
-        <ul className="guide-list">
-          <li>{t('setup.liBill')}</li>
-          <li>{t('setup.liDaily')}</li>
-          <li>{t('setup.liWeekly')}</li>
-          <li>{t('setup.liGoal')}</li>
-        </ul>
-        <p className="muted">{t('setup.envHint')}</p>
-        <p className="tiny">{t('setup.examples')}</p>
-        <div className="chips" style={{ flexWrap: 'wrap' }}>
-          {(['arriendo', 'movil', 'comida', 'ocio', 'viajes'] as ExampleId[])
-            .filter((id) => !envelopes.some((e) => e.id === id))
-            .map((id) => {
-              const sample = exampleEnvelope(locale, id)
-              return (
-                <button key={id} type="button" className="chip" onClick={() => addExample(id)}>
-                  {sample.emoji} {sample.name}
-                </button>
-              )
-            })}
-        </div>
-        {balanced
-          .filter((e) => e.kind !== 'buffer')
-          .map((e) => (
-            <div className="card stack" key={e.id} style={{ gap: 8 }}>
-              <div className="row">
-                <label className="field" style={{ flex: 1 }}>
-                  {t('setup.name')}
-                  <input
-                    value={e.name}
-                    onChange={(ev) =>
-                      setEnvelopes((prev) =>
-                        prev.map((x) => (x.id === e.id ? { ...x, name: ev.target.value } : x)),
-                      )
-                    }
-                  />
-                </label>
-                {e.kind !== 'savings' && (
-                  <button type="button" className="back" onClick={() => removeRow(e.id)}>
-                    {t('setup.remove')}
-                  </button>
-                )}
-              </div>
-              <p className="muted" style={{ fontSize: 13 }}>
-                {explain[e.kind]?.hint ?? kindLabel(e.kind, locale)}
-              </p>
-              {e.kind !== 'savings' && (
-                <label className="field">
-                  {t('setup.type')}
-                  <select
-                    value={e.kind}
-                    onChange={(ev) => {
-                      const kind = ev.target.value as EnvelopeKind
-                      setEnvelopes((prev) =>
-                        prev.map((x) =>
-                          x.id === e.id
-                            ? {
-                                ...x,
-                                kind,
-                                rhythm:
-                                  kind === 'cap'
-                                    ? x.rhythm === 'weekly'
-                                      ? 'weekly'
-                                      : 'daily'
-                                    : kind === 'buffer'
-                                      ? 'daily'
-                                      : 'none',
-                              }
-                            : x,
-                        ),
-                      )
-                    }}
-                  >
-                    <option value="fixed">{t('setup.typeBill')}</option>
-                    <option value="cap">{t('setup.typeCap')}</option>
-                    <option value="fund">{t('setup.typeGoal')}</option>
-                  </select>
-                </label>
-              )}
-              {e.kind === 'cap' && (
-                <>
-                  <label className="field">
-                    {t('setup.dailyOrWeekly')}
-                    <select
-                      value={e.rhythm === 'weekly' ? 'weekly' : 'daily'}
-                      onChange={(ev) => {
-                        const rhythm = ev.target.value as Rhythm
-                        setEnvelopes((prev) =>
-                          prev.map((x) =>
-                            x.id === e.id
-                              ? {
-                                  ...x,
-                                  rhythm,
-                                  weekStartsOn:
-                                    rhythm === 'weekly'
-                                      ? (x.weekStartsOn ?? weekStartsOn)
-                                      : x.weekStartsOn,
-                                }
-                              : x,
-                          ),
-                        )
-                      }}
-                    >
-                      <option value="weekly">{t('setup.optWeekly')}</option>
-                      <option value="daily">{t('setup.optDaily')}</option>
-                    </select>
-                  </label>
-                  {e.rhythm === 'weekly' && !e.splitDaily && (
-                    <WeekStartSelect
-                      value={e.weekStartsOn ?? weekStartsOn}
-                      onChange={(day) =>
-                        setEnvelopes((prev) =>
-                          prev.map((x) => (x.id === e.id ? { ...x, weekStartsOn: day } : x)),
-                        )
-                      }
-                    />
-                  )}
-                  <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(e.splitDaily)}
-                      onChange={(ev) =>
-                        setEnvelopes((prev) =>
-                          prev.map((x) => (x.id === e.id ? { ...x, splitDaily: ev.target.checked } : x)),
-                        )
-                      }
-                    />
-                    <span style={{ fontWeight: 500 }}>
-                      {t('setup.addDaily')}
-                    </span>
-                  </label>
-                </>
-              )}
-              {e.kind === 'fund' && (
-                <label className="field" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={e.cycleSetAside != null}
-                    onChange={(ev) =>
-                      setEnvelopes((prev) =>
-                        prev.map((x) => {
-                          if (x.id !== e.id) return x
-                          if (!ev.target.checked) {
-                            const rest = { ...x }
-                            delete rest.cycleSetAside
-                            return rest
-                          }
-                          return { ...x, cycleSetAside: x.planned }
-                        }),
-                      )
-                    }
-                    style={{ marginTop: 4 }}
-                  />
-                  <span>
-                    <span style={{ fontWeight: 500 }}>{t('fund.eachCycle')}</span>
-                    <span className="muted" style={{ display: 'block', fontSize: 13 }}>
-                      {t('fund.eachCycleHint')}
-                    </span>
-                  </span>
-                </label>
-              )}
-              <label className="field">
-                {e.kind === 'fund' ? t('setup.amountGoal') : t('setup.amount')}
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  enterKeyHint="done"
-                  defaultValue={(e.planned / 100).toString()}
-                  onChange={(ev) => setPlanned(e.id, ev.target.value)}
-                  onBlur={(ev) => setPlanned(e.id, ev.target.value)}
-                />
-              </label>
-            </div>
-          ))}
-        {buffer ? (
-          <div className="card stack" style={{ gap: 8 }}>
-            <div className="row">
-              <strong>
-                {buffer.emoji} {buffer.name}
-              </strong>
-              <span>{money(buffer.planned)}</span>
-            </div>
-            <p className="muted" style={{ fontSize: 13 }}>
-              {t('setup.freeCard', {
-                extra: balanced.some((e) => e.kind === 'cap' && e.splitDaily)
-                  ? t('setup.freeCardExtra')
-                  : '',
-              })}
-            </p>
-          </div>
-        ) : null}
-        <button className="btn ghost full" onClick={addRow}>
-          {t('setup.addRow')}
-        </button>
-        <button className="btn full" onClick={() => setStep('review')}>
-          {t('setup.review')}
-        </button>
-      </div>
+      <Frame
+        n={n}
+        title={t('guide.saveTitle')}
+        lead={t('guide.saveLead')}
+        onBack={() => go('pay')}
+        primary={t('common.next')}
+        onPrimary={() => {
+          if (overBy(savings)) return
+          go('bill')
+        }}
+        error={error}
+      >
+        <label className="field">
+          {t('guide.saveAmount')}
+          <input
+            inputMode="decimal"
+            value={saveText}
+            onChange={(e) => setSaveText(e.target.value)}
+            placeholder="0"
+          />
+        </label>
+        <label className="field">
+          {t('setup.saved')}
+          <input
+            inputMode="decimal"
+            value={savedText}
+            onChange={(e) => setSavedText(e.target.value)}
+            placeholder="0"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: 13 }}>
+          {t('setup.savedHint')}
+        </p>
+      </Frame>
+    )
+  }
+
+  if (step === 'bill') {
+    return (
+      <Frame
+        n={n}
+        title={t('guide.billTitle')}
+        lead={t('guide.billLead')}
+        onBack={() => go('save')}
+        primary={t('common.next')}
+        onPrimary={() => {
+          const name = billName.trim()
+          if (!name) {
+            setError(t('guide.needName'))
+            return
+          }
+          if (billCents <= 0) {
+            setError(t('guide.needAmount'))
+            return
+          }
+          if (overBy(savings + billCents)) return
+          go('cap')
+        }}
+        skip={t('guide.skip')}
+        onSkip={() => {
+          setBillName('')
+          setBillAmount('')
+          go('cap')
+        }}
+        error={error}
+      >
+        <label className="field">
+          {t('setup.name')}
+          <input
+            value={billName}
+            onChange={(e) => setBillName(e.target.value)}
+            placeholder={t('guide.billPh')}
+          />
+        </label>
+        <label className="field">
+          {t('setup.amount')}
+          <input
+            inputMode="decimal"
+            value={billAmount}
+            onChange={(e) => setBillAmount(e.target.value)}
+            placeholder="0"
+          />
+        </label>
+      </Frame>
+    )
+  }
+
+  if (step === 'cap') {
+    return (
+      <Frame
+        n={n}
+        title={t('guide.capTitle')}
+        lead={t('guide.capLead')}
+        onBack={() => go('bill')}
+        primary={t('common.next')}
+        onPrimary={() => {
+          const name = capName.trim()
+          if (!name) {
+            setError(t('guide.needName'))
+            return
+          }
+          if (capCents <= 0) {
+            setError(t('guide.needAmount'))
+            return
+          }
+          if (overBy(savings + (billName.trim() ? billCents : 0) + capCents)) return
+          go('libre')
+        }}
+        skip={t('guide.skip')}
+        onSkip={() => {
+          setCapName('')
+          setCapAmount('')
+          go('libre')
+        }}
+        error={error}
+      >
+        <label className="field">
+          {t('setup.name')}
+          <input value={capName} onChange={(e) => setCapName(e.target.value)} placeholder={t('guide.capPh')} />
+        </label>
+        <label className="field">
+          {t('setup.amount')}
+          <input
+            inputMode="decimal"
+            value={capAmount}
+            onChange={(e) => setCapAmount(e.target.value)}
+            placeholder="0"
+          />
+        </label>
+      </Frame>
     )
   }
 
   return (
-    <div className="stack">
-      <button className="back" onClick={() => setStep('envelopes')}>
-        {t('common.back')}
-      </button>
-      <h2 className="serif" style={{ fontSize: 32 }}>
-        {t('setup.closes')}
-      </h2>
-      <p className="muted">
-        {t('setup.closesHint')}
-      </p>
+    <Frame
+      n={n}
+      title={t('guide.libreTitle')}
+      lead={t('guide.libreLead')}
+      onBack={() => go('cap')}
+      primary={deficit > 0 ? t('setup.openBlocked') : t('guide.enter')}
+      onPrimary={start}
+      error={error}
+    >
+      <section className="hero">
+        <div className="label">{buffer?.name}</div>
+        <div className="amount">{money(Math.max(0, buffer?.planned ?? 0))}</div>
+      </section>
       <div className="math">
         <div className="math-row">
           <span>{t('setup.incomeRow')}</span>
           <span>{money(income)}</span>
         </div>
-        {savingsOpening > 0 ? (
-          <div className="math-row">
-            <span>{t('setup.savedRow')}</span>
-            <span>{money(savingsOpening)}</span>
-          </div>
-        ) : null}
-        {balanced.map((e) => (
-          <div className="math-row" key={e.id}>
-            <span>
-              {e.emoji} {e.name}
-            </span>
-            <span>{money(e.planned)}</span>
-          </div>
-        ))}
+        {balanced
+          .filter((e) => e.kind !== 'buffer')
+          .map((e) => (
+            <div className="math-row" key={e.id}>
+              <span>
+                {e.emoji} {e.name}
+              </span>
+              <span>{money(e.planned)}</span>
+            </div>
+          ))}
       </div>
       {deficit > 0 ? (
-        <div className="deficit">
-          {t('setup.deficit', { amount: money(deficit) })}
-        </div>
+        <div className="deficit">{t('setup.deficit', { amount: money(deficit) })}</div>
       ) : (
-        <div className="hint">
-          {buffer && buffer.planned > 0
-            ? t('setup.freeHint', {
-                amount: money(buffer.planned),
-                extra: balanced.some((e) => e.kind === 'cap' && e.splitDaily)
-                  ? t('setup.freeHintExtra')
-                  : '',
-              })
-            : t('setup.allAssigned')}
-        </div>
+        <p className="muted" style={{ fontSize: 13 }}>
+          {t('guide.later')}
+        </p>
       )}
-      {error ? <div className="deficit">{error}</div> : null}
-      <button type="button" className="btn full sage" onClick={start}>
-        {deficit > 0 ? t('setup.openBlocked') : t('setup.open')}
+    </Frame>
+  )
+}
+
+function Frame({
+  n,
+  title,
+  lead,
+  onBack,
+  children,
+  primary,
+  onPrimary,
+  skip,
+  onSkip,
+  error,
+}: {
+  n: number
+  title: string
+  lead: string
+  onBack: () => void
+  children: ReactNode
+  primary: string
+  onPrimary: () => void
+  skip?: string
+  onSkip?: () => void
+  error?: string
+}) {
+  const t = useT()
+  return (
+    <div className="stack">
+      <button className="back" onClick={onBack}>
+        {t('common.back')}
       </button>
-      <p className="muted tiny" style={{ textTransform: 'none', letterSpacing: 0 }}>
-        {t('setup.starts', { start: startedAt, end: expectedEndAt })}
+      <p className="tiny">
+        {n} / {ORDER.length}
       </p>
+      <div className="dots">
+        {ORDER.map((id, i) => (
+          <span key={id} className={i === n - 1 ? 'dot on' : 'dot'} />
+        ))}
+      </div>
+      <h2 className="serif" style={{ fontSize: 32 }}>
+        {title}
+      </h2>
+      <p>{lead}</p>
+      {children}
+      {error ? <div className="deficit">{error}</div> : null}
+      <button type="button" className="btn full sage" onClick={onPrimary}>
+        {primary}
+      </button>
+      {skip && onSkip ? (
+        <button type="button" className="btn ghost full" onClick={onSkip}>
+          {skip}
+        </button>
+      ) : null}
     </div>
   )
 }

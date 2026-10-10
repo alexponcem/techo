@@ -13,7 +13,7 @@ import {
   type EnvelopeView,
   type HomeGroupId,
 } from './logic'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { clampWeekStart, daysBetween, formatRange, localDayFromStamp, todayISO } from './dates'
 import { weekdayName, type MsgKey } from './i18n'
 import { kindLabel } from './template'
@@ -70,6 +70,7 @@ export function Home({
   const locale = useLocale()
   const cycle = [...state.cycles].reverse().find((c) => !c.closedAt)
   const views = viewsFor(state)
+  const [tourMark, setTourMark] = useState('')
 
   if (!cycle) return null
 
@@ -97,6 +98,22 @@ export function Home({
     .filter((e) => e.kind === 'fund')
     .map((e) => ({ env: e, gap: fundCarryGap(state, e.id) }))
     .filter((row) => row.gap > 0)
+  const tourCap = views.find((v) => v.env.kind === 'cap' && !v.env.parentId)
+  const tourBill = views.find((v) => v.env.kind === 'fixed')
+  const tourSteps = [
+    { title: t('tour.today'), body: t('tour.todayBody'), target: 'tour-hoy' },
+    { title: t('tour.add'), body: t('tour.addBody'), target: 'tour-gasto' },
+    {
+      title: t('tour.cap'),
+      body: tourCap ? t('tour.capBody', { name: tourCap.env.name }) : t('tour.capLater'),
+      target: tourCap ? `sobre-${tourCap.env.id}` : 'tour-new',
+    },
+    {
+      title: t('tour.bill'),
+      body: tourBill ? t('tour.billBody', { name: tourBill.env.name }) : t('tour.billLater'),
+      target: tourBill ? `sobre-${tourBill.env.id}` : 'tour-new',
+    },
+  ]
 
   return (
     <div>
@@ -112,7 +129,7 @@ export function Home({
         </div>
       </header>
 
-      <div className="actions">
+      <div id="tour-gasto" className={tourMark === 'tour-gasto' ? 'actions tour-target' : 'actions'}>
         <button className="btn sage" onClick={() => onOpen({ name: 'add' })}>
           {t('home.spend')}
         </button>
@@ -164,7 +181,7 @@ export function Home({
         </div>
       )}
 
-      <section className="hero">
+      <section id="tour-hoy" className={tourMark === 'tour-hoy' ? 'hero tour-target' : 'hero'}>
         <div className="label">{t('home.today')}</div>
         <div className="amount">{money(libreGuide?.hoy ?? 0)}</div>
         <div className="sub">
@@ -263,6 +280,7 @@ export function Home({
                 <EnvelopeCard
                   key={v.env.id}
                   view={v}
+                  marked={tourMark === `sobre-${v.env.id}`}
                   group={g.id}
                   folders={views.filter((c) => c.env.parentId === v.env.id)}
                   onOpen={() => onEnvelope(v.env.id)}
@@ -276,7 +294,8 @@ export function Home({
       )}
       <button
         type="button"
-        className="btn ghost full"
+        id="tour-new"
+        className={tourMark === 'tour-new' ? 'btn ghost full tour-target' : 'btn ghost full'}
         style={{ margin: '4px 0 24px' }}
         onClick={() => onOpen({ name: 'new-envelope' })}
       >
@@ -284,27 +303,42 @@ export function Home({
       </button>
       {state.settings.seenHomeTour === false && (
         <HomeTour
-          onSkip={() => updateSettings({ ...state.settings, seenHomeTour: true })}
+          steps={tourSteps}
+          onMark={setTourMark}
+          onSkip={() => {
+            setTourMark('')
+            updateSettings({ ...state.settings, seenHomeTour: true })
+          }}
         />
       )}
     </div>
   )
 }
 
-function HomeTour({ onSkip }: { onSkip: () => void }) {
+function HomeTour({
+  steps,
+  onMark,
+  onSkip,
+}: {
+  steps: { title: string; body: string; target: string }[]
+  onMark: (id: string) => void
+  onSkip: () => void
+}) {
   const t = useT()
   const [i, setI] = useState(0)
-  const pages = [
-    { title: t('tour.account'), body: t('tour.accountBody') },
-    { title: t('tour.today'), body: t('tour.todayBody') },
-    { title: t('tour.add'), body: t('tour.addBody') },
-  ]
-  const page = pages[i]
+  const page = steps[i]
+  const target = page?.target ?? ''
+  useEffect(() => {
+    if (!target) return
+    onMark(target)
+    document.getElementById(target)?.scrollIntoView({ block: 'center', behavior: 'instant' })
+  }, [target, onMark])
+  if (!page) return null
   return (
     <div className="tour">
       <div className="tour-card stack">
         <p className="tiny">
-          {i + 1} / {pages.length}
+          {i + 1} / {steps.length}
         </p>
         <h3 className="serif" style={{ fontSize: 24, margin: 0 }}>
           {page.title}
@@ -314,11 +348,11 @@ function HomeTour({ onSkip }: { onSkip: () => void }) {
           type="button"
           className="btn full sage"
           onClick={() => {
-            if (i < pages.length - 1) setI(i + 1)
+            if (i < steps.length - 1) setI(i + 1)
             else onSkip()
           }}
         >
-          {i < pages.length - 1 ? t('common.next') : t('common.start')}
+          {i < steps.length - 1 ? t('common.next') : t('common.start')}
         </button>
         <button type="button" className="btn ghost full" onClick={onSkip}>
           {t('common.skipTour')}
@@ -341,6 +375,7 @@ function folderLine(
 
 function EnvelopeCard({
   view,
+  marked = false,
   group,
   folders = [],
   onOpen,
@@ -348,6 +383,7 @@ function EnvelopeCard({
   onSpend,
 }: {
   view: EnvelopeView
+  marked?: boolean
   group: HomeGroupId
   folders?: EnvelopeView[]
   onOpen: () => void
@@ -374,7 +410,7 @@ function EnvelopeCard({
     week && week.target > 0 ? Math.min(100, Math.round((week.spent / week.target) * 100)) : 0
   const barPct = !capDone && group === 'cap' && week ? weekPct : Math.min(100, Math.max(0, pct))
   return (
-    <button className="env" id={`sobre-${env.id}`} onClick={onOpen}>
+    <button className={marked ? 'env tour-target' : 'env'} id={`sobre-${env.id}`} onClick={onOpen}>
       <div className="emoji">{env.emoji}</div>
       <div>
         <div className="name">{env.name}</div>

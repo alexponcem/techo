@@ -29,6 +29,44 @@ export function blankPlan(locale: Locale = 'es'): Envelope[] {
   ]
 }
 
+/** Plan mínimo del alta guiada: ahorro, y una cuota o un techo solo si traen nombre e importe. */
+export function guidedPlan(
+  locale: Locale,
+  input: { savings: number; billName?: string; billAmount?: number; capName?: string; capAmount?: number },
+): Envelope[] {
+  const base = blankPlan(locale)
+  const rows: Envelope[] = base
+    .filter((e) => e.kind === 'savings')
+    .map((e) => ({ ...e, planned: Math.max(0, input.savings) }))
+  const billName = input.billName?.trim() ?? ''
+  if (billName && (input.billAmount ?? 0) > 0) {
+    rows.push({
+      id: 'cuota',
+      name: billName,
+      kind: 'fixed',
+      planned: input.billAmount ?? 0,
+      emoji: '🏠',
+      opening: 0,
+      rhythm: 'none',
+    })
+  }
+  const capName = input.capName?.trim() ?? ''
+  if (capName && (input.capAmount ?? 0) > 0) {
+    rows.push({
+      id: 'techo',
+      name: capName,
+      kind: 'cap',
+      planned: input.capAmount ?? 0,
+      emoji: '✦',
+      opening: 0,
+      rhythm: 'daily',
+      splitDaily: false,
+    })
+  }
+  const libre = base.find((e) => e.kind === 'buffer')
+  return libre ? [...rows, libre] : rows
+}
+
 export type ExampleId = 'arriendo' | 'movil' | 'comida' | 'ocio' | 'viajes'
 
 export function exampleEnvelope(locale: Locale, id: ExampleId): Envelope {

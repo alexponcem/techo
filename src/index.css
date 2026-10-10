@@ -760,6 +760,13 @@ select:focus {
   box-shadow: var(--shadow);
 }
 
+.tour-target {
+  position: relative;
+  z-index: 32;
+  border-radius: 18px;
+  box-shadow: 0 0 0 4px #fff, 0 0 0 7px var(--sage);
+}
+
 .welcome {
   padding-top: 28px;
 }

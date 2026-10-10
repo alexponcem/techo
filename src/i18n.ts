@@ -271,15 +271,33 @@ const msg = {
     es: 'El total es todo tu dinero. Debajo, banco y efectivo por separado. Las cuotas que aún no marcas siguen dentro del banco.',
     en: 'The total is all your money. Under it, bank and cash are split. Bills you haven’t marked paid are still in the bank.',
   },
-  'tour.today': { es: 'Hoy puedes gastar', en: 'You can spend today' },
+  'tour.today': { es: 'Hoy', en: 'Today' },
   'tour.todayBody': {
-    es: 'Cuenta Libre y los techos que marques para el diario. Los techos semanales van en su propio grupo.',
-    en: 'This is Free plus any caps you add to daily. Weekly caps live in their own group.',
+    es: 'Este número es lo que puedes usar hoy de Libre.',
+    en: 'This number is what you can use today from Free.',
   },
   'tour.add': { es: '+ Gasto', en: '+ Spend' },
   'tour.addBody': {
-    es: 'Cuánto, en qué sobre, anotar. La app te dice si cabe en ESE sobre. Las cuotas: “Marcar pagado” cuando salgan.',
-    en: 'How much, which envelope, log it. Techo tells you if it fits THAT envelope. Bills: “Mark paid” when they leave.',
+    es: 'Importe y sobre. Techo te dice si ese gasto cabe ahí.',
+    en: 'Amount and envelope. Techo tells you if that spend fits there.',
+  },
+  'tour.cap': { es: 'Tu techo', en: 'Your cap' },
+  'tour.capBody': {
+    es: '{name} es el límite que pusiste. Ábrelo para ver cuánto queda.',
+    en: '{name} is the limit you set. Open it to see what’s left.',
+  },
+  'tour.capLater': {
+    es: 'Los techos salen en esta pantalla. Con + Nuevo sobre creas otro cuando quieras.',
+    en: 'Caps show up on this screen. + New envelope creates another whenever you want.',
+  },
+  'tour.bill': { es: 'Marcar pagado', en: 'Mark paid' },
+  'tour.billBody': {
+    es: 'Cuando el banco cobre {name}, toca Marcar pagado en su tarjeta. Hasta entonces ese dinero sigue en el banco.',
+    en: 'When the bank charges {name}, tap Mark paid on its card. Until then that money stays in the bank.',
+  },
+  'tour.billLater': {
+    es: 'Cuando tengas una cuota, Marcar pagado está en su tarjeta. Hasta que el banco la cobre, ese dinero sigue en el banco.',
+    en: 'When you have a bill, Mark paid is on its card. Until the bank charges it, that money stays in the bank.',
   },
 
   'welcome.kicker': { es: 'Control de dinero', en: 'Money, with a cap' },
@@ -293,9 +311,49 @@ const msg = {
   },
   'welcome.create': { es: 'Crear mi plan', en: 'Create my plan' },
   'welcome.createSub': {
-    es: 'Primero cómo se usa, luego tus números',
-    en: 'How it works first, then your numbers',
+    es: 'Te guío mientras pones tus números',
+    en: 'I’ll walk you through your numbers',
   },
+  'guide.payTitle': { es: 'El dinero de este ciclo', en: 'This cycle’s money' },
+  'guide.payLead': {
+    es: 'Anota lo que acaba de entrar. El ciclo va de este cobro al siguiente.',
+    en: 'Enter what just came in. The cycle runs from this payday to the next.',
+  },
+  'guide.saveTitle': { es: 'Aparta el ahorro ahora', en: 'Set savings aside now' },
+  'guide.saveLead': {
+    es: 'Esta cifra sale del sueldo en este momento y se queda en Ahorro.',
+    en: 'This amount leaves the paycheck now and stays in Savings.',
+  },
+  'guide.saveAmount': { es: '¿Cuánto va a Ahorro este ciclo?', en: 'How much goes to Savings this cycle?' },
+  'guide.billTitle': { es: 'Una cuota', en: 'One bill' },
+  'guide.billLead': {
+    es: 'Una cuota es un pago fijo. Se reserva del sueldo. Cuando el banco lo cobre, lo marcas pagado.',
+    en: 'A bill is a fixed payment. It is reserved from payday. When the bank charges it, you mark it paid.',
+  },
+  'guide.billPh': { es: 'Ej. alquiler', en: 'E.g. rent' },
+  'guide.capTitle': { es: 'Un techo', en: 'One cap' },
+  'guide.capLead': {
+    es: 'Un techo es un límite con el nombre que tú le pongas. Lo vas gastando durante el ciclo.',
+    en: 'A cap is a limit with whatever name you give it. You spend it down during the cycle.',
+  },
+  'guide.capPh': { es: 'Ej. super', en: 'E.g. groceries' },
+  'guide.skip': { es: 'Ahora no tengo', en: 'I don’t have one yet' },
+  'guide.needName': { es: 'Ponle un nombre.', en: 'Give it a name.' },
+  'guide.needAmount': { es: 'Pon el importe.', en: 'Enter the amount.' },
+  'guide.badDates': {
+    es: 'El próximo cobro tiene que ser después de este.',
+    en: 'The next payday has to be after this one.',
+  },
+  'guide.libreTitle': { es: 'Libre se crea solo', en: 'Free creates itself' },
+  'guide.libreLead': {
+    es: 'Libre es lo que queda del sueldo. En Inicio, el número grande es lo que toca hoy de ese dinero.',
+    en: 'Free is what’s left of the paycheck. On Home, the big number is today’s share of that money.',
+  },
+  'guide.later': {
+    es: 'Desde Inicio puedes crear más sobres. El efectivo y el día de la semana están en Ajustes.',
+    en: 'From Home you can create more envelopes. Cash and the week’s start day are in Settings.',
+  },
+  'guide.enter': { es: 'Entrar a Inicio', en: 'Go to Home' },
   'welcome.restore': { es: 'Restaurar una copia', en: 'Restore a backup' },
   'welcome.restoreSub': {
     es: 'Si ya usabas Techo y tienes un techo-backup.json',
