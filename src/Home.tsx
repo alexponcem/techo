@@ -13,11 +13,11 @@ import {
   type EnvelopeView,
   type HomeGroupId,
 } from './logic'
-import { useEffect, useState } from 'react'
 import { clampWeekStart, daysBetween, formatRange, localDayFromStamp, todayISO } from './dates'
 import { weekdayName, type MsgKey } from './i18n'
 import { kindLabel } from './template'
-import { downloadBackup, markPaid, restoreFundCarry, updateSettings, useAppState } from './store'
+import { downloadBackup, markPaid, restoreFundCarry, useAppState } from './store'
+import { useTourTarget } from './tour'
 import { useLocale, useMoney, useT } from './useT'
 import type { Sheet as SheetState } from './types'
 
@@ -72,7 +72,7 @@ export function Home({
   const locale = useLocale()
   const cycle = [...state.cycles].reverse().find((c) => !c.closedAt)
   const views = viewsFor(state)
-  const [tourMark, setTourMark] = useState('')
+  const tourOn = useTourTarget()
 
   if (!cycle) return null
 
@@ -100,23 +100,6 @@ export function Home({
     .filter((e) => e.kind === 'fund')
     .map((e) => ({ env: e, gap: fundCarryGap(state, e.id) }))
     .filter((row) => row.gap > 0)
-  const tourCap = views.find((v) => v.env.kind === 'cap' && !v.env.parentId)
-  const tourBill = views.find((v) => v.env.kind === 'fixed')
-  const tourSteps = [
-    { title: t('tour.today'), body: t('tour.todayBody'), target: 'tour-hoy' },
-    { title: t('tour.add'), body: t('tour.addBody'), target: 'tour-gasto' },
-    {
-      title: t('tour.cap'),
-      body: tourCap ? t('tour.capBody', { name: tourCap.env.name }) : t('tour.capLater'),
-      target: tourCap ? `sobre-${tourCap.env.id}` : 'tour-new',
-    },
-    {
-      title: t('tour.bill'),
-      body: tourBill ? t('tour.billBody', { name: tourBill.env.name }) : t('tour.billLater'),
-      target: tourBill ? `sobre-${tourBill.env.id}` : 'tour-new',
-    },
-  ]
-
   return (
     <div>
       <header className="topbar">
@@ -131,7 +114,7 @@ export function Home({
         </div>
       </header>
 
-      <div id="tour-gasto" className={tourMark === 'tour-gasto' ? 'actions tour-target' : 'actions'}>
+      <div id="tour-gasto" className={tourOn === 'tour-gasto' ? 'actions tour-target' : 'actions'}>
         <button className="btn sage" onClick={() => onOpen({ name: 'add' })}>
           {t('home.spend')}
         </button>
@@ -183,7 +166,7 @@ export function Home({
         </div>
       )}
 
-      <section id="tour-hoy" className={tourMark === 'tour-hoy' ? 'hero tour-target' : 'hero'}>
+      <section id="tour-hoy" className={tourOn === 'tour-hoy' ? 'hero tour-target' : 'hero'}>
         <div className="label">{t('home.today')}</div>
         <div className="amount">{money(libreGuide?.hoy ?? 0)}</div>
         <div className="sub">
@@ -229,7 +212,7 @@ export function Home({
         </div>
       </section>
 
-      <section className="saldo">
+      <section id="tour-bank" className={tourOn === 'tour-bank' ? 'saldo tour-target' : 'saldo'}>
         <div className="tiny">{t('home.inAccount')}</div>
         <div className="saldo-amount">{money(onHand)}</div>
         <p className="muted" style={{ fontSize: 13 }}>
@@ -282,7 +265,6 @@ export function Home({
                 <EnvelopeCard
                   key={v.env.id}
                   view={v}
-                  marked={tourMark === `sobre-${v.env.id}`}
                   group={g.id}
                   folders={views.filter((c) => c.env.parentId === v.env.id)}
                   onOpen={() => onEnvelope(v.env.id)}
@@ -297,69 +279,12 @@ export function Home({
       <button
         type="button"
         id="tour-new"
-        className={tourMark === 'tour-new' ? 'btn ghost full tour-target' : 'btn ghost full'}
+        className={tourOn === 'tour-new' ? 'btn ghost full tour-target' : 'btn ghost full'}
         style={{ margin: '4px 0 24px' }}
         onClick={() => onOpen({ name: 'new-envelope' })}
       >
         {t('home.newEnvelope')}
       </button>
-      {state.settings.seenHomeTour === false && (
-        <HomeTour
-          steps={tourSteps}
-          onMark={setTourMark}
-          onSkip={() => {
-            setTourMark('')
-            updateSettings({ ...state.settings, seenHomeTour: true })
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-function HomeTour({
-  steps,
-  onMark,
-  onSkip,
-}: {
-  steps: { title: string; body: string; target: string }[]
-  onMark: (id: string) => void
-  onSkip: () => void
-}) {
-  const t = useT()
-  const [i, setI] = useState(0)
-  const page = steps[i]
-  const target = page?.target ?? ''
-  useEffect(() => {
-    if (!target) return
-    onMark(target)
-    document.getElementById(target)?.scrollIntoView({ block: 'center', behavior: 'instant' })
-  }, [target, onMark])
-  if (!page) return null
-  return (
-    <div className="tour">
-      <div className="tour-card stack">
-        <p className="tiny">
-          {i + 1} / {steps.length}
-        </p>
-        <h3 className="serif" style={{ fontSize: 24, margin: 0 }}>
-          {page.title}
-        </h3>
-        <p>{page.body}</p>
-        <button
-          type="button"
-          className="btn full sage"
-          onClick={() => {
-            if (i < steps.length - 1) setI(i + 1)
-            else onSkip()
-          }}
-        >
-          {i < steps.length - 1 ? t('common.next') : t('common.start')}
-        </button>
-        <button type="button" className="btn ghost full" onClick={onSkip}>
-          {t('common.skipTour')}
-        </button>
-      </div>
     </div>
   )
 }
@@ -377,7 +302,6 @@ function folderLine(
 
 function EnvelopeCard({
   view,
-  marked = false,
   group,
   folders = [],
   onOpen,
@@ -385,7 +309,6 @@ function EnvelopeCard({
   onSpend,
 }: {
   view: EnvelopeView
-  marked?: boolean
   group: HomeGroupId
   folders?: EnvelopeView[]
   onOpen: () => void
@@ -397,6 +320,7 @@ function EnvelopeCard({
   const locale = useLocale()
   const app = useAppState()
   const { env, total, pct, light, paid } = view
+  const marked = useTourTarget() === `sobre-${env.id}`
   const openCycle = [...app.cycles].reverse().find((c) => !c.closedAt)
   const closedHere = Boolean(openCycle && env.fundClosedInCycle === openCycle.id)
   const capDone = env.kind === 'cap' && env.capClosedInCycle === openCycle?.id

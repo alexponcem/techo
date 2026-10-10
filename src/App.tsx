@@ -8,6 +8,7 @@ import { Setup } from './Setup'
 import { AddSheet, CardPaySheet, CashSheet, EditSheet, IncomeSheet, MoveSheet, NewEnvelopeSheet } from './Sheets'
 import { ActivityScreen, StatsScreen } from './Stats'
 import { useAppState } from './store'
+import { HomeTour } from './tour'
 import { useLocale, useT } from './useT'
 import type { Screen, Sheet } from './types'
 
@@ -161,6 +162,15 @@ export default function App() {
           {t('nav.stats')}
         </button>
       </nav>
+
+      {state.settings.seenHomeTour === false && (
+        <HomeTour
+          screen={screen}
+          sheet={sheet}
+          onOpenAdd={(id) => openSheet({ name: 'add', envelopeId: id })}
+          onOpenEnvelope={openEnvelope}
+        />
+      )}
 
       {sheet?.name === 'add' && (
         <AddSheet

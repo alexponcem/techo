@@ -9,8 +9,30 @@ import { useLocale, useMoney, useT } from './useT'
 import type { PayMode } from './types'
 
 type Step = 'welcome' | 'pay' | 'save' | 'bill' | 'cap' | 'libre'
+type NamedDraft = { name: string; amount: string }
 
 const ORDER: Step[] = ['pay', 'save', 'bill', 'cap', 'libre']
+
+function draftAmount(row: NamedDraft): { name: string; amount: number } {
+  return { name: row.name.trim(), amount: parseEuros(row.amount) ?? 0 }
+}
+
+function rowCents(rows: NamedDraft[]): number {
+  return rows.reduce((sum, row) => sum + (parseEuros(row.amount) ?? 0), 0)
+}
+
+/** Vacío sigue igual. A medias avisa. Completo se suma a la lista. */
+function commitDraft(
+  rows: NamedDraft[],
+  name: string,
+  amount: string,
+): { rows: NamedDraft[]; partial: boolean } {
+  const trimmed = name.trim()
+  const cents = parseEuros(amount) ?? 0
+  if (!trimmed && !amount.trim()) return { rows, partial: false }
+  if (!trimmed || cents <= 0) return { rows, partial: true }
+  return { rows: [...rows, { name: trimmed, amount }], partial: false }
+}
 
 export function Setup() {
   const t = useT()
@@ -26,8 +48,10 @@ export function Setup() {
   )
   const [saveText, setSaveText] = useState('')
   const [savedText, setSavedText] = useState('')
+  const [bills, setBills] = useState<NamedDraft[]>([])
   const [billName, setBillName] = useState('')
   const [billAmount, setBillAmount] = useState('')
+  const [caps, setCaps] = useState<NamedDraft[]>([])
   const [capName, setCapName] = useState('')
   const [capAmount, setCapAmount] = useState('')
   const [error, setError] = useState('')
@@ -36,18 +60,14 @@ export function Setup() {
   const income = parseEuros(incomeText) ?? 0
   const savings = parseEuros(saveText) ?? 0
   const savingsOpening = parseEuros(savedText) ?? 0
-  const billCents = parseEuros(billAmount) ?? 0
-  const capCents = parseEuros(capAmount) ?? 0
   const plan = useMemo(
     () =>
       guidedPlan(locale, {
         savings,
-        billName,
-        billAmount: billCents,
-        capName,
-        capAmount: capCents,
+        bills: bills.map(draftAmount),
+        caps: caps.map(draftAmount),
       }),
-    [locale, savings, billName, billCents, capName, capCents],
+    [locale, savings, bills, caps],
   )
   const balanced = useMemo(() => withBalancedBuffer(plan, income, locale), [plan, income, locale])
   const plannedOthers = assigned(balanced.filter((e) => takesFromPay(e)))
@@ -266,26 +286,36 @@ export function Setup() {
         onBack={() => go('save')}
         primary={t('common.next')}
         onPrimary={() => {
-          const name = billName.trim()
-          if (!name) {
-            setError(t('guide.needName'))
+          const next = commitDraft(bills, billName, billAmount)
+          if (next.partial) {
+            setError(!billName.trim() ? t('guide.needName') : t('guide.needAmount'))
             return
           }
-          if (billCents <= 0) {
-            setError(t('guide.needAmount'))
-            return
-          }
-          if (overBy(savings + billCents)) return
-          go('cap')
-        }}
-        skip={t('guide.skip')}
-        onSkip={() => {
+          if (overBy(savings + rowCents(next.rows))) return
+          setBills(next.rows)
           setBillName('')
           setBillAmount('')
           go('cap')
         }}
+        skip={bills.length === 0 ? t('guide.skip') : undefined}
+        onSkip={
+          bills.length === 0
+            ? () => {
+                setBillName('')
+                setBillAmount('')
+                go('cap')
+              }
+            : undefined
+        }
         error={error}
       >
+        <p className="hint">{t('guide.billExample')}</p>
+        <NamedList
+          rows={bills}
+          onRemove={(index) => setBills(bills.filter((_, i) => i !== index))}
+          money={money}
+          removeLabel={t('guide.remove')}
+        />
         <label className="field">
           {t('setup.name')}
           <input
@@ -303,11 +333,31 @@ export function Setup() {
             placeholder="0"
           />
         </label>
+        <button
+          type="button"
+          className="btn full"
+          onClick={() => {
+            const next = commitDraft(bills, billName, billAmount)
+            if (next.partial) {
+              setError(!billName.trim() ? t('guide.needName') : t('guide.needAmount'))
+              return
+            }
+            if (next.rows === bills) return
+            if (overBy(savings + rowCents(next.rows))) return
+            setError('')
+            setBills(next.rows)
+            setBillName('')
+            setBillAmount('')
+          }}
+        >
+          {t('guide.add')}
+        </button>
       </Frame>
     )
   }
 
   if (step === 'cap') {
+    const already = savings + rowCents(bills)
     return (
       <Frame
         n={n}
@@ -316,26 +366,36 @@ export function Setup() {
         onBack={() => go('bill')}
         primary={t('common.next')}
         onPrimary={() => {
-          const name = capName.trim()
-          if (!name) {
-            setError(t('guide.needName'))
+          const next = commitDraft(caps, capName, capAmount)
+          if (next.partial) {
+            setError(!capName.trim() ? t('guide.needName') : t('guide.needAmount'))
             return
           }
-          if (capCents <= 0) {
-            setError(t('guide.needAmount'))
-            return
-          }
-          if (overBy(savings + (billName.trim() ? billCents : 0) + capCents)) return
-          go('libre')
-        }}
-        skip={t('guide.skip')}
-        onSkip={() => {
+          if (overBy(already + rowCents(next.rows))) return
+          setCaps(next.rows)
           setCapName('')
           setCapAmount('')
           go('libre')
         }}
+        skip={caps.length === 0 ? t('guide.skip') : undefined}
+        onSkip={
+          caps.length === 0
+            ? () => {
+                setCapName('')
+                setCapAmount('')
+                go('libre')
+              }
+            : undefined
+        }
         error={error}
       >
+        <p className="hint">{t('guide.capExample')}</p>
+        <NamedList
+          rows={caps}
+          onRemove={(index) => setCaps(caps.filter((_, i) => i !== index))}
+          money={money}
+          removeLabel={t('guide.remove')}
+        />
         <label className="field">
           {t('setup.name')}
           <input value={capName} onChange={(e) => setCapName(e.target.value)} placeholder={t('guide.capPh')} />
@@ -349,6 +409,25 @@ export function Setup() {
             placeholder="0"
           />
         </label>
+        <button
+          type="button"
+          className="btn full"
+          onClick={() => {
+            const next = commitDraft(caps, capName, capAmount)
+            if (next.partial) {
+              setError(!capName.trim() ? t('guide.needName') : t('guide.needAmount'))
+              return
+            }
+            if (next.rows === caps) return
+            if (overBy(already + rowCents(next.rows))) return
+            setError('')
+            setCaps(next.rows)
+            setCapName('')
+            setCapAmount('')
+          }}
+        >
+          {t('guide.add')}
+        </button>
       </Frame>
     )
   }
@@ -391,6 +470,34 @@ export function Setup() {
         </p>
       )}
     </Frame>
+  )
+}
+
+function NamedList({
+  rows,
+  onRemove,
+  money,
+  removeLabel,
+}: {
+  rows: NamedDraft[]
+  onRemove: (index: number) => void
+  money: (cents: number) => string
+  removeLabel: string
+}) {
+  if (rows.length === 0) return null
+  return (
+    <div className="stack">
+      {rows.map((row, index) => (
+        <div className="row" key={`${row.name}-${index}`}>
+          <span>
+            {row.name} · {money(parseEuros(row.amount) ?? 0)}
+          </span>
+          <button type="button" className="back" onClick={() => onRemove(index)}>
+            {removeLabel}
+          </button>
+        </div>
+      ))}
+    </div>
   )
 }
 

@@ -29,40 +29,46 @@ export function blankPlan(locale: Locale = 'es'): Envelope[] {
   ]
 }
 
-/** Plan mínimo del alta guiada: ahorro, y una cuota o un techo solo si traen nombre e importe. */
+export type GuidedAmount = { name: string; amount: number }
+
+function namedRows(
+  items: GuidedAmount[] | undefined,
+  kind: Envelope['kind'],
+  idBase: string,
+  emoji: string,
+  rhythm: Envelope['rhythm'],
+  splitDaily?: boolean,
+): Envelope[] {
+  const out: Envelope[] = []
+  for (const item of items ?? []) {
+    const name = item.name.trim()
+    if (!name || item.amount <= 0) continue
+    const n = out.length + 1
+    out.push({
+      id: n === 1 ? idBase : `${idBase}-${n}`,
+      name,
+      kind,
+      planned: item.amount,
+      emoji,
+      opening: 0,
+      rhythm,
+      ...(splitDaily === undefined ? {} : { splitDaily }),
+    })
+  }
+  return out
+}
+
+/** Ahorro, las cuotas y los techos que la persona nombró, y Libre. */
 export function guidedPlan(
   locale: Locale,
-  input: { savings: number; billName?: string; billAmount?: number; capName?: string; capAmount?: number },
+  input: { savings: number; bills?: GuidedAmount[]; caps?: GuidedAmount[] },
 ): Envelope[] {
   const base = blankPlan(locale)
   const rows: Envelope[] = base
     .filter((e) => e.kind === 'savings')
     .map((e) => ({ ...e, planned: Math.max(0, input.savings) }))
-  const billName = input.billName?.trim() ?? ''
-  if (billName && (input.billAmount ?? 0) > 0) {
-    rows.push({
-      id: 'cuota',
-      name: billName,
-      kind: 'fixed',
-      planned: input.billAmount ?? 0,
-      emoji: '🏠',
-      opening: 0,
-      rhythm: 'none',
-    })
-  }
-  const capName = input.capName?.trim() ?? ''
-  if (capName && (input.capAmount ?? 0) > 0) {
-    rows.push({
-      id: 'techo',
-      name: capName,
-      kind: 'cap',
-      planned: input.capAmount ?? 0,
-      emoji: '✦',
-      opening: 0,
-      rhythm: 'daily',
-      splitDaily: false,
-    })
-  }
+  rows.push(...namedRows(input.bills, 'fixed', 'cuota', '🏠', 'none'))
+  rows.push(...namedRows(input.caps, 'cap', 'techo', '✦', 'daily', false))
   const libre = base.find((e) => e.kind === 'buffer')
   return libre ? [...rows, libre] : rows
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTourTarget } from './tour'
 import { formatRange, formatStamp } from './dates'
 import {
   activeCycle,
@@ -71,6 +72,7 @@ export function EnvelopeScreen({
   const [moveAmount, setMoveAmount] = useState('')
   const [finishing, setFinishing] = useState(false)
   const [finishTo, setFinishTo] = useState('')
+  const tourOn = useTourTarget()
 
   if (!cycle || !env) {
     return (
@@ -560,7 +562,7 @@ export function EnvelopeScreen({
           .slice()
           .reverse()
           .map((t) => (
-            <div className="tx" key={t.id}>
+            <div className={tourOn === `mov-${t.id}` ? 'tx tour-target' : 'tx'} id={`mov-${t.id}`} key={t.id}>
               <div>
                 <div>{labelTx(t.type, t.envelopeId === id, tr)}</div>
                 <div className="muted">
