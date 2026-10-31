@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { suggestedNextPay, todayISO } from './dates'
-import { activeCycle, fundSpentSince, viewsFor } from './logic'
+import { activeCycle, cashOnHand, fundSpentSince, viewsFor } from './logic'
 import { parseEuros } from './money'
 import { downloadBackup, startNextCycle, useAppState } from './store'
 import { useMoney, useT } from './useT'
@@ -13,7 +13,6 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
   const cycle = activeCycle(state)
   const views = viewsFor(state)
   const [income, setIncome] = useState(cycle ? String(cycle.income / 100) : '')
-  const [cashText, setCashText] = useState('0')
   const [startedAt, setStartedAt] = useState(todayISO())
   const [expectedEndAt, setExpectedEndAt] = useState(() =>
     suggestedNextPay(todayISO(), state.settings.payMode, state.settings.fixedDay),
@@ -38,6 +37,9 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
   const loose = views
     .filter((v) => v.env.kind !== 'fund' && v.env.kind !== 'savings')
     .reduce((s, v) => s + Math.max(0, v.remaining), 0)
+  const wallet = Math.max(0, cashOnHand(state))
+  const looseSaved = Math.max(0, loose - wallet)
+  const cashFromSavings = Math.max(0, wallet - loose)
   const leftover = loose
   const leftoverTargets = [
     ...(savings ? [{ id: savings.env.id, label: `${savings.env.emoji} ${savings.env.name}` }] : []),
@@ -56,7 +58,7 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
 
   function close() {
     if (cents <= 0) return
-    startNextCycle(cents, startedAt, expectedEndAt, leftoverTo, parseEuros(cashText) ?? 0, fundChoice)
+    startNextCycle(cents, startedAt, expectedEndAt, leftoverTo, fundChoice)
     onBack()
   }
 
@@ -123,7 +125,7 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
       </div>
       <div className="hint">
         {t('cycle.savNow', { amount: money(savingsNow) })}
-        {t('cycle.left', { amount: money(loose) })}
+        {t('cycle.left', { amount: money(looseSaved) })}
         {keeping.length > 0
           ? t('cycle.fundsStay', {
               list: keeping.map((f) => `${f.env.name} ${money(f.remaining)}`).join(', '),
@@ -168,13 +170,12 @@ export function CycleScreen({ onBack }: { onBack: () => void }) {
         {t('cycle.pay')}
         <input inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} />
       </label>
-      <label className="field">
-        {t('setup.cash')}
-        <input inputMode="decimal" value={cashText} onChange={(e) => setCashText(e.target.value)} placeholder="0" />
-      </label>
-      <p className="muted" style={{ fontSize: 13 }}>
-        {t('setup.cashHint')}
-      </p>
+      {wallet > 0 && (
+        <p className="muted" style={{ fontSize: 13 }}>
+          {t('cycle.cashStays', { amount: money(wallet) })}
+          {cashFromSavings > 0 ? t('cycle.cashFromSav', { amount: money(cashFromSavings) }) : ''}
+        </p>
+      )}
       <label className="field">
         {t('cycle.when')}
         <input type="date" value={startedAt} onChange={(e) => onStartChange(e.target.value)} />

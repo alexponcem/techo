@@ -421,22 +421,36 @@ export function AddSheet({
             <p>
               {plan.fromParent && plan.parentId ? (
                 <>
-                  {t('sheet.fromFolder', {
+                  {t(pocket === 'credit' ? 'sheet.creditFromFolder' : 'sheet.fromFolder', {
                     amount: money(plan.fromParent),
                     parent: parentName,
                     name: chargeView?.env.name ?? '',
                   })}{' '}
                 </>
               ) : null}
-              {t('sheet.fromSavings', { amount: money(plan.fromSavings) })}
+              {t(pocket === 'credit' ? 'sheet.creditFromSavings' : 'sheet.fromSavings', {
+                amount: money(plan.fromSavings),
+              })}
             </p>
           ) : (
             <>
               {view && plan.overflow > 0 ? (
                 <p>{t('logic.noFit', { name: view.env.name, over: money(plan.overflow) })}</p>
               ) : null}
-              {plan.fromLibre > 0 && <p>{t('sheet.fromFree', { amount: money(plan.fromLibre) })}</p>}
-              {plan.fromSavings > 0 && <p>{t('sheet.freeShort', { amount: money(plan.fromSavings) })}</p>}
+              {plan.fromLibre > 0 && (
+                <p>
+                  {t(pocket === 'credit' ? 'sheet.creditFromFree' : 'sheet.fromFree', {
+                    amount: money(plan.fromLibre),
+                  })}
+                </p>
+              )}
+              {plan.fromSavings > 0 && (
+                <p>
+                  {t(pocket === 'credit' ? 'sheet.creditFreeShort' : 'sheet.freeShort', {
+                    amount: money(plan.fromSavings),
+                  })}
+                </p>
+              )}
             </>
           )}
           {!plan.possible && <p>{t('sheet.notEnough')}</p>}
@@ -476,7 +490,7 @@ export function AddSheet({
             : onlyParent
               ? t('sheet.save')
               : plan?.goalFromSavings
-                ? t('sheet.continueSav')
+                ? t(pocket === 'credit' ? 'sheet.continueSavLater' : 'sheet.continueSav')
                 : plan || paceOver
                   ? t('sheet.continue')
                   : t('sheet.save')}

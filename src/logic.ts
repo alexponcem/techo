@@ -12,7 +12,7 @@ import {
 } from './dates'
 import { t } from './i18n'
 import { euros } from './money'
-import type { AppState, Cycle, Envelope, EnvelopeKind, FundLife, Light, Locale, Rhythm, Tx } from './types'
+import type { AppState, Cycle, Envelope, EnvelopeKind, FundLife, Light, Locale, PendingCover, Rhythm, Tx } from './types'
 
 function loc(state: AppState): Locale {
   return state.settings.locale ?? 'es'
@@ -906,27 +906,32 @@ export function releaseUnmatchedCardPay(txs: Tx[]): Tx[] {
   return next
 }
 
+/** Efectivo del ciclo abierto: lo que había al abrirlo, más cajero, menos gastos en efectivo. */
+export function cashOnHand(state: AppState): number {
+  const cycle = activeCycle(state)
+  let cash = cycle?.openingCash ?? 0
+  if (!cycle) return cash
+  for (const tx of state.txs) {
+    if (tx.cycleId !== cycle.id) continue
+    if (tx.type === 'pocket') {
+      if (tx.pocketMove === 'to-cash') cash += tx.amount
+      if (tx.pocketMove === 'to-bank') cash -= tx.amount
+      continue
+    }
+    if (tx.pocket !== 'cash') continue
+    if (tx.type === 'expense') cash -= tx.amount
+    if (tx.type === 'income') cash += tx.amount
+  }
+  return cash
+}
+
 /** Banco = total − efectivo + lo que la tarjeta todavía no ha cobrado. */
 export function pocketSplit(
   state: AppState,
   total: number,
   afterFixed: number,
 ): { cash: number; bank: number; afterCash: number; afterBank: number; credit: number } {
-  const cycle = activeCycle(state)
-  let cash = cycle?.openingCash ?? 0
-  if (cycle) {
-    for (const tx of state.txs) {
-      if (tx.cycleId !== cycle.id) continue
-      if (tx.type === 'pocket') {
-        if (tx.pocketMove === 'to-cash') cash += tx.amount
-        if (tx.pocketMove === 'to-bank') cash -= tx.amount
-        continue
-      }
-      if (tx.pocket !== 'cash') continue
-      if (tx.type === 'expense') cash -= tx.amount
-      if (tx.type === 'income') cash += tx.amount
-    }
-  }
+  const cash = cashOnHand(state)
   const credit = creditFloat(state)
   return {
     cash,
@@ -1370,12 +1375,195 @@ export function envelopesAfterRemoval(
   return next
 }
 
-/** Apartado que pasa al ciclo siguiente. El dinero de un fondo se queda en ese fondo. */
+function coverSum(parts: PendingCover[] | undefined): number {
+  return (parts ?? []).reduce((s, part) => s + part.amount, 0)
+}
+
+/** Cobertura de crédito que aún no se ha traspasado, por el sobre del gasto. */
+export function unreleasedCoverByEnvelope(txs: Tx[]): Map<string, number> {
+  const released = new Map<string, number>()
+  for (const tx of txs) {
+    if (tx.type !== 'transfer' || !tx.settlesExpenseId || !tx.settleFromId || !tx.toEnvelopeId) continue
+    const exp = txs.find((row) => row.id === tx.settlesExpenseId)
+    const target = exp?.envelopeId
+    if (!target) continue
+    const sign = tx.envelopeId === tx.settleFromId && tx.toEnvelopeId === target ? tx.amount : -tx.amount
+    released.set(tx.settlesExpenseId, (released.get(tx.settlesExpenseId) ?? 0) + sign)
+  }
+  const hole = new Map<string, number>()
+  for (const tx of txs) {
+    if (tx.type !== 'expense' || !tx.pendingCover?.length) continue
+    const still = Math.max(0, coverSum(tx.pendingCover) - (released.get(tx.id) ?? 0))
+    if (still <= 0) continue
+    hole.set(tx.envelopeId, (hole.get(tx.envelopeId) ?? 0) + still)
+  }
+  return hole
+}
+
+/**
+ * Un gasto a crédito deja el sobre en el que se anotó más bajo, para no usarlo dos veces.
+ * Lo que faltaba y salía de otro sobre espera. Al pagar la tarjeta, esa parte se traspasa,
+ * primero los gastos más viejos. Si el gasto deja de ser crédito, sale en el acto.
+ * Los traspasos ya cerrados en un ciclo anterior no se reabren: el hueco viaja en el opening.
+ */
+export function reconcileCreditCovers(txs: Tx[], openCycleId: string | undefined): Tx[] {
+  const open = absorbOpenCreditCovers(txs, openCycleId)
+  const pairs = releasePairs(open, openCycleId)
+  let next = open
+  for (const pair of pairs) {
+    const updated = placeCoverRelease(next, openCycleId, pair)
+    if (updated !== next) next = updated
+  }
+  return next
+}
+
+function absorbOpenCreditCovers(txs: Tx[], openCycleId: string | undefined): Tx[] {
+  if (!openCycleId) return txs
+  let next = txs
+  for (const exp of txs) {
+    if (exp.type !== 'expense' || exp.pocket !== 'credit' || exp.cycleId !== openCycleId) continue
+    const siblings = next.filter(
+      (tx) =>
+        tx.type === 'transfer' &&
+        !tx.settlesExpenseId &&
+        tx.cycleId === exp.cycleId &&
+        tx.at === exp.at &&
+        tx.toEnvelopeId === exp.envelopeId,
+    )
+    if (siblings.length === 0) continue
+    const pending = [...(exp.pendingCover ?? [])]
+    for (const row of siblings) {
+      pending.push({ fromId: row.envelopeId, amount: row.amount, note: row.note })
+    }
+    const drop = new Set(siblings.map((row) => row.id))
+    next = next
+      .filter((tx) => !drop.has(tx.id))
+      .map((tx) => (tx.id === exp.id ? { ...tx, pendingCover: pending } : tx))
+  }
+  return next
+}
+
+interface CoverPair {
+  expenseId: string
+  fromId: string
+  toId: string
+  note: string
+  target: number
+}
+
+function releasePairs(txs: Tx[], _openCycleId: string | undefined): CoverPair[] {
+  let pool = 0
+  for (const tx of txs) {
+    if (tx.type === 'cardpay') pool += tx.amount
+    else if (tx.type === 'income' && tx.pocket === 'credit') pool += tx.amount
+  }
+  const pairs: CoverPair[] = []
+  const seen = new Set<string>()
+  const add = (pair: CoverPair) => {
+    const key = `${pair.expenseId}:${pair.fromId}`
+    if (seen.has(key)) return
+    seen.add(key)
+    pairs.push(pair)
+  }
+  const assign = (exp: Tx, release: number) => {
+    const parts = exp.pendingCover ?? []
+    let left = Math.max(0, release)
+    const amounts = new Map<string, number>()
+    for (const part of parts) {
+      const take = Math.min(part.amount, left)
+      left -= take
+      amounts.set(part.fromId, (amounts.get(part.fromId) ?? 0) + take)
+    }
+    for (const part of parts) {
+      add({
+        expenseId: exp.id,
+        fromId: part.fromId,
+        toId: exp.envelopeId,
+        note: part.note,
+        target: amounts.get(part.fromId) ?? 0,
+      })
+    }
+  }
+  for (const exp of txs) {
+    if (exp.type !== 'expense' || exp.pocket !== 'credit') continue
+    const cover = coverSum(exp.pendingCover)
+    const own = Math.max(0, exp.amount - cover)
+    const take = Math.min(pool, Math.max(0, exp.amount))
+    pool -= take
+    if (cover > 0) assign(exp, Math.max(0, take - own))
+  }
+  for (const exp of txs) {
+    if (exp.type !== 'expense' || exp.pocket === 'credit' || !exp.pendingCover?.length) continue
+    assign(exp, coverSum(exp.pendingCover))
+  }
+  for (const tx of txs) {
+    if (tx.type !== 'transfer' || !tx.settlesExpenseId || !tx.settleFromId || !tx.toEnvelopeId) continue
+    const key = `${tx.settlesExpenseId}:${tx.settleFromId}`
+    if (seen.has(key)) continue
+    const exp = txs.find((row) => row.id === tx.settlesExpenseId)
+    const toId = exp?.envelopeId ?? (tx.envelopeId === tx.settleFromId ? tx.toEnvelopeId : tx.envelopeId)
+    if (!toId) continue
+    add({
+      expenseId: tx.settlesExpenseId,
+      fromId: tx.settleFromId,
+      toId,
+      note: tx.note,
+      target: 0,
+    })
+  }
+  return pairs
+}
+
+function placeCoverRelease(txs: Tx[], openCycleId: string | undefined, pair: CoverPair): Tx[] {
+  const related = txs.filter((tx) => tx.settlesExpenseId === pair.expenseId && tx.settleFromId === pair.fromId)
+  let closed = 0
+  const openRows: Tx[] = []
+  for (const tx of related) {
+    const forward = tx.envelopeId === pair.fromId && tx.toEnvelopeId === pair.toId
+    const sign = forward ? tx.amount : -tx.amount
+    if (openCycleId && tx.cycleId === openCycleId) openRows.push(tx)
+    else closed += sign
+  }
+  const openTarget = pair.target - closed
+  if (openRows.length === 0 && openTarget === 0) return txs
+  if (openRows.length === 1 && openTarget !== 0) {
+    const row = openRows[0]
+    const forward = row.envelopeId === pair.fromId && row.toEnvelopeId === pair.toId
+    const reverse = row.envelopeId === pair.toId && row.toEnvelopeId === pair.fromId
+    if ((forward && row.amount === openTarget) || (reverse && row.amount === -openTarget)) return txs
+  }
+  if (!openCycleId) return txs
+  const drop = new Set(openRows.map((tx) => tx.id))
+  const out = txs.filter((tx) => !drop.has(tx.id))
+  if (openTarget === 0) return out
+  const forward = openTarget > 0
+  const existing = openRows[0]
+  out.push({
+    id: existing?.id ?? uid(),
+    cycleId: openCycleId,
+    at: existing?.at ?? new Date().toISOString(),
+    type: 'transfer',
+    envelopeId: forward ? pair.fromId : pair.toId,
+    toEnvelopeId: forward ? pair.toId : pair.fromId,
+    amount: Math.abs(openTarget),
+    note: pair.note || existing?.note || '',
+    settlesExpenseId: pair.expenseId,
+    settleFromId: pair.fromId,
+  })
+  return out
+}
+
+/**
+ * Apartado que pasa al ciclo siguiente. El dinero de un fondo se queda en ese fondo.
+ * El efectivo no entra en el destino del sobrante: se aparca en Libre y sigue siendo efectivo.
+ * Un hueco de crédito sin pagar también pasa, para que ese euro no aparezca dos veces.
+ */
 export function nextOpenings(
   envelopes: Envelope[],
   txs: Tx[],
   cycleId: string,
   destId: string,
+  holdCash = 0,
 ): Map<string, number> {
   const leftoverById = new Map<string, number>()
   for (const env of envelopes) leftoverById.set(env.id, env.opening + env.planned)
@@ -1394,14 +1582,51 @@ export function nextOpenings(
       }
     }
   }
+  const hole = unreleasedCoverByEnvelope(txs)
   let extra = 0
   const openings = new Map<string, number>()
   for (const env of envelopes) {
     const left = leftoverById.get(env.id) ?? 0
     if (carryKinds(env.kind)) openings.set(env.id, Math.max(0, left))
     else extra += Math.max(0, left)
+    const owed = hole.get(env.id) ?? 0
+    if (left < 0 && owed > 0) {
+      const carryNeg = Math.max(left, -owed)
+      openings.set(env.id, (openings.get(env.id) ?? 0) + carryNeg)
+    }
   }
-  openings.set(destId, (openings.get(destId) ?? 0) + extra)
+
+  const bufferId = envelopes.find((env) => env.kind === 'buffer')?.id
+  let spare = extra
+  let need = Math.max(0, holdCash)
+  const fromSpare = Math.min(need, spare)
+  spare -= fromSpare
+  need -= fromSpare
+  let parked = fromSpare
+  if (need > 0) {
+    const order: string[] = []
+    for (const env of envelopes) {
+      if (env.kind === 'savings') order.push(env.id)
+    }
+    const dest = envelopes.find((env) => env.id === destId)
+    if (dest && carryKinds(dest.kind) && !order.includes(destId)) order.push(destId)
+    const funds = envelopes
+      .filter((env) => env.kind === 'fund' && !order.includes(env.id))
+      .sort((a, b) => (openings.get(b.id) ?? 0) - (openings.get(a.id) ?? 0))
+    for (const fund of funds) order.push(fund.id)
+    for (const id of order) {
+      if (need <= 0) break
+      const have = Math.max(0, openings.get(id) ?? 0)
+      const take = Math.min(have, need)
+      if (take <= 0) continue
+      openings.set(id, (openings.get(id) ?? 0) - take)
+      need -= take
+      parked += take
+    }
+  }
+  const parkId = bufferId ?? destId
+  if (parked > 0) openings.set(parkId, (openings.get(parkId) ?? 0) + parked)
+  if (spare > 0) openings.set(destId, (openings.get(destId) ?? 0) + spare)
   return openings
 }
 
@@ -1431,6 +1656,25 @@ function orderedCycles(state: AppState): Cycle[] {
 
 function cycleStartedAt(state: AppState, cycleId: string): string | undefined {
   return state.cycles.find((c) => c.id === cycleId)?.startedAt
+}
+
+/**
+ * El fondo se cerró y, desde entonces, nadie ha anotado nada en él ni en sus carpetas.
+ * Inicio no lo muestra como carpeta activa. Al abrirlo sigue el resumen y el historial.
+ */
+export function fundDormant(state: AppState, envId: string): boolean {
+  const env = state.envelopes.find((row) => row.id === envId)
+  if (!env || env.kind !== 'fund' || !env.fundEpoch || !(env.fundLives?.length)) return false
+  const epochAt = cycleStartedAt(state, env.fundEpoch)
+  if (!epochAt) return false
+  const ids = new Set(envelopeTree(state.envelopes, envId))
+  for (const tx of state.txs) {
+    if (tx.type === 'pocket' || tx.type === 'cardpay') continue
+    const started = cycleStartedAt(state, tx.cycleId)
+    if (started && started < epochAt) continue
+    if (ids.has(tx.envelopeId) || (tx.toEnvelopeId && ids.has(tx.toEnvelopeId))) return false
+  }
+  return true
 }
 
 /** Gastado del fondo desde la última vez que se cerró, ciclos anteriores incluidos. */
@@ -1510,7 +1754,7 @@ export function fundCarryGap(state: AppState, envId: string): number {
   if (prev.fundSnap) {
     const snap = prev.fundSnap.find((s) => s.id === envId)
     if (!snap || !snap.carried) return 0
-    return Math.max(0, snap.left - env.opening)
+    return Math.max(0, snap.left - Math.max(0, env.opening))
   }
   const epochAt = env.fundEpoch ? cycleStartedAt(state, env.fundEpoch) : undefined
   let carried = 0

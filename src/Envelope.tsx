@@ -7,6 +7,7 @@ import {
   envelopeTree,
   envelopeView,
   fundCarryGap,
+  fundDormant,
   fundLifeTxs,
   fundPastCycles,
   fundSpentSince,
@@ -171,6 +172,19 @@ export function EnvelopeScreen({
             spent: money(view.week.spent),
             total: money(view.total),
           })}
+        </div>
+      )}
+      {env.kind === 'fund' && fundDormant(state, env.id) && (env.fundLives?.length ?? 0) > 0 && (
+        <div className="card stack">
+          <strong>
+            {tr('fund.closedSummary', {
+              spent: money(env.fundLives?.[env.fundLives.length - 1]?.spent ?? 0),
+              left: money(env.fundLives?.[env.fundLives.length - 1]?.left ?? 0),
+            })}
+          </strong>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {tr('fund.closedSummaryHint')}
+          </p>
         </div>
       )}
       {env.kind === 'fund' && lifeSpent > view.spent + childViews.reduce((s, c) => s + c.spent, 0) && (
@@ -351,24 +365,28 @@ export function EnvelopeScreen({
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>
                 {tr('fund.hint')}
               </p>
-              {childViews.map((child) => (
-                <button
-                  key={child.env.id}
-                  type="button"
-                  className="btn ghost full"
-                  onClick={() => onOpen(child.env.id)}
-                >
-                  {child.env.emoji} {child.env.name} ·{' '}
-                  {child.remaining > 0 && fundSpentSince(state, child.env.id) > 0
-                    ? tr('fund.both', {
-                        set: money(child.remaining),
-                        spent: money(fundSpentSince(state, child.env.id)),
-                      })
-                    : fundSpentSince(state, child.env.id) > 0
-                      ? tr('fund.spentBit', { amount: money(fundSpentSince(state, child.env.id)) })
-                      : tr('fund.setAside', { amount: money(child.remaining) })}
-                </button>
-              ))}
+              {childViews.map((child) => {
+                const quiet = fundDormant(state, child.env.id)
+                const life = child.env.fundLives?.[child.env.fundLives.length - 1]
+                const spent = quiet ? (life?.spent ?? 0) : fundSpentSince(state, child.env.id)
+                return (
+                  <button
+                    key={child.env.id}
+                    type="button"
+                    className="btn ghost full"
+                    onClick={() => onOpen(child.env.id)}
+                  >
+                    {child.env.emoji} {child.env.name} ·{' '}
+                    {quiet && life
+                      ? tr('fund.homeClosed', { spent: money(life.spent) })
+                      : child.remaining > 0 && spent > 0
+                        ? tr('fund.both', { set: money(child.remaining), spent: money(spent) })
+                        : spent > 0
+                          ? tr('fund.spentBit', { amount: money(spent) })
+                          : tr('fund.setAside', { amount: money(child.remaining) })}
+                  </button>
+                )
+              })}
               {childViews.length > 0 && view.remaining > 0 && (
                 <div className="stack" style={{ gap: 8 }}>
                   <strong>{tr('fund.moveTitle')}</strong>

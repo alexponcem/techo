@@ -96,11 +96,11 @@ export const TUTORIAL: GuidePage[] = [
     items: [
       {
         k: 'Fondos',
-        v: 'Salen del ahorro, no del diario. Al cerrar el ciclo, si el fondo continúa, lo apartado se suma. Si se cerró, lo que quede va con lo que sobró.',
+        v: 'Salen del ahorro, no del diario. Si continúa, lo apartado sigue en el fondo. Si se cerró, el dinero se queda ahí: sale de la vista previa de Inicio y el historial queda dentro.',
       },
       {
         k: 'Cerrar el ciclo',
-        v: 'Lo que sobró en techos y Libre puede ir al ahorro o a un fondo. Ese es el premio por aguantar el mes.',
+        v: 'Lo que sobró en techos y Libre puede ir al ahorro o a un fondo. El efectivo del bolsillo no: sigue en efectivo hasta que lo metas a la cuenta.',
       },
     ],
   },
@@ -210,11 +210,11 @@ const TUTORIAL_EN: GuidePage[] = [
     items: [
       {
         k: 'Goals',
-        v: 'They come from savings, not daily money. At close, a goal that continues adds up. If it closed, what’s left joins the leftover.',
+        v: 'They come from savings, not daily money. If it continues, what’s set aside stays in the goal. If it closed, the money stays there: it leaves the Home preview and the history stays inside.',
       },
       {
         k: 'Close the cycle',
-        v: 'What’s left in caps and Free can go to savings or a goal. That’s the prize for holding the line.',
+        v: 'What’s left in caps and Free can go to savings or a goal. Cash in your pocket does not: it stays cash until you move it to the account.',
       },
     ],
   },

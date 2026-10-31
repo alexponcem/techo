@@ -86,6 +86,22 @@ export interface Tx {
   pocket?: Pocket
   /** Solo type pocket: mueve entre banco y efectivo, sin tocar sobres. */
   pocketMove?: PocketMove
+  /**
+   * Cobertura que espera al pago de la tarjeta. El sobre del gasto ya bajó;
+   * estos traspasos no, hasta que el banco cobre.
+   */
+  pendingCover?: PendingCover[]
+  /** Este traspaso aplica una cobertura que esperaba al pago de la tarjeta. */
+  settlesExpenseId?: string
+  /** Sobre del que sale esa cobertura (ahorro, Libre o el fondo padre). */
+  settleFromId?: string
+}
+
+/** Parte de un gasto a crédito que saldrá de otro sobre al pagar la tarjeta. */
+export interface PendingCover {
+  fromId: string
+  amount: number
+  note: string
 }
 
 export type Locale = 'es' | 'en'

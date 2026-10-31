@@ -3,6 +3,7 @@ import {
   pocketSplit,
   cycleTxs,
   fundCarryGap,
+  fundDormant,
   fundSpentSince,
   homeGroupOf,
   homeGroups,
@@ -323,6 +324,9 @@ function EnvelopeCard({
   const marked = useTourTarget() === `sobre-${env.id}`
   const openCycle = [...app.cycles].reverse().find((c) => !c.closedAt)
   const closedHere = Boolean(openCycle && env.fundClosedInCycle === openCycle.id)
+  const dormant = env.kind === 'fund' && fundDormant(app, env.id)
+  const lastLife = env.fundLives?.[env.fundLives.length - 1]
+  const shownFolders = dormant ? [] : folders.filter((c) => !fundDormant(app, c.env.id))
   const capDone = env.kind === 'cap' && env.capClosedInCycle === openCycle?.id
   const ownPace = group === 'daily' && !capDone ? guideForEnvelope(app, view.env.id) : null
   const folderRemaining = folders.reduce((s, c) => s + c.remaining, 0)
@@ -349,16 +353,18 @@ function EnvelopeCard({
               ? t('home.savingsUsed', { amount: money(view.used) })
               : env.kind === 'fund'
                 ? `${
-                    remaining > 0 && spentLife > 0
-                      ? t('fund.both', { set: money(remaining), spent: money(spentLife) })
-                      : spentLife > 0
-                        ? t('fund.spentBit', { amount: money(spentLife) })
-                        : t('fund.setAside', { amount: money(remaining) })
+                    dormant && lastLife
+                      ? t('fund.homeClosed', { spent: money(lastLife.spent) })
+                      : remaining > 0 && spentLife > 0
+                        ? t('fund.both', { set: money(remaining), spent: money(spentLife) })
+                        : spentLife > 0
+                          ? t('fund.spentBit', { amount: money(spentLife) })
+                          : t('fund.setAside', { amount: money(remaining) })
                   }${
                     (env.cycleSetAside ?? 0) > 0
                       ? t('fund.eachBit', { amount: money(env.cycleSetAside ?? 0) })
                       : ''
-                  }${closedHere ? t('fund.closedBit') : ''}`
+                  }${closedHere && !dormant ? t('fund.closedBit') : ''}`
                 : week
                   ? `${t('home.weekLine', {
                       spent: money(week.spent),
@@ -375,19 +381,21 @@ function EnvelopeCard({
         <div className="remain">{money(remaining)}</div>
         <span className={`pill ${env.kind === 'fund' ? (remaining > 0 ? 'green' : light) : light}`}>
           {env.kind === 'fund'
-            ? remaining > 0
-              ? t('home.pillSet')
-              : spentLife > 0
-                ? t('home.pillFromSav')
-                : t('home.pillEmpty')
+            ? dormant
+              ? t('fund.closedPill')
+              : remaining > 0
+                ? t('home.pillSet')
+                : spentLife > 0
+                  ? t('home.pillFromSav')
+                  : t('home.pillEmpty')
             : pillLabel(view, t)}
         </span>
       </div>
       <div className={`bar ${capDone && remaining >= 0 ? '' : light}`}>
         <span style={{ width: `${barPct}%` }} />
       </div>
-      {folders.length > 0 &&
-        folders.map((c) => (
+      {shownFolders.length > 0 &&
+        shownFolders.map((c) => (
           <span key={c.env.id} className="muted" style={{ fontSize: 12, gridColumn: '1 / -1' }}>
             {c.env.emoji} {c.env.name} · {folderLine(t, money, c.remaining, fundSpentSince(app, c.env.id))}
             {openCycle && c.env.fundClosedInCycle === openCycle.id ? t('fund.closedBit') : ''}

@@ -188,8 +188,8 @@ const msg = {
   'sheet.cash': { es: 'Efectivo', en: 'Cash' },
   'sheet.credit': { es: 'Crédito', en: 'Credit' },
   'sheet.creditHint': {
-    es: 'El sobre baja ahora. El banco no baja hasta que pagues la tarjeta.',
-    en: 'The envelope drops now. The bank does not drop until you pay the card.',
+    es: 'El sobre baja ahora, para no usarlo dos veces. El banco no baja hasta que pagues la tarjeta. Si falta dinero, el ahorro, Libre o el fondo tampoco bajan hasta ese pago.',
+    en: 'The envelope drops now, so you don’t spend it twice. The bank does not drop until you pay the card. If money is short, savings, Free, or the goal wait for that payment too.',
   },
   'home.whenBillsLeave': { es: 'Cuando salgan las cuotas pendientes', en: 'When pending bills leave' },
   'home.billsLeft': {
@@ -580,27 +580,37 @@ const msg = {
   'fund.outBit': { es: 'salió {amount}', en: 'out {amount}' },
   'fund.askTitle': { es: 'Fondos el mes que viene', en: 'Goals next cycle' },
   'fund.askHint': {
-    es: 'Si continúa, el gasto sigue contando. Si se cerró, ese gasto pasa al historial y el mes que viene empieza de cero. Lo apartado se queda en el fondo.',
-    en: 'If it continues, spending keeps counting. If it closed, that spending goes to the history and next month starts at zero. What’s set aside stays in the goal.',
+    es: 'Si continúa, el gasto sigue contando. Si se cerró, el mes que viene sale de la vista previa de Inicio. Al abrirlo ves lo gastado y el historial. Lo apartado se queda en el fondo.',
+    en: 'If it continues, spending keeps counting. If it closed, next cycle it leaves the Home preview. Open it to see what was spent and the history. What’s set aside stays in the goal.',
   },
   'fund.continue': { es: 'Continúa', en: 'Continues' },
   'fund.closed': { es: 'Se cerró', en: 'Closed' },
   'fund.closeNow': { es: 'Cerrar este fondo', en: 'Close this goal' },
   'fund.closeHint': {
-    es: 'Inicio sigue mostrando el gasto hasta que acabe este ciclo. Después pasa al historial. El dinero apartado se queda en el fondo.',
-    en: 'Home keeps showing the spending until this cycle ends. Then it goes to the history. Money set aside stays in the goal.',
+    es: 'Inicio lo sigue mostrando hasta que acabe este ciclo. Después sale de la vista previa. Al abrirlo ves lo gastado y el historial. El dinero apartado se queda.',
+    en: 'Home keeps showing it until this cycle ends. Then it leaves the preview. Open it to see what was spent and the history. Money set aside stays.',
   },
   'fund.closedNow': {
-    es: 'Cerrado en este ciclo. En Inicio se sigue viendo hasta el próximo cobro.',
-    en: 'Closed this cycle. Home keeps showing it until the next payday.',
+    es: 'Cerrado en este ciclo. En Inicio se sigue viendo hasta el próximo cobro. Luego queda el resumen dentro del fondo.',
+    en: 'Closed this cycle. Home keeps showing it until the next payday. After that, the summary stays inside the goal.',
   },
   'fund.closedOk': {
-    es: 'Listo. El gasto se archiva al acabar el ciclo. Lo apartado se queda.',
-    en: 'Done. The spending is archived when the cycle ends. What’s set aside stays.',
+    es: 'Listo. Al acabar el ciclo sale de la vista previa. Lo apartado se queda y el historial queda dentro.',
+    en: 'Done. When the cycle ends it leaves the preview. What’s set aside stays, and the history stays inside.',
   },
   'fund.reopen': { es: 'Seguir con este fondo', en: 'Keep this goal going' },
   'fund.reopened': { es: 'Sigue abierto.', en: 'It’s open again.' },
   'fund.closedBit': { es: ' · cerrado este ciclo', en: ' · closed this cycle' },
+  'fund.closedPill': { es: 'Cerrado', en: 'Closed' },
+  'fund.homeClosed': { es: 'cerrado · gastado {spent}', en: 'closed · spent {spent}' },
+  'fund.closedSummary': {
+    es: 'Período cerrado: gastado {spent} · quedó {left}',
+    en: 'Closed period: spent {spent} · {left} left',
+  },
+  'fund.closedSummaryHint': {
+    es: 'El historial de ese período está más abajo, por si hay que comprobar un movimiento.',
+    en: 'That period’s history is further down, if you need to check a movement.',
+  },
   'fund.lives': { es: 'Historial del fondo', en: 'Goal history' },
   'fund.lifeLine': { es: 'gastado {spent} · quedó {left}', en: 'spent {spent} · {left} left' },
   'fund.already': {
@@ -742,8 +752,8 @@ const msg = {
   'sheet.cashOk': { es: 'Listo. El total no cambia.', en: 'Done. The total stays the same.' },
   'sheet.cardTitle': { es: 'Pagar la tarjeta', en: 'Pay the card' },
   'sheet.cardHint': {
-    es: 'Sale del banco y baja lo que debes. No es un gasto: el gasto ya quedó en su sobre.',
-    en: 'It leaves the bank and lowers what you owe. It is not a spend: the spend is already in its envelope.',
+    es: 'Sale del banco y baja lo que debes. No es un gasto nuevo. Si ese gasto se cubría con otro sobre, esa parte sale ahora.',
+    en: 'It leaves the bank and lowers what you owe. It is not a new spend. If another envelope was covering it, that part leaves now.',
   },
   'sheet.cardShort': { es: 'No debes tanto en la tarjeta.', en: 'You don’t owe that much on the card.' },
   'sheet.cardOk': { es: 'Listo. El banco baja y la tarjeta también.', en: 'Done. The bank and the card both go down.' },
@@ -838,6 +848,26 @@ const msg = {
     es: 'Se descontarán {amount} del ahorro.',
     en: '{amount} will come from savings.',
   },
+  'sheet.creditFromSavings': {
+    es: 'Esos {amount} saldrán del ahorro cuando pagues la tarjeta, no ahora.',
+    en: 'Those {amount} leave savings when you pay the card, not now.',
+  },
+  'sheet.creditFromFree': {
+    es: 'Esos {amount} saldrán de Libre cuando pagues la tarjeta, no ahora.',
+    en: 'Those {amount} leave Free when you pay the card, not now.',
+  },
+  'sheet.creditFreeShort': {
+    es: 'Libre no alcanza. Esos {amount} saldrán del ahorro cuando pagues la tarjeta.',
+    en: 'Free isn’t enough. Those {amount} leave savings when you pay the card.',
+  },
+  'sheet.creditFromFolder': {
+    es: '{amount} saldrán de {parent} cuando pagues la tarjeta. El gasto queda en {name}.',
+    en: '{amount} leave {parent} when you pay the card. The spend stays in {name}.',
+  },
+  'sheet.continueSavLater': {
+    es: 'Continuar, el ahorro espera al pago',
+    en: 'Continue, savings waits for the payment',
+  },
   'sheet.savLock': {
     es: 'Hace falta un motivo. Queda anotado.',
     en: 'A reason is required. It stays on the record.',
@@ -845,8 +875,8 @@ const msg = {
 
   'cycle.title': { es: 'Cerrar ciclo', en: 'Close cycle' },
   'cycle.lead': {
-    es: 'Lo que sobró en techos, cuotas y Libre va al sobre que elijas. En cada fondo dices si el gasto continúa o si ese período se cierra. El dinero apartado se queda en el fondo.',
-    en: 'What’s left in caps, bills and Free goes to the envelope you pick. For each goal you say if the spending continues or that period closes. Money set aside stays in the goal.',
+    es: 'Lo que sobró en techos, cuotas y Libre va al sobre que elijas. El efectivo del bolsillo se queda en efectivo. En cada fondo dices si el gasto continúa o si ese período se cierra. El dinero apartado se queda en el fondo.',
+    en: 'What’s left in caps, bills and Free goes to the envelope you pick. Cash in hand stays cash. For each goal you say if the spending continues or that period closes. Money set aside stays in the goal.',
   },
   'cycle.savNow': { es: 'Ahorro ahora: {amount}.', en: 'Savings now: {amount}.' },
   'cycle.left': { es: ' Residual de techos/cuotas/libre: {amount}.', en: ' Left in caps/bills/Free: {amount}.' },
@@ -862,6 +892,14 @@ const msg = {
     en: 'The new cycle is assigned from that total. Savings does not reset.',
   },
   'cycle.where': { es: '¿A dónde va lo que sobró?', en: 'Where does the leftover go?' },
+  'cycle.cashStays': {
+    es: 'Efectivo en el bolsillo: {amount}. Sigue siendo efectivo y no entra al ahorro. Solo deja de serlo si lo pasas a la cuenta.',
+    en: 'Cash in hand: {amount}. It stays cash and does not join savings. It only stops being cash if you move it to the account.',
+  },
+  'cycle.cashFromSav': {
+    es: ' De ese efectivo, {amount} deja de figurar en el ahorro, porque salió del banco y no volvió.',
+    en: ' Of that cash, {amount} leaves what savings shows now, because it left the bank and did not come back.',
+  },
   'cycle.pay': { es: 'Sueldo que acaba de entrar', en: 'Pay that just arrived' },
   'cycle.when': { es: 'Fecha en que llegó', en: 'Date it arrived' },
   'cycle.next': { es: 'Próximo sueldo estimado', en: 'Next payday (estimate)' },

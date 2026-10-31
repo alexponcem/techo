@@ -14,6 +14,8 @@ import {
   accountSnapshot,
   openDailyPace,
   creditFloat,
+  cashOnHand,
+  reconcileCreditCovers,
   releaseUnmatchedCardPay,
   pocketSplit,
   reassignTxs,
@@ -157,7 +159,9 @@ function load(): AppState {
       },
     })
     const paced = withFrozenDailyPace(migrated)
-    const txs = releaseUnmatchedCardPay(paced.txs)
+    const trimmed = releaseUnmatchedCardPay(paced.txs)
+    const cycleId = [...paced.cycles].reverse().find((c) => !c.closedAt)?.id
+    const txs = reconcileCreditCovers(trimmed, cycleId)
     const next = txs === paced.txs ? paced : { ...paced, txs }
     localStorage.setItem(KEY, JSON.stringify(next))
     return next
@@ -170,7 +174,9 @@ let state: AppState = load()
 const listeners = new Set<() => void>()
 
 function emit(next: AppState) {
-  const txs = releaseUnmatchedCardPay(next.txs)
+  const trimmed = releaseUnmatchedCardPay(next.txs)
+  const cycleId = [...next.cycles].reverse().find((c) => !c.closedAt)?.id
+  const txs = reconcileCreditCovers(trimmed, cycleId)
   const settled = txs === next.txs ? next : { ...next, txs }
   state = settled
   localStorage.setItem(KEY, JSON.stringify(settled))
@@ -276,41 +282,43 @@ export function coverAndSpend(input: {
   if (!cycle || input.amount <= 0) return
   const at = input.at ?? new Date().toISOString()
   const extra: Tx[] = []
+  const locale = localeOf(state)
+  const covers: { fromId: string; amount: number; note: string }[] = []
   if (input.fromParent && input.fromParent.amount > 0) {
-    extra.push({
-      id: uid(),
-      cycleId: cycle.id,
-      at,
-      type: 'transfer',
-      envelopeId: input.fromParent.id,
-      toEnvelopeId: input.envelopeId,
+    covers.push({
+      fromId: input.fromParent.id,
       amount: input.fromParent.amount,
-      note: t(localeOf(state), 'store.toFolder'),
+      note: t(locale, 'store.toFolder'),
     })
   }
   if (input.fromLibre && input.fromLibre.amount > 0) {
-    extra.push({
-      id: uid(),
-      cycleId: cycle.id,
-      at,
-      type: 'transfer',
-      envelopeId: input.fromLibre.id,
-      toEnvelopeId: input.envelopeId,
+    covers.push({
+      fromId: input.fromLibre.id,
       amount: input.fromLibre.amount,
-      note: t(localeOf(state), 'store.coveredFree'),
+      note: t(locale, 'store.coveredFree'),
     })
   }
   if (input.fromSavings && input.fromSavings.amount > 0) {
-    extra.push({
-      id: uid(),
-      cycleId: cycle.id,
-      at,
-      type: 'transfer',
-      envelopeId: input.fromSavings.id,
-      toEnvelopeId: input.envelopeId,
+    covers.push({
+      fromId: input.fromSavings.id,
       amount: input.fromSavings.amount,
-      note: t(localeOf(state), 'store.savNote', { reason: input.fromSavings.reason }),
+      note: t(locale, 'store.savNote', { reason: input.fromSavings.reason }),
     })
+  }
+  const waitsForCard = (input.pocket ?? 'card') === 'credit' && covers.length > 0
+  if (!waitsForCard) {
+    for (const cover of covers) {
+      extra.push({
+        id: uid(),
+        cycleId: cycle.id,
+        at,
+        type: 'transfer',
+        envelopeId: cover.fromId,
+        toEnvelopeId: input.envelopeId,
+        amount: cover.amount,
+        note: cover.note,
+      })
+    }
   }
   extra.push({
     id: uid(),
@@ -321,6 +329,7 @@ export function coverAndSpend(input: {
     amount: input.amount,
     note: input.note,
     pocket: input.pocket ?? 'card',
+    pendingCover: waitsForCard ? covers : undefined,
   })
   emit({ ...state, txs: [...state.txs, ...extra] })
 }
@@ -359,6 +368,7 @@ function coverSiblings(expense: Tx): Tx[] {
   return state.txs.filter(
     (t) =>
       t.type === 'transfer' &&
+      !t.settlesExpenseId &&
       t.cycleId === expense.cycleId &&
       t.at === expense.at &&
       t.toEnvelopeId === expense.envelopeId,
@@ -383,29 +393,42 @@ export function updateExpense(
   const tx = state.txs.find((t) => t.id === id)
   if (!tx || tx.type !== 'expense' || patch.amount <= 0) return
   const siblings = coverSiblings(tx)
-  const cover = siblings.reduce((s, t) => s + t.amount, 0)
+  const pendingList = tx.pendingCover ?? []
+  const pendingSum = pendingList.reduce((s, part) => s + part.amount, 0)
+  const siblingSum = siblings.reduce((s, t) => s + t.amount, 0)
+  const cover = pendingSum + siblingSum
   const fromOwn = Math.max(0, tx.amount - cover)
   const newCover = Math.max(0, patch.amount - fromOwn)
+  const pendingTarget = cover > 0 ? Math.round((pendingSum / cover) * newCover) : 0
+  const siblingTarget = newCover - pendingTarget
+  const scaledPending =
+    pendingTarget <= 0
+      ? undefined
+      : scaleParts(pendingList, pendingTarget).filter((part) => part.amount > 0)
   let txs = state.txs.map((t) =>
     t.id === id
-      ? { ...t, amount: patch.amount, note: patch.note, at: patch.at, pocket: patch.pocket ?? t.pocket }
+      ? {
+          ...t,
+          amount: patch.amount,
+          note: patch.note,
+          at: patch.at,
+          pocket: patch.pocket ?? t.pocket,
+          pendingCover: scaledPending,
+        }
       : t,
   )
-  if (newCover === 0) {
+  if (siblingTarget <= 0) {
     const drop = new Set(siblings.map((t) => t.id))
     txs = txs.filter((t) => !drop.has(t.id))
   } else if (siblings.length === 1) {
     const sid = siblings[0].id
-    txs = txs.map((t) => (t.id === sid ? { ...t, amount: newCover, at: patch.at } : t))
-  } else if (siblings.length > 1 && cover > 0) {
-    let assigned = 0
-    const amounts = siblings.map((s, i) => {
-      if (i === siblings.length - 1) return Math.max(0, newCover - assigned)
-      const part = Math.round((s.amount / cover) * newCover)
-      assigned += part
-      return part
-    })
-    const byId = new Map(siblings.map((s, i) => [s.id, amounts[i]]))
+    txs = txs.map((t) => (t.id === sid ? { ...t, amount: siblingTarget, at: patch.at } : t))
+  } else if (siblings.length > 1 && siblingSum > 0) {
+    const amounts = scaleParts(
+      siblings.map((s) => ({ amount: s.amount })),
+      siblingTarget,
+    )
+    const byId = new Map(siblings.map((s, i) => [s.id, amounts[i]?.amount ?? 0]))
     txs = txs.flatMap((t) => {
       const amount = byId.get(t.id)
       if (amount == null) return [t]
@@ -414,6 +437,19 @@ export function updateExpense(
     })
   }
   emit({ ...state, txs })
+}
+
+function scaleParts<T extends { amount: number }>(parts: T[], target: number): T[] {
+  if (parts.length === 0) return []
+  const total = parts.reduce((s, part) => s + part.amount, 0)
+  if (total <= 0) return parts.map((part) => ({ ...part, amount: 0 }))
+  let assigned = 0
+  return parts.map((part, i) => {
+    if (i === parts.length - 1) return { ...part, amount: Math.max(0, target - assigned) }
+    const next = Math.round((part.amount / total) * target)
+    assigned += next
+    return { ...part, amount: next }
+  })
 }
 
 export function markPaid(envelopeId: string, remaining: number) {
@@ -553,7 +589,6 @@ export function startNextCycle(
   startedAt: string,
   expectedEndAt?: string,
   leftoverToId?: string,
-  openingCash = 0,
   fundChoice: Record<string, 'continue' | 'close'> = {},
 ) {
   const current = activeCycle(state)
@@ -568,7 +603,8 @@ export function startNextCycle(
   for (const env of state.envelopes) {
     if (env.kind === 'fund' && env.fundClosedInCycle === current.id) choice[env.id] = 'close'
   }
-  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId)
+  const wallet = Math.max(0, cashOnHand(state))
+  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId, wallet)
   const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id)
   const cycleId = uid()
   const today = todayISO()
@@ -630,7 +666,7 @@ export function startNextCycle(
         income,
         fairDaily: pace.fairDaily,
         paceStartedAt: pace.paceStartedAt,
-        openingCash,
+        openingCash: wallet,
       },
     ],
   })
@@ -738,7 +774,7 @@ export function reopenCap(id: string): { ok: true } | { ok: false; error: string
   return { ok: true }
 }
 
-/** Cierra el fondo hoy. El gasto sigue en Inicio hasta que acabe este ciclo de cobro. */
+/** Cierra el fondo hoy. Inicio lo sigue mostrando hasta que acabe este ciclo de cobro. */
 export function closeFund(id: string): { ok: true } | { ok: false; error: string } {
   const cycle = activeCycle(state)
   const locale = localeOf(state)
