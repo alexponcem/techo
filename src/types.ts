@@ -95,6 +95,16 @@ export interface Tx {
   settlesExpenseId?: string
   /** Sobre del que sale esa cobertura (ahorro, Libre o el fondo padre). */
   settleFromId?: string
+  /**
+   * Cuánto de este movimiento ya sale del ahorro. El resto espera al pago de la tarjeta.
+   * Si falta, cuenta el importe entero.
+   */
+  counted?: number
+  /**
+   * Parte impagada que ya está reflejada en el opening del ahorro.
+   * Un cierre anterior la había restado; al pagar, ese opening baja. Así no se suma dos veces.
+   */
+  savingsRestored?: number
 }
 
 /** Parte de un gasto a crédito que saldrá de otro sobre al pagar la tarjeta. */

@@ -203,6 +203,13 @@ function RecentList({ cycleId }: { cycleId: string }) {
                 {(tx.type === 'expense' || tx.type === 'income') && (
                   <PocketChips value={paidWith} onChange={(next) => setTxPocket(tx.id, next)} />
                 )}
+                {tx.type === 'expense' &&
+                tx.pocket === 'credit' &&
+                env?.kind === 'savings' &&
+                tx.counted != null &&
+                tx.counted < tx.amount ? (
+                  <div className="muted">{t('tx.creditWaits', { amount: money(tx.amount - tx.counted) })}</div>
+                ) : null}
               </div>
               <div>
                 {sign}

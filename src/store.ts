@@ -13,11 +13,14 @@ import {
   nextOpenings,
   accountSnapshot,
   openDailyPace,
-  creditFloat,
+  creditOwed,
   cashOnHand,
+  carryUnpaidSavingsCredit,
+  holdSavingsCredit,
   reconcileCreditCovers,
   releaseUnmatchedCardPay,
   pocketSplit,
+  withoutTxs,
   reassignTxs,
   reportFor,
   splitPlanned,
@@ -159,10 +162,7 @@ function load(): AppState {
       },
     })
     const paced = withFrozenDailyPace(migrated)
-    const trimmed = releaseUnmatchedCardPay(paced.txs)
-    const cycleId = [...paced.cycles].reverse().find((c) => !c.closedAt)?.id
-    const txs = reconcileCreditCovers(trimmed, cycleId)
-    const next = txs === paced.txs ? paced : { ...paced, txs }
+    const next = settle(paced)
     localStorage.setItem(KEY, JSON.stringify(next))
     return next
   } catch {
@@ -170,14 +170,19 @@ function load(): AppState {
   }
 }
 
+function settle(next: AppState): AppState {
+  const trimmed = releaseUnmatchedCardPay(next.txs)
+  const cycleId = [...next.cycles].reverse().find((c) => !c.closedAt)?.id
+  const txs = reconcileCreditCovers(trimmed, cycleId)
+  const covered = txs === next.txs ? next : { ...next, txs }
+  return holdSavingsCredit(covered, cycleId)
+}
+
 let state: AppState = load()
 const listeners = new Set<() => void>()
 
 function emit(next: AppState) {
-  const trimmed = releaseUnmatchedCardPay(next.txs)
-  const cycleId = [...next.cycles].reverse().find((c) => !c.closedAt)?.id
-  const txs = reconcileCreditCovers(trimmed, cycleId)
-  const settled = txs === next.txs ? next : { ...next, txs }
+  const settled = settle(next)
   state = settled
   localStorage.setItem(KEY, JSON.stringify(settled))
   listeners.forEach((l) => l())
@@ -356,12 +361,13 @@ export function moveMoney(fromId: string, toId: string, amount: number, note: st
 }
 
 export function undoLast() {
-  if (state.txs.length === 0) return
-  emit({ ...state, txs: state.txs.slice(0, -1) })
+  const last = state.txs[state.txs.length - 1]
+  if (!last) return
+  emit(withoutTxs(state, new Set([last.id])))
 }
 
 export function removeTx(id: string) {
-  emit({ ...state, txs: state.txs.filter((t) => t.id !== id) })
+  emit(withoutTxs(state, new Set([id])))
 }
 
 function coverSiblings(expense: Tx): Tx[] {
@@ -383,7 +389,7 @@ export function removeExpense(id: string) {
     return
   }
   const drop = new Set([id, ...coverSiblings(tx).map((t) => t.id)])
-  emit({ ...state, txs: state.txs.filter((t) => !drop.has(t.id)) })
+  emit(withoutTxs(state, drop))
 }
 
 export function updateExpense(
@@ -599,13 +605,14 @@ export function startNextCycle(
   const locale = localeOf(state)
   const savingsId = state.envelopes.find((e) => e.kind === 'savings')?.id ?? 'ahorro'
   const destId = leftoverToId ?? savingsId
+  const carriedTxs = carryUnpaidSavingsCredit(state.txs, savingsId, current.id)
   const choice: Record<string, 'continue' | 'close'> = { ...fundChoice }
   for (const env of state.envelopes) {
     if (env.kind === 'fund' && env.fundClosedInCycle === current.id) choice[env.id] = 'close'
   }
   const wallet = Math.max(0, cashOnHand(state))
-  const openings = nextOpenings(state.envelopes, state.txs, current.id, destId, wallet)
-  const fundSnap = fundCloseSnap(state.envelopes, state.txs, current.id)
+  const openings = nextOpenings(state.envelopes, carriedTxs, current.id, destId, wallet)
+  const fundSnap = fundCloseSnap(state.envelopes, carriedTxs, current.id)
   const cycleId = uid()
   const today = todayISO()
   const lives = new Map<string, FundLife>()
@@ -643,6 +650,7 @@ export function startNextCycle(
   const pace = openDailyPace(envelopes, startedAt, end)
   emit({
     ...state,
+    txs: carriedTxs,
     template,
     envelopes,
     cycles: [
@@ -882,7 +890,7 @@ export function payCard(amount: number): { ok: true } | { ok: false; error: stri
   const locale = localeOf(state)
   if (!cycle) return { ok: false, error: t(locale, 'store.noCycle') }
   if (amount <= 0) return { ok: false, error: t(locale, 'logic.needAmt') }
-  if (amount > creditFloat(state)) return { ok: false, error: t(locale, 'sheet.cardShort') }
+  if (amount > creditOwed(state)) return { ok: false, error: t(locale, 'sheet.cardShort') }
   pushTx({
     type: 'cardpay',
     envelopeId: '',

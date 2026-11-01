@@ -117,15 +117,20 @@ export function cycleTxs(state: AppState, cycleId: string): Tx[] {
   return state.txs.filter((t) => t.cycleId === cycleId)
 }
 
+/** Importe que ya mueve el sobre. Un crédito del ahorro espera y solo cuenta lo pagado. */
+function applied(tx: Tx): number {
+  return tx.counted != null ? tx.counted : tx.amount
+}
+
 export function netFor(envId: string, txs: Tx[]): { spent: number; in: number; out: number } {
   let spent = 0
   let incoming = 0
   let outgoing = 0
   for (const t of txs) {
-    if (t.type === 'expense' && t.envelopeId === envId) spent += t.amount
+    if (t.type === 'expense' && t.envelopeId === envId) spent += applied(t)
     if (t.type === 'income' && t.envelopeId === envId) incoming += t.amount
-    if (t.type === 'transfer' && t.envelopeId === envId) outgoing += t.amount
-    if (t.type === 'transfer' && t.toEnvelopeId === envId) incoming += t.amount
+    if (t.type === 'transfer' && t.envelopeId === envId) outgoing += applied(t)
+    if (t.type === 'transfer' && t.toEnvelopeId === envId) incoming += applied(t)
   }
   return { spent, in: incoming, out: outgoing }
 }
@@ -869,8 +874,8 @@ export function accountSnapshot(views: EnvelopeView[]): {
   }
 }
 
-/** Lo que la tarjeta de crédito aún no ha cobrado del banco. Cuenta todos los ciclos. */
-export function creditFloat(state: AppState): number {
+/** Deuda completa de la tarjeta, también la que sigue dentro del ahorro. Cuenta todos los ciclos. */
+export function creditOwed(state: AppState): number {
   let owed = 0
   for (const tx of state.txs) {
     if (tx.type === 'expense' && tx.pocket === 'credit') owed += tx.amount
@@ -878,6 +883,32 @@ export function creditFloat(state: AppState): number {
     else if (tx.type === 'cardpay') owed -= tx.amount
   }
   return owed
+}
+
+/**
+ * Parte de la deuda que sigue dentro del ahorro. No se suma al banco:
+ * si no, el euro aparecería en el ahorro y otra vez en el total.
+ */
+export function savingsCreditHeld(state: AppState): number {
+  const savingsId = state.envelopes.find((e) => e.kind === 'savings')?.id
+  if (!savingsId) return 0
+  let held = 0
+  for (const tx of state.txs) {
+    if (tx.envelopeId !== savingsId) continue
+    if (tx.type === 'expense' && tx.pocket === 'credit') {
+      if (tx.counted != null) held += Math.max(0, tx.amount - tx.counted)
+      continue
+    }
+    if (tx.type !== 'transfer') continue
+    if (tx.counted != null) held += Math.max(0, tx.amount - tx.counted)
+    else if (tx.savingsRestored) held += Math.max(0, tx.savingsRestored)
+  }
+  return held
+}
+
+/** Lo que el banco todavía no ha soltado. La parte que sigue en el ahorro no entra aquí. */
+export function creditFloat(state: AppState): number {
+  return creditOwed(state) - savingsCreditHeld(state)
 }
 
 /** Si los pagos superan lo que sigue en crédito, recorta el pago más reciente. */
@@ -925,20 +956,21 @@ export function cashOnHand(state: AppState): number {
   return cash
 }
 
-/** Banco = total − efectivo + lo que la tarjeta todavía no ha cobrado. */
+/** Banco = total − efectivo + lo que la tarjeta ya sacó de un sobre y el banco aún no ha pagado. */
 export function pocketSplit(
   state: AppState,
   total: number,
   afterFixed: number,
 ): { cash: number; bank: number; afterCash: number; afterBank: number; credit: number } {
   const cash = cashOnHand(state)
-  const credit = creditFloat(state)
+  const owed = creditOwed(state)
+  const float = creditFloat(state)
   return {
     cash,
-    bank: total - cash + credit,
+    bank: total - cash + float,
     afterCash: cash,
-    afterBank: afterFixed - cash + credit,
-    credit,
+    afterBank: afterFixed - cash + float,
+    credit: owed,
   }
 }
 
@@ -1036,7 +1068,8 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
       partsMap.set(t.toEnvelopeId, (partsMap.get(t.toEnvelopeId) ?? 0) + t.amount)
     }
     if (t.type === 'expense' && t.envelopeId === savingsId) {
-      partsMap.set('otros', (partsMap.get('otros') ?? 0) + t.amount)
+      const take = t.counted != null ? t.counted : t.amount
+      if (take > 0) partsMap.set('otros', (partsMap.get('otros') ?? 0) + take)
     }
   }
   const savingsParts = [...partsMap.entries()]
@@ -1379,6 +1412,197 @@ function coverSum(parts: PendingCover[] | undefined): number {
   return (parts ?? []).reduce((s, part) => s + part.amount, 0)
 }
 
+/** Los pagos llenan primero los gastos a crédito más viejos. El pago puede ser de otro ciclo. */
+function allocateCredit(txs: Tx[]): Map<string, number> {
+  let pool = 0
+  for (const tx of txs) {
+    if (tx.type === 'cardpay') pool += tx.amount
+    else if (tx.type === 'income' && tx.pocket === 'credit') pool += tx.amount
+  }
+  const paid = new Map<string, number>()
+  for (const tx of txs) {
+    if (tx.type !== 'expense' || tx.pocket !== 'credit') continue
+    const take = Math.min(pool, Math.max(0, tx.amount))
+    pool -= take
+    paid.set(tx.id, take)
+  }
+  return paid
+}
+
+function sameStampCovers(txs: Tx[], exp: Tx): Tx[] {
+  return txs.filter(
+    (tx) =>
+      tx.type === 'transfer' &&
+      !tx.settlesExpenseId &&
+      tx.cycleId === exp.cycleId &&
+      tx.at === exp.at &&
+      tx.toEnvelopeId === exp.envelopeId,
+  )
+}
+
+/** De cada traspaso desde el ahorro, cuánto sigue impagado. */
+function unpaidSavingsCovers(exp: Tx, covers: Tx[], savingsId: string, paid: number): Map<string, number> {
+  const coverAll = covers.reduce((s, tx) => s + tx.amount, 0)
+  const own = Math.max(0, exp.amount - coverAll)
+  let release = Math.max(0, paid - own)
+  const unpaid = new Map<string, number>()
+  for (const tx of covers) {
+    const take = Math.min(tx.amount, release)
+    release -= take
+    if (tx.envelopeId === savingsId) unpaid.set(tx.id, tx.amount - take)
+  }
+  return unpaid
+}
+
+function dropHold(tx: Tx): Tx {
+  const rest = { ...tx }
+  delete rest.counted
+  delete rest.savingsRestored
+  return rest
+}
+
+/**
+ * Un gasto a crédito anotado en el ahorro no lo reduce hasta que la tarjeta se paga.
+ * Si un cierre anterior ya lo había restado, esa parte vuelve al opening una sola vez.
+ * Lo mismo con un traspaso del ahorro que cubría otro gasto a crédito en un ciclo cerrado.
+ */
+export function holdSavingsCredit(state: AppState, openCycleId: string | undefined): AppState {
+  const savingsId = state.envelopes.find((e) => e.kind === 'savings')?.id
+  if (!savingsId) return state
+  const paid = allocateCredit(state.txs)
+  const closed = (cycleId: string) => cycleId !== openCycleId
+  let delta = 0
+  let changed = false
+  const txs = state.txs.map((tx) => {
+    if (tx.type === 'expense' && tx.envelopeId === savingsId) {
+      if (tx.pocket !== 'credit') {
+        if (tx.counted == null && tx.savingsRestored == null) return tx
+        if (tx.savingsRestored) delta -= tx.savingsRestored
+        changed = true
+        return dropHold(tx)
+      }
+      const counted = Math.min(tx.amount, paid.get(tx.id) ?? 0)
+      const unpaid = tx.amount - counted
+      if (!closed(tx.cycleId)) {
+        if (tx.savingsRestored) delta -= tx.savingsRestored
+        if (tx.counted === counted && tx.savingsRestored == null) return tx
+        changed = true
+        const rest = { ...tx, counted }
+        delete rest.savingsRestored
+        return rest
+      }
+      const prev = tx.savingsRestored ?? 0
+      delta += unpaid - prev
+      if (tx.counted === counted && tx.savingsRestored === unpaid) return tx
+      changed = true
+      return { ...tx, counted, savingsRestored: unpaid }
+    }
+
+    if (tx.type !== 'transfer' || tx.settlesExpenseId || tx.envelopeId !== savingsId) return tx
+    const exp = state.txs.find(
+      (row) =>
+        row.type === 'expense' &&
+        row.pocket === 'credit' &&
+        row.cycleId === tx.cycleId &&
+        row.at === tx.at &&
+        row.envelopeId === tx.toEnvelopeId,
+    )
+    if (!exp || exp.envelopeId === savingsId) {
+      if (tx.counted == null && tx.savingsRestored == null) return tx
+      if (closed(tx.cycleId) && tx.savingsRestored) delta -= tx.savingsRestored
+      changed = true
+      return dropHold(tx)
+    }
+    const unpaid = unpaidSavingsCovers(exp, sameStampCovers(state.txs, exp), savingsId, paid.get(exp.id) ?? 0).get(
+      tx.id,
+    )
+    if (unpaid == null) return tx
+    const counted = tx.amount - unpaid
+    if (!closed(tx.cycleId)) {
+      if (tx.savingsRestored) delta -= tx.savingsRestored
+      if (tx.counted === counted && tx.savingsRestored == null) return tx
+      changed = true
+      const rest = { ...tx, counted }
+      delete rest.savingsRestored
+      return rest
+    }
+    const prev = tx.savingsRestored ?? 0
+    delta += unpaid - prev
+    if (tx.savingsRestored === unpaid && tx.counted == null) return tx
+    changed = true
+    const rest = { ...tx, savingsRestored: unpaid }
+    delete rest.counted
+    return rest
+  })
+  if (!changed && delta === 0) return state
+  const envelopes =
+    delta === 0
+      ? state.envelopes
+      : state.envelopes.map((e) => (e.id === savingsId ? { ...e, opening: e.opening + delta } : e))
+  return { ...state, txs: changed ? txs : state.txs, envelopes }
+}
+
+/**
+ * Al cerrar, el opening solo arrastra lo ya pagado. Se marca la parte impagada
+ * para que el siguiente arreglo no la sume otra vez.
+ */
+export function carryUnpaidSavingsCredit(txs: Tx[], savingsId: string | undefined, cycleId: string): Tx[] {
+  if (!savingsId) return txs
+  const paid = allocateCredit(txs)
+  let changed = false
+  const next = txs.map((tx) => {
+    if (tx.cycleId !== cycleId) return tx
+    if (tx.type === 'expense' && tx.pocket === 'credit' && tx.envelopeId === savingsId) {
+      const counted = Math.min(tx.amount, paid.get(tx.id) ?? 0)
+      const savingsRestored = tx.amount - counted
+      if (tx.counted === counted && tx.savingsRestored === savingsRestored) return tx
+      changed = true
+      return { ...tx, counted, savingsRestored }
+    }
+    if (
+      tx.type === 'transfer' &&
+      !tx.settlesExpenseId &&
+      tx.envelopeId === savingsId &&
+      tx.counted != null
+    ) {
+      const savingsRestored = Math.max(0, tx.amount - tx.counted)
+      if (tx.savingsRestored === savingsRestored) return tx
+      changed = true
+      return { ...tx, savingsRestored }
+    }
+    return tx
+  })
+  return changed ? next : txs
+}
+
+/** Quita movimientos. Si un cierre ya había restado un crédito del ahorro, ese dinero vuelve. */
+export function withoutTxs(state: AppState, ids: Set<string>): AppState {
+  const savingsId = state.envelopes.find((e) => e.kind === 'savings')?.id
+  const closed = new Set(state.cycles.filter((c) => c.closedAt).map((c) => c.id))
+  let delta = 0
+  if (savingsId) {
+    for (const tx of state.txs) {
+      if (!ids.has(tx.id) || !closed.has(tx.cycleId)) continue
+      const direct = tx.type === 'expense' && tx.pocket === 'credit' && tx.envelopeId === savingsId
+      const cover =
+        tx.type === 'transfer' &&
+        tx.envelopeId === savingsId &&
+        (tx.savingsRestored != null || tx.counted != null)
+      if (!direct && !cover) continue
+      if (tx.savingsRestored != null) delta += tx.amount - tx.savingsRestored
+      else if (tx.counted != null) delta += tx.counted
+      else if (direct) delta += tx.amount
+    }
+  }
+  const txs = state.txs.filter((tx) => !ids.has(tx.id))
+  if (delta === 0) return { ...state, txs }
+  return {
+    ...state,
+    txs,
+    envelopes: state.envelopes.map((e) => (e.id === savingsId ? { ...e, opening: e.opening + delta } : e)),
+  }
+}
+
 /** Cobertura de crédito que aún no se ha traspasado, por el sobre del gasto. */
 export function unreleasedCoverByEnvelope(txs: Tx[]): Map<string, number> {
   const released = new Map<string, number>()
@@ -1402,6 +1626,7 @@ export function unreleasedCoverByEnvelope(txs: Tx[]): Map<string, number> {
 
 /**
  * Un gasto a crédito deja el sobre en el que se anotó más bajo, para no usarlo dos veces.
+ * Si ese sobre es el ahorro, no baja hasta que la tarjeta se pague.
  * Lo que faltaba y salía de otro sobre espera. Al pagar la tarjeta, esa parte se traspasa,
  * primero los gastos más viejos. Si el gasto deja de ser crédito, sale en el acto.
  * Los traspasos ya cerrados en un ciclo anterior no se reabren: el hueco viaja en el opening.
@@ -1452,11 +1677,7 @@ interface CoverPair {
 }
 
 function releasePairs(txs: Tx[], _openCycleId: string | undefined): CoverPair[] {
-  let pool = 0
-  for (const tx of txs) {
-    if (tx.type === 'cardpay') pool += tx.amount
-    else if (tx.type === 'income' && tx.pocket === 'credit') pool += tx.amount
-  }
+  const paid = allocateCredit(txs)
   const pairs: CoverPair[] = []
   const seen = new Set<string>()
   const add = (pair: CoverPair) => {
@@ -1488,8 +1709,7 @@ function releasePairs(txs: Tx[], _openCycleId: string | undefined): CoverPair[] 
     if (exp.type !== 'expense' || exp.pocket !== 'credit') continue
     const cover = coverSum(exp.pendingCover)
     const own = Math.max(0, exp.amount - cover)
-    const take = Math.min(pool, Math.max(0, exp.amount))
-    pool -= take
+    const take = paid.get(exp.id) ?? 0
     if (cover > 0) assign(exp, Math.max(0, take - own))
   }
   for (const exp of txs) {
@@ -1570,15 +1790,17 @@ export function nextOpenings(
   for (const tx of txs) {
     if (tx.cycleId !== cycleId) continue
     if (tx.type === 'expense') {
-      leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) - tx.amount)
+      const take = tx.counted != null ? tx.counted : tx.amount
+      leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) - take)
     }
     if (tx.type === 'income') {
       leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) + tx.amount)
     }
     if (tx.type === 'transfer') {
-      leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) - tx.amount)
+      const take = tx.counted != null ? tx.counted : tx.amount
+      leftoverById.set(tx.envelopeId, (leftoverById.get(tx.envelopeId) ?? 0) - take)
       if (tx.toEnvelopeId) {
-        leftoverById.set(tx.toEnvelopeId, (leftoverById.get(tx.toEnvelopeId) ?? 0) + tx.amount)
+        leftoverById.set(tx.toEnvelopeId, (leftoverById.get(tx.toEnvelopeId) ?? 0) + take)
       }
     }
   }

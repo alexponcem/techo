@@ -587,6 +587,13 @@ export function EnvelopeScreen({
                   {formatStamp(t.at, locale)}
                   {t.note ? ` · ${displayNote(t.note, locale)}` : ''}
                 </div>
+                {env.kind === 'savings' &&
+                t.type === 'expense' &&
+                t.pocket === 'credit' &&
+                t.counted != null &&
+                t.counted < t.amount ? (
+                  <div className="muted">{tr('tx.creditWaits', { amount: money(t.amount - t.counted) })}</div>
+                ) : null}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div>{sign(t, id)}{money(t.amount)}</div>
