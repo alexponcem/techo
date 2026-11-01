@@ -87,8 +87,8 @@ export interface Tx {
   /** Solo type pocket: mueve entre banco y efectivo, sin tocar sobres. */
   pocketMove?: PocketMove
   /**
-   * Cobertura que espera al pago de la tarjeta. El sobre del gasto ya bajó;
-   * estos traspasos no, hasta que el banco cobre.
+   * Cobertura que espera al pago de la tarjeta. El sobre del gasto tampoco baja
+   * hasta ese pago; estos traspasos salen entonces.
    */
   pendingCover?: PendingCover[]
   /** Este traspaso aplica una cobertura que esperaba al pago de la tarjeta. */
@@ -96,13 +96,13 @@ export interface Tx {
   /** Sobre del que sale esa cobertura (ahorro, Libre o el fondo padre). */
   settleFromId?: string
   /**
-   * Cuánto de este movimiento ya sale del ahorro. El resto espera al pago de la tarjeta.
+   * Cuánto de este movimiento ya sale del sobre. El resto espera al pago de la tarjeta.
    * Si falta, cuenta el importe entero.
    */
   counted?: number
   /**
-   * Parte impagada que ya está reflejada en el opening del ahorro.
-   * Un cierre anterior la había restado; al pagar, ese opening baja. Así no se suma dos veces.
+   * Parte impagada que ya está en el opening: del sobre del gasto, o del ahorro si el
+   * traspaso salía de ahí. Un cierre anterior la había restado; al pagar, ese opening baja.
    */
   savingsRestored?: number
 }

@@ -697,7 +697,7 @@ export function IncomeSheet({ onClose }: { onClose: () => void }) {
       </label>
       <p className="tiny">{t('sheet.payWith')}</p>
       <PocketChips value={pocket} onChange={setPocket} />
-      {pocket === 'credit' ? <p className="muted" style={{ fontSize: 13 }}>{t('sheet.creditHint')}</p> : null}
+      {pocket === 'credit' ? <p className="muted" style={{ fontSize: 13 }}>{t('sheet.creditInHint')}</p> : null}
       <SelectEnv label={t('sheet.envelope')} value={envelopeId} views={views} onChange={setEnvelopeId} />
       <button className="btn full sage" disabled={!envelopeId || cents <= 0} onClick={save}>
         {t('sheet.incomeBtn')}

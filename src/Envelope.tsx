@@ -587,8 +587,7 @@ export function EnvelopeScreen({
                   {formatStamp(t.at, locale)}
                   {t.note ? ` · ${displayNote(t.note, locale)}` : ''}
                 </div>
-                {env.kind === 'savings' &&
-                t.type === 'expense' &&
+                {t.type === 'expense' &&
                 t.pocket === 'credit' &&
                 t.counted != null &&
                 t.counted < t.amount ? (

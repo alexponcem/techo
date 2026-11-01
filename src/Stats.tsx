@@ -205,7 +205,6 @@ function RecentList({ cycleId }: { cycleId: string }) {
                 )}
                 {tx.type === 'expense' &&
                 tx.pocket === 'credit' &&
-                env?.kind === 'savings' &&
                 tx.counted != null &&
                 tx.counted < tx.amount ? (
                   <div className="muted">{t('tx.creditWaits', { amount: money(tx.amount - tx.counted) })}</div>

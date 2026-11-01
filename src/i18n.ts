@@ -165,8 +165,8 @@ const msg = {
   'home.paydayGo': { es: 'Cerrar ciclo', en: 'Close cycle' },
   'home.cashMove': { es: 'Cajero', en: 'Cash machine' },
   'home.creditOwed': {
-    es: 'En la tarjeta de crédito debes {amount}. Ese dinero sigue en el banco.',
-    en: 'You owe {amount} on the credit card. That money is still in the bank.',
+    es: 'En la tarjeta de crédito debes {amount}. Ese dinero sigue en el banco y dentro de los sobres.',
+    en: 'You owe {amount} on the credit card. That money is still in the bank and inside the envelopes.',
   },
   'home.payCard': { es: 'Pagar tarjeta', en: 'Pay the card' },
   'home.inAccount': { es: 'Tu dinero ahora', en: 'Your money now' },
@@ -188,16 +188,20 @@ const msg = {
   'sheet.cash': { es: 'Efectivo', en: 'Cash' },
   'sheet.credit': { es: 'Crédito', en: 'Credit' },
   'sheet.creditHint': {
-    es: 'El sobre baja ahora, para no usarlo dos veces. El banco no baja hasta que pagues la tarjeta. Si falta dinero, el ahorro, Libre o el fondo tampoco bajan hasta ese pago.',
-    en: 'The envelope drops now, so you don’t spend it twice. The bank does not drop until you pay the card. If money is short, savings, Free, or the goal wait for that payment too.',
+    es: 'El sobre no baja hasta que pagues la tarjeta. Mientras, se ve cuánto debes. Si falta dinero, esa parte tampoco sale hasta ese pago.',
+    en: 'The envelope does not drop until you pay the card. Until then, you can see what you owe. If money is short, that part waits for the same payment.',
+  },
+  'sheet.creditInHint': {
+    es: 'Un abono a crédito baja lo que debes. No entra dinero nuevo al banco.',
+    en: 'A credit refund lowers what you owe. It does not add new money to the bank.',
   },
   'sheet.creditSavHint': {
-    es: 'El ahorro no baja hasta que pagues la tarjeta. Mientras, arriba se ve cuánto debes.',
-    en: 'Savings does not drop until you pay the card. Until then, the amount you owe stays on screen.',
+    es: 'Este sobre no baja hasta que pagues la tarjeta. Mientras, arriba se ve cuánto debes.',
+    en: 'This envelope does not drop until you pay the card. Until then, the amount you owe stays on screen.',
   },
   'tx.creditWaits': {
-    es: 'Aún no sale del ahorro ({amount})',
-    en: 'Still in savings until the card is paid ({amount})',
+    es: 'Aún no sale de este sobre ({amount})',
+    en: 'Still in this envelope ({amount})',
   },
   'home.whenBillsLeave': { es: 'Cuando salgan las cuotas pendientes', en: 'When pending bills leave' },
   'home.billsLeft': {
@@ -760,8 +764,8 @@ const msg = {
   'sheet.cashOk': { es: 'Listo. El total no cambia.', en: 'Done. The total stays the same.' },
   'sheet.cardTitle': { es: 'Pagar la tarjeta', en: 'Pay the card' },
   'sheet.cardHint': {
-    es: 'Sale del banco y baja lo que debes. No es un gasto nuevo. Si ese gasto se cubría con otro sobre, esa parte sale ahora. Si el gasto estaba en el ahorro, el ahorro baja ahora.',
-    en: 'It leaves the bank and lowers what you owe. It is not a new spend. If another envelope was covering it, that part leaves now. If the spend was on savings, savings drops now.',
+    es: 'Sale del banco y baja lo que debes. No es un gasto nuevo. El sobre de ese gasto baja ahora. Si lo cubría otro sobre, esa parte sale ahora.',
+    en: 'It leaves the bank and lowers what you owe. It is not a new spend. That envelope drops now. If another envelope was covering it, that part leaves now.',
   },
   'sheet.cardShort': { es: 'No debes tanto en la tarjeta.', en: 'You don’t owe that much on the card.' },
   'sheet.cardOk': { es: 'Listo. El banco baja y la tarjeta también.', en: 'Done. The bank and the card both go down.' },
@@ -920,8 +924,8 @@ const msg = {
   'stats.moved': { es: '{from} → {to}', en: '{from} → {to}' },
   'stats.noRecent': { es: 'Todavía no hay movimientos en este ciclo.', en: 'No activity in this cycle yet.' },
   'stats.creditFix': {
-    es: 'Si un gasto fue con crédito, márcalo aquí. El banco no baja hasta que pagues la tarjeta. Si está en el ahorro, el ahorro tampoco baja hasta ese pago.',
-    en: 'If a spend was on credit, mark it here. The bank does not drop until you pay the card. If it is on savings, savings waits for that payment too.',
+    es: 'Si un gasto fue con crédito, márcalo aquí. Ni el banco ni el sobre bajan hasta que pagues la tarjeta.',
+    en: 'If a spend was on credit, mark it here. Neither the bank nor the envelope drops until you pay the card.',
   },
   'stats.prev': { es: 'Meses anteriores', en: 'Previous cycles' },
   'stats.this': { es: 'Este ciclo', en: 'This cycle' },
