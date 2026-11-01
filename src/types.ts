@@ -60,6 +60,8 @@ export interface Cycle {
   income: number
   closedAt?: string
   spent?: number
+  /** El cierre guardó el dinero que salió, no el crédito todavía impagado. Los ciclos viejos no lo traen. */
+  spentIsOutflow?: boolean
   savedNet?: number
   savingsUsed?: number
   savingsGoal?: number

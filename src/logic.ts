@@ -1022,10 +1022,125 @@ function envMeta(state: AppState, id: string): Envelope | undefined {
   return state.envelopes.find((e) => e.id === id) ?? state.template.find((e) => e.id === id)
 }
 
+/**
+ * Dinero que salió en estos movimientos.
+ * Débito y efectivo cuentan al anotarlos. El crédito cuenta cuando se paga la tarjeta.
+ */
+export function cycleOutflow(txs: Tx[]): number {
+  let spent = 0
+  for (const tx of txs) {
+    if (tx.type === 'cardpay') spent += tx.amount
+    else if (tx.type === 'expense' && tx.pocket !== 'credit') spent += tx.amount
+  }
+  return spent
+}
+
+/**
+ * Los pagos de este ciclo llenan primero el crédito más viejo, aunque sea de otro ciclo.
+ * Lo que cae en un gasto de este ciclo cuenta ahí. El resto es deuda de ciclos anteriores.
+ */
+export function creditPaidThisCycle(
+  allTxs: Tx[],
+  cycleId: string,
+): { byExpense: Map<string, number>; older: number } {
+  const expenses: { id: string; cycleId: string; left: number }[] = []
+  for (const tx of allTxs) {
+    if (tx.type === 'expense' && tx.pocket === 'credit' && tx.amount > 0) {
+      expenses.push({ id: tx.id, cycleId: tx.cycleId, left: tx.amount })
+    }
+  }
+  const byExpense = new Map<string, number>()
+  let older = 0
+  for (const tx of allTxs) {
+    if (tx.type !== 'cardpay' || tx.amount <= 0) continue
+    let pool = tx.amount
+    let onThisCycle = 0
+    for (const exp of expenses) {
+      if (pool <= 0) break
+      if (exp.left <= 0) continue
+      const take = Math.min(pool, exp.left)
+      exp.left -= take
+      pool -= take
+      if (tx.cycleId === cycleId && exp.cycleId === cycleId) {
+        onThisCycle += take
+        byExpense.set(exp.id, (byExpense.get(exp.id) ?? 0) + take)
+      }
+    }
+    if (tx.cycleId === cycleId) older += tx.amount - onThisCycle
+  }
+  return { byExpense, older }
+}
+
+export interface CycleLine {
+  id: string
+  name: string
+  emoji: string
+  spent: number
+  remaining?: number
+}
+
+/** Por sobre: en un ciclo abierto, solo el dinero que ya salió. En uno cerrado, lo que se guardó al cerrar. */
+export function cycleLines(
+  state: AppState,
+  cycleId: string,
+  live: boolean,
+): { lines: CycleLine[]; olderCard: number } {
+  const txs = cycleTxs(state, cycleId)
+  const cycle = state.cycles.find((c) => c.id === cycleId)
+  // Un cierre nuevo marca spentIsOutflow. Uno viejo guardó la suma de los gastos, crédito incluido.
+  const paidBasis = live || cycle?.spentIsOutflow === true
+  const byId = new Map<string, number>()
+  let olderCard = 0
+  if (paidBasis) {
+    const paid = creditPaidThisCycle(state.txs, cycleId)
+    olderCard = paid.older
+    for (const tx of txs) {
+      if (tx.type !== 'expense') continue
+      const part = tx.pocket === 'credit' ? (paid.byExpense.get(tx.id) ?? 0) : tx.amount
+      if (part <= 0) continue
+      byId.set(tx.envelopeId, (byId.get(tx.envelopeId) ?? 0) + part)
+    }
+  } else {
+    for (const tx of txs) {
+      if (tx.type !== 'expense') continue
+      byId.set(tx.envelopeId, (byId.get(tx.envelopeId) ?? 0) + tx.amount)
+    }
+  }
+  const lines: CycleLine[] = []
+  if (live) {
+    const seen = new Set<string>()
+    for (const view of viewsFor(state)) {
+      const spent = byId.get(view.env.id) ?? 0
+      if (spent <= 0 && view.remaining === 0) continue
+      seen.add(view.env.id)
+      lines.push({
+        id: view.env.id,
+        name: view.env.name,
+        emoji: view.env.emoji,
+        spent,
+        remaining: view.remaining,
+      })
+    }
+    for (const [id, spent] of byId) {
+      if (seen.has(id) || spent <= 0) continue
+      const meta = envMeta(state, id)
+      lines.push({ id, name: meta?.name ?? id, emoji: meta?.emoji ?? '✦', spent })
+    }
+  } else {
+    for (const [id, spent] of byId) {
+      if (spent <= 0) continue
+      const meta = envMeta(state, id)
+      lines.push({ id, name: meta?.name ?? id, emoji: meta?.emoji ?? '✦', spent })
+    }
+  }
+  lines.sort((a, b) => b.spent - a.spent || (b.remaining ?? 0) - (a.remaining ?? 0))
+  return { lines, olderCard }
+}
+
 export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   const locale = loc(state)
   const txs = cycleTxs(state, cycle.id)
-  const spent = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const legacySpent = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const live = !cycle.closedAt
   const views = live ? viewsFor(state) : []
   const savings = views.find((v) => v.env.kind === 'savings')
@@ -1101,8 +1216,8 @@ export function reportFor(state: AppState, cycle: Cycle): CycleReport {
   const savingsStart = savings ? savings.env.opening : 0
   const savedNet = live
     ? savingsNow - savingsStart + leftover
-    : (cycle.savedNet ?? Math.max(0, cycle.income - spent))
-  const spentFinal = live ? spent : (cycle.spent ?? spent)
+    : (cycle.savedNet ?? Math.max(0, cycle.income - legacySpent))
+  const spentFinal = live ? cycleOutflow(txs) : (cycle.spent ?? legacySpent)
   const income = cycle.income
   const kept = Math.max(0, income - spentFinal)
   const spendPct = income > 0 ? Math.round((spentFinal / income) * 100) : 0

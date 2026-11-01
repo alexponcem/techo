@@ -394,10 +394,14 @@ export function removeExpense(id: string) {
 
 export function updateExpense(
   id: string,
-  patch: { amount: number; note: string; at: string; pocket?: Pocket },
+  patch: { amount: number; note: string; at: string; pocket?: Pocket; envelopeId?: string },
 ) {
   const tx = state.txs.find((t) => t.id === id)
   if (!tx || tx.type !== 'expense' || patch.amount <= 0) return
+  const nextEnvelope =
+    patch.envelopeId && state.envelopes.some((e) => e.id === patch.envelopeId)
+      ? patch.envelopeId
+      : tx.envelopeId
   const siblings = coverSiblings(tx)
   const pendingList = tx.pendingCover ?? []
   const pendingSum = pendingList.reduce((s, part) => s + part.amount, 0)
@@ -415,6 +419,7 @@ export function updateExpense(
     t.id === id
       ? {
           ...t,
+          envelopeId: nextEnvelope,
           amount: patch.amount,
           note: patch.note,
           at: patch.at,
@@ -423,12 +428,14 @@ export function updateExpense(
         }
       : t,
   )
+  const retarget = (t: Tx): Tx =>
+    t.toEnvelopeId === tx.envelopeId ? { ...t, toEnvelopeId: nextEnvelope } : t
   if (siblingTarget <= 0) {
     const drop = new Set(siblings.map((t) => t.id))
     txs = txs.filter((t) => !drop.has(t.id))
   } else if (siblings.length === 1) {
     const sid = siblings[0].id
-    txs = txs.map((t) => (t.id === sid ? { ...t, amount: siblingTarget, at: patch.at } : t))
+    txs = txs.map((t) => (t.id === sid ? retarget({ ...t, amount: siblingTarget, at: patch.at }) : t))
   } else if (siblings.length > 1 && siblingSum > 0) {
     const amounts = scaleParts(
       siblings.map((s) => ({ amount: s.amount })),
@@ -439,8 +446,15 @@ export function updateExpense(
       const amount = byId.get(t.id)
       if (amount == null) return [t]
       if (amount <= 0) return []
-      return [{ ...t, amount, at: patch.at }]
+      return [retarget({ ...t, amount, at: patch.at })]
     })
+  }
+  if (nextEnvelope !== tx.envelopeId) {
+    txs = txs.map((t) =>
+      t.type === 'transfer' && t.settlesExpenseId === id && t.toEnvelopeId === tx.envelopeId
+        ? { ...t, toEnvelopeId: nextEnvelope }
+        : t,
+    )
   }
   emit({ ...state, txs })
 }
@@ -660,6 +674,7 @@ export function startNextCycle(
               ...c,
               closedAt: todayISO(),
               spent: snap.spent,
+              spentIsOutflow: true,
               savedNet: snap.savedNet,
               savingsUsed: snap.savingsUsed,
               savingsGoal: snap.savingsGoal,

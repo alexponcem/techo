@@ -219,6 +219,11 @@ export function Home({
         <p className="muted" style={{ fontSize: 13 }}>
           {t('home.inAccountHint', { bank: money(pockets.bank), cash: money(pockets.cash) })}
         </p>
+        {pockets.cash > 0 && libreEnv ? (
+          <p className="muted" style={{ fontSize: 13 }}>
+            {t('home.cashInside', { cash: money(pockets.cash), name: libreEnv.name })}
+          </p>
+        ) : null}
         {snap.unpaidTotal > 0 ? (
           <div className="saldo-next">
             <div className="row">

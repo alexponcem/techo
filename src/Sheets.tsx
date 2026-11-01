@@ -524,7 +524,9 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
   const [pocket, setPocket] = useState<Pocket>(
     tx?.pocket === 'cash' || tx?.pocket === 'credit' ? tx.pocket : 'card',
   )
-  const editKind = state.envelopes.find((e) => e.id === tx?.envelopeId)?.kind
+  const [envelopeId, setEnvelopeId] = useState(tx?.envelopeId ?? '')
+  const views = viewsFor(state)
+  const editKind = state.envelopes.find((e) => e.id === envelopeId)?.kind
   const onSavings = editKind === 'savings'
 
   if (!tx || tx.type !== 'expense') {
@@ -544,7 +546,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
 
   function save() {
     if (cents <= 0) return
-    updateExpense(txId, { amount: cents, note, at: stampEdited(day, savedAt), pocket })
+    updateExpense(txId, { amount: cents, note, at: stampEdited(day, savedAt), pocket, envelopeId })
     onClose()
   }
 
@@ -592,6 +594,7 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
           onChange={(e) => setSpendDay(clampDay(e.target.value || todayISO(), minDay, maxDay))}
         />
       </label>
+      <SelectEnv label={t('sheet.envelope')} value={envelopeId} views={views} onChange={setEnvelopeId} />
       <label className="field">
         {t('sheet.note')}
         <input value={note} onChange={(e) => setNote(e.target.value)} />

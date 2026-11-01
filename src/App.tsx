@@ -65,7 +65,7 @@ export default function App() {
   }
 
   const envelopeId = screen.name === 'envelope' ? screen.id : ''
-  const pinTop = envelopeId || (screen.name === 'activity' ? 'activity' : '')
+  const pinTop = envelopeId || (screen.name === 'activity' || screen.name === 'stats' ? screen.name : '')
   useEffect(() => {
     if (!pinTop) return
     const apply = () => window.scrollTo(0, 0)
@@ -128,7 +128,9 @@ export default function App() {
         />
       )}
       {screen.name === 'cycle' && <CycleScreen onBack={backHome} />}
-      {screen.name === 'activity' && <ActivityScreen />}
+      {screen.name === 'activity' && (
+        <ActivityScreen onEdit={(txId) => openSheet({ name: 'edit', txId })} />
+      )}
       {screen.name === 'stats' && <StatsScreen />}
 
       <nav className="tabbar">
