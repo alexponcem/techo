@@ -105,6 +105,11 @@ export interface Tx {
    * traspaso salía de ahí. Un cierre anterior la había restado; al pagar, ese opening baja.
    */
   savingsRestored?: number
+  /**
+   * Parte impagada de un gasto a crédito en un fondo que ya se movió al opening del ahorro.
+   * El fondo deja de mostrarla como apartado. Al pagar, baja el ahorro.
+   */
+  parkedOnSavings?: number
 }
 
 /** Parte de un gasto a crédito que saldrá de otro sobre al pagar la tarjeta. */

@@ -199,9 +199,17 @@ const msg = {
     es: 'Este sobre no baja hasta que pagues la tarjeta. Mientras, arriba se ve cuánto debes.',
     en: 'This envelope does not drop until you pay the card. Until then, the amount you owe stays on screen.',
   },
+  'sheet.creditFundHint': {
+    es: 'El fondo baja ahora: ese apartado ya se usó. El dinero espera en el ahorro hasta que pagues la tarjeta. La suma de los sobres no cambia.',
+    en: 'The goal drops now: that set-aside is already used. The money waits in savings until you pay the card. The envelope total does not change.',
+  },
   'tx.creditWaits': {
     es: 'Aún no sale de este sobre ({amount})',
     en: 'Still in this envelope ({amount})',
+  },
+  'tx.creditFundWaits': {
+    es: 'Espera en el ahorro hasta pagar la tarjeta ({amount})',
+    en: 'Waiting in savings until the card is paid ({amount})',
   },
   'home.whenBillsLeave': { es: 'Cuando salgan las cuotas pendientes', en: 'When pending bills leave' },
   'home.billsLeft': {
@@ -924,8 +932,8 @@ const msg = {
   'stats.moved': { es: '{from} → {to}', en: '{from} → {to}' },
   'stats.noRecent': { es: 'Todavía no hay movimientos en este ciclo.', en: 'No activity in this cycle yet.' },
   'stats.creditFix': {
-    es: 'Si un gasto fue con crédito, márcalo aquí. Ni el banco ni el sobre bajan hasta que pagues la tarjeta.',
-    en: 'If a spend was on credit, mark it here. Neither the bank nor the envelope drops until you pay the card.',
+    es: 'Si un gasto fue con crédito, márcalo aquí. El total no baja hasta que pagues la tarjeta. Si era un fondo, ese apartado espera en el ahorro.',
+    en: 'If a spend was on credit, mark it here. The total does not drop until you pay the card. On a goal, that set-aside waits in savings.',
   },
   'stats.prev': { es: 'Meses anteriores', en: 'Previous cycles' },
   'stats.this': { es: 'Este ciclo', en: 'This cycle' },

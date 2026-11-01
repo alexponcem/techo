@@ -589,8 +589,13 @@ export function EnvelopeScreen({
                 </div>
                 {t.type === 'expense' &&
                 t.pocket === 'credit' &&
-                t.counted != null &&
-                t.counted < t.amount ? (
+                (t.parkedOnSavings ?? 0) > 0 ? (
+                  <div className="muted">{tr('tx.creditFundWaits', { amount: money(t.parkedOnSavings ?? 0) })}</div>
+                ) : t.type === 'expense' &&
+                  t.pocket === 'credit' &&
+                  env?.kind !== 'fund' &&
+                  t.counted != null &&
+                  t.counted < t.amount ? (
                   <div className="muted">{tr('tx.creditWaits', { amount: money(t.amount - t.counted) })}</div>
                 ) : null}
               </div>

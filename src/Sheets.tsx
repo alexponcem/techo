@@ -321,7 +321,13 @@ export function AddSheet({
       <PocketChips value={pocket} onChange={setPocket} />
       {pocket === 'credit' ? (
         <p className="muted" style={{ fontSize: 13 }}>
-          {t(isSavings ? 'sheet.creditSavHint' : 'sheet.creditHint')}
+          {t(
+            isSavings
+              ? 'sheet.creditSavHint'
+              : selectedEnv?.kind === 'fund'
+                ? 'sheet.creditFundHint'
+                : 'sheet.creditHint',
+          )}
         </p>
       ) : null}
       {recentEnvelopes.length > 0 && (
@@ -518,7 +524,8 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
   const [pocket, setPocket] = useState<Pocket>(
     tx?.pocket === 'cash' || tx?.pocket === 'credit' ? tx.pocket : 'card',
   )
-  const onSavings = state.envelopes.find((e) => e.id === tx?.envelopeId)?.kind === 'savings'
+  const editKind = state.envelopes.find((e) => e.id === tx?.envelopeId)?.kind
+  const onSavings = editKind === 'savings'
 
   if (!tx || tx.type !== 'expense') {
     return (
@@ -551,7 +558,9 @@ export function EditSheet({ txId, onClose }: { txId: string; onClose: () => void
       <PocketChips value={pocket} onChange={setPocket} />
       {pocket === 'credit' ? (
         <p className="muted" style={{ fontSize: 13 }}>
-          {t(onSavings ? 'sheet.creditSavHint' : 'sheet.creditHint')}
+          {t(
+            onSavings ? 'sheet.creditSavHint' : editKind === 'fund' ? 'sheet.creditFundHint' : 'sheet.creditHint',
+          )}
         </p>
       ) : null}
       <p className="tiny">{t('sheet.when')}</p>

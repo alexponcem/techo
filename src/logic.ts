@@ -12,7 +12,19 @@ import {
 } from './dates'
 import { t } from './i18n'
 import { euros } from './money'
-import type { AppState, Cycle, Envelope, EnvelopeKind, FundLife, Light, Locale, PendingCover, Rhythm, Tx } from './types'
+import type {
+  AppState,
+  Cycle,
+  Envelope,
+  EnvelopeKind,
+  FundLife,
+  FundSnap,
+  Light,
+  Locale,
+  PendingCover,
+  Rhythm,
+  Tx,
+} from './types'
 
 function loc(state: AppState): Locale {
   return state.settings.locale ?? 'es'
@@ -949,13 +961,17 @@ export function cashOnHand(state: AppState): number {
   return cash
 }
 
-/** Banco = total − efectivo + la deuda que ya salió de un sobre y el banco aún no ha pagado. */
+/**
+ * Banco = total − efectivo + la deuda que ya salió de un sobre y el banco aún no ha pagado.
+ * El efectivo no baja de 0: un gasto en efectivo por encima de lo anotado ya redujo los sobres,
+ * y el banco no debe quedar por encima de esa suma.
+ */
 export function pocketSplit(
   state: AppState,
   total: number,
   afterFixed: number,
 ): { cash: number; bank: number; afterCash: number; afterBank: number; credit: number } {
-  const cash = cashOnHand(state)
+  const cash = Math.max(0, cashOnHand(state))
   const owed = creditOwed(state)
   const float = creditFloat(state)
   return {
@@ -1451,7 +1467,49 @@ function dropHold(tx: Tx): Tx {
   const rest = { ...tx }
   delete rest.counted
   delete rest.savingsRestored
+  delete rest.parkedOnSavings
   return rest
+}
+
+function coverBooked(exp: Tx, txs: Tx[]): number {
+  let stamped = 0
+  for (const tx of sameStampCovers(txs, exp)) stamped += tx.amount
+  return coverSum(exp.pendingCover) + stamped
+}
+
+/** Lo que el fondo puso de su dinero y la tarjeta todavía no ha pagado. */
+function unpaidOwnPortion(exp: Tx, txs: Tx[], paidAmount: number): number {
+  const own = Math.max(0, exp.amount - coverBooked(exp, txs))
+  return Math.max(0, own - paidAmount)
+}
+
+/**
+ * Saldo del fondo antes de aparcar este gasto.
+ * El crédito del ciclo abierto cuenta solo lo ya pagado: si `counted` aún no está
+ * guardado, el importe entero no puede restar, o el primer guardado no aparca nada.
+ */
+function fundCashBeforePark(
+  state: AppState,
+  id: string,
+  openCycleId: string | undefined,
+  extraOpening: number,
+  paid: Map<string, number>,
+): number {
+  const env = state.envelopes.find((e) => e.id === id)
+  if (!env) return 0
+  const mine = openCycleId ? state.txs.filter((tx) => tx.cycleId === openCycleId) : []
+  let spent = 0
+  let incoming = 0
+  let outgoing = 0
+  for (const t of mine) {
+    if (t.type === 'expense' && t.envelopeId === id) {
+      spent += t.pocket === 'credit' ? Math.min(t.amount, paid.get(t.id) ?? 0) : applied(t)
+    }
+    if (t.type === 'income' && t.envelopeId === id) incoming += t.amount
+    if (t.type === 'transfer' && t.envelopeId === id) outgoing += applied(t)
+    if (t.type === 'transfer' && t.toEnvelopeId === id) incoming += applied(t)
+  }
+  return env.opening + extraOpening + env.planned + incoming - outgoing - spent
 }
 
 /** Parte impagada que corresponde al sobre del gasto. La cobertura del ahorro va aparte. */
@@ -1483,12 +1541,62 @@ export function holdSavingsCredit(state: AppState, openCycleId: string | undefin
   const txs = state.txs.map((tx) => {
     if (tx.type === 'expense') {
       if (tx.pocket !== 'credit') {
-        if (tx.counted == null && tx.savingsRestored == null) return tx
+        const park = tx.parkedOnSavings ?? 0
+        if (tx.counted == null && tx.savingsRestored == null && park === 0) return tx
         bump(delta, tx.envelopeId, -(tx.savingsRestored ?? 0))
+        if (park && savingsId) {
+          bump(delta, savingsId, -park)
+          if (!closed(tx.cycleId)) bump(delta, tx.envelopeId, park)
+        }
         changed = true
         return dropHold(tx)
       }
       const counted = Math.min(tx.amount, paid.get(tx.id) ?? 0)
+      const envKind = state.envelopes.find((e) => e.id === tx.envelopeId)?.kind
+      if (envKind === 'fund' && savingsId) {
+        const unpaidOwn = unpaidOwnPortion(tx, state.txs, counted)
+        const prevPark = tx.parkedOnSavings ?? null
+        const already = prevPark ?? 0
+        const isClosed = closed(tx.cycleId)
+        let nextPark = unpaidOwn
+        if (!isClosed || prevPark != null || tx.savingsRestored != null) {
+          const visible = fundCashBeforePark(
+            state,
+            tx.envelopeId,
+            openCycleId,
+            delta.get(tx.envelopeId) ?? 0,
+            paid,
+          )
+          nextPark = Math.min(unpaidOwn, Math.max(0, visible + already))
+        }
+        const own = Math.max(0, tx.amount - coverBooked(tx, state.txs))
+        const prevCoverOut = Math.max(0, (tx.counted ?? 0) - own)
+        const nextCoverOut = Math.max(0, counted - own)
+        const coverShift = isClosed ? prevCoverOut - nextCoverOut : 0
+        if (
+          tx.counted === counted &&
+          prevPark === nextPark &&
+          tx.savingsRestored == null &&
+          coverShift === 0
+        ) {
+          return tx
+        }
+        if (prevPark == null) {
+          if (!isClosed || tx.savingsRestored != null) bump(delta, tx.envelopeId, -nextPark)
+          bump(delta, savingsId, nextPark)
+        } else if (!isClosed) {
+          bump(delta, tx.envelopeId, -(nextPark - already))
+          bump(delta, savingsId, nextPark - already)
+        } else {
+          bump(delta, savingsId, nextPark - already)
+          if (nextPark > already) bump(delta, tx.envelopeId, -(nextPark - already))
+        }
+        if (coverShift) bump(delta, tx.envelopeId, coverShift)
+        changed = true
+        const rest = { ...tx, counted, parkedOnSavings: nextPark }
+        delete rest.savingsRestored
+        return rest
+      }
       const onEnvelope = heldOnEnvelope(tx, state.txs, savingsId, counted)
       if (!closed(tx.cycleId)) {
         if (tx.counted === counted && tx.savingsRestored == null) return tx
@@ -1588,7 +1696,24 @@ export function withoutTxs(state: AppState, ids: Set<string>): AppState {
   const closed = new Set(state.cycles.filter((c) => c.closedAt).map((c) => c.id))
   const delta = new Map<string, number>()
   for (const tx of state.txs) {
-    if (!ids.has(tx.id) || !closed.has(tx.cycleId)) continue
+    if (!ids.has(tx.id)) continue
+    const fundCredit =
+      tx.type === 'expense' &&
+      tx.pocket === 'credit' &&
+      (tx.parkedOnSavings != null ||
+        state.envelopes.find((e) => e.id === tx.envelopeId)?.kind === 'fund')
+    if (fundCredit && tx.type === 'expense') {
+      const park = tx.parkedOnSavings ?? 0
+      if (savingsId && park) bump(delta, savingsId, -park)
+      if (closed.has(tx.cycleId)) {
+        const own = Math.max(0, tx.amount - coverBooked(tx, state.txs))
+        bump(delta, tx.envelopeId, own)
+      } else if (park) {
+        bump(delta, tx.envelopeId, park)
+      }
+      continue
+    }
+    if (!closed.has(tx.cycleId)) continue
     if (tx.type === 'expense' && tx.pocket === 'credit') {
       let already = tx.savingsRestored ?? 0
       if (savingsId) {
@@ -2010,7 +2135,7 @@ export function fundCarryGap(state: AppState, envId: string): number {
   if (prev.fundSnap) {
     const snap = prev.fundSnap.find((s) => s.id === envId)
     if (!snap || !snap.carried) return 0
-    return Math.max(0, snap.left - Math.max(0, env.opening))
+    return unexplainedFundGap(state, env, prev, snap)
   }
   const epochAt = env.fundEpoch ? cycleStartedAt(state, env.fundEpoch) : undefined
   let carried = 0
@@ -2018,10 +2143,68 @@ export function fundCarryGap(state: AppState, envId: string): number {
     if (!cycle.closedAt || cycle.id === active.id) continue
     if (cycle.startedAt > prev.startedAt) continue
     if (epochAt && cycle.startedAt < epochAt) continue
-    const n = netFor(envId, state.txs.filter((tx) => tx.cycleId === cycle.id))
-    carried = Math.max(0, carried + n.in - n.out - n.spent)
+    const mine = state.txs.filter((tx) => tx.cycleId === cycle.id)
+    const n = netFor(envId, mine)
+    let parked = 0
+    for (const tx of mine) {
+      if (tx.type === 'expense' && tx.envelopeId === envId) parked += tx.parkedOnSavings ?? 0
+    }
+    carried = Math.max(0, carried + n.in - n.out - n.spent - parked)
   }
   return Math.max(0, carried - env.opening)
+}
+
+/**
+ * Lo que el cierre apuntó de más: un crédito que ya se pagó, un apartado que pasó al ahorro,
+ * o efectivo que se aparcó en Libre. Eso no se vuelve a traer.
+ */
+function unexplainedFundGap(state: AppState, env: Envelope, prev: Cycle, snap: FundSnap): number {
+  const missing = Math.max(0, snap.left - Math.max(0, env.opening))
+  if (missing <= 0) return 0
+  const mine = state.txs.filter((tx) => tx.cycleId === prev.id)
+  const spentNow = netFor(env.id, mine).spent
+  let explained = Math.max(0, spentNow - snap.spent)
+  for (const tx of mine) {
+    if (tx.type === 'expense' && tx.envelopeId === env.id) explained += tx.parkedOnSavings ?? 0
+  }
+  explained += cashParkedFromFund(state, env.id)
+  return Math.max(0, missing - explained)
+}
+
+function cashParkedFromFund(state: AppState, envId: string): number {
+  const active = activeCycle(state)
+  const wallet = Math.max(0, active?.openingCash ?? 0)
+  if (!active || wallet <= 0) return 0
+  const libre = state.envelopes.find((e) => e.kind === 'buffer')
+  const savings = state.envelopes.find((e) => e.kind === 'savings')
+  if (!libre || libre.opening < wallet) return 0
+  if ((savings?.opening ?? 0) > 0) return 0
+  const ordered = orderedCycles(state)
+  const prev = [...ordered].reverse().find((c) => c.closedAt && c.id !== active.id)
+  if (!prev?.fundSnap) return 0
+  const shorts: { id: string; short: number }[] = []
+  for (const snap of prev.fundSnap) {
+    if (!snap.carried) continue
+    const row = state.envelopes.find((e) => e.id === snap.id)
+    if (!row) continue
+    const mine = state.txs.filter((tx) => tx.cycleId === prev.id)
+    const spentNow = netFor(snap.id, mine).spent
+    let explained = Math.max(0, spentNow - snap.spent)
+    for (const tx of mine) {
+      if (tx.type === 'expense' && tx.envelopeId === snap.id) explained += tx.parkedOnSavings ?? 0
+    }
+    const missing = Math.max(0, snap.left - Math.max(0, row.opening) - explained)
+    if (missing > 0) shorts.push({ id: snap.id, short: missing })
+  }
+  shorts.sort((a, b) => b.short - a.short)
+  let left = wallet
+  for (const row of shorts) {
+    const take = Math.min(row.short, left)
+    if (row.id === envId) return take
+    left -= take
+    if (left <= 0) return 0
+  }
+  return 0
 }
 
 export interface FundPastRow {

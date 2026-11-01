@@ -205,8 +205,13 @@ function RecentList({ cycleId }: { cycleId: string }) {
                 )}
                 {tx.type === 'expense' &&
                 tx.pocket === 'credit' &&
-                tx.counted != null &&
-                tx.counted < tx.amount ? (
+                (tx.parkedOnSavings ?? 0) > 0 ? (
+                  <div className="muted">{t('tx.creditFundWaits', { amount: money(tx.parkedOnSavings ?? 0) })}</div>
+                ) : tx.type === 'expense' &&
+                  tx.pocket === 'credit' &&
+                  env?.kind !== 'fund' &&
+                  tx.counted != null &&
+                  tx.counted < tx.amount ? (
                   <div className="muted">{t('tx.creditWaits', { amount: money(tx.amount - tx.counted) })}</div>
                 ) : null}
               </div>
